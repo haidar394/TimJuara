@@ -865,11 +865,40 @@ export async function createTask(taskData: {
   }
 
   if (isSupabaseConfigured && supabase) {
-    const { data, error } = await supabase
+    let { data, error } = await supabase
       .from('tasks')
       .insert(cleanData)
       .select()
       .single();
+
+    // Fallback cerdas: Jika skema tabel tasks di Supabase belum memiliki kolom review (completed_by / review_notes / task_link),
+    // otomatis retry dengan menyisipkan hanya kolom-kolom inti agar penambahan tugas tidak gagal!
+    if (error && (
+      error.message.includes('completed_by') || 
+      error.message.includes('review_notes') || 
+      error.message.includes('task_link')
+    )) {
+      const fallbackData: any = {
+        team_id: cleanData.team_id,
+        title: cleanData.title,
+        description: cleanData.description,
+        status: cleanData.status,
+        assigned_to: cleanData.assigned_to,
+        deadline: cleanData.deadline,
+        created_by: cleanData.created_by,
+      };
+
+      const retryRes = await supabase
+        .from('tasks')
+        .insert(fallbackData)
+        .select()
+        .single();
+
+      if (!retryRes.error) {
+        data = retryRes.data;
+        error = null;
+      }
+    }
 
     if (error) {
       console.error('Error creating task in Supabase:', error);

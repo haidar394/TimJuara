@@ -81,6 +81,11 @@ CREATE TABLE IF NOT EXISTS public.tasks (
 CREATE INDEX IF NOT EXISTS idx_tasks_team_id ON public.tasks(team_id);
 CREATE INDEX IF NOT EXISTS idx_tasks_status ON public.tasks(status);
 
+-- Pastikan kolom baru tetap ada jika tabel tasks dibuat dari skrip versi lama
+ALTER TABLE public.tasks ADD COLUMN IF NOT EXISTS task_link TEXT DEFAULT '';
+ALTER TABLE public.tasks ADD COLUMN IF NOT EXISTS completed_by UUID REFERENCES public.profiles(id) ON DELETE SET NULL;
+ALTER TABLE public.tasks ADD COLUMN IF NOT EXISTS review_notes TEXT DEFAULT '';
+
 
 -- 6. Tabel Materi & Hasil Riset (100% Hemat Kuota via Google Drive / Link)
 CREATE TABLE IF NOT EXISTS public.research_materials (
