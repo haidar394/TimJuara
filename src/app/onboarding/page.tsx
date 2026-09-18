@@ -649,13 +649,6 @@ function OnboardingContent() {
                       <span className="form-hint">Tanyakan username tim kepada ketua atau rekan satu kelompok Anda.</span>
                     </div>
 
-                    <div style={{ background: '#f8fafc', padding: 14, borderRadius: 'var(--radius-md)', border: '1px solid var(--surface-border)', marginBottom: 20 }}>
-                      <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 6, margin: 0 }}>
-                        <Sparkles size={14} color="#4f46e5" />
-                        Untuk mencoba demo, Anda bisa mengetik: <code>garuda-2026</code>
-                      </p>
-                    </div>
-
                     <button
                       type="submit"
                       disabled={submitting}
