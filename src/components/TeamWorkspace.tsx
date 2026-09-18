@@ -1628,25 +1628,30 @@ export default function TeamWorkspace() {
                     <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: 14 }}>
                       Email utama yang digunakan untuk masuk (login) ke akun TimJuara Anda.
                     </p>
-                    <form onSubmit={handleUpdateEmail} style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-                      <div style={{ flex: 1, minWidth: 260 }}>
-                        <input
-                          type="email"
-                          required
-                          placeholder="nama@email.com"
-                          value={profileEmail}
-                          onChange={(e) => setProfileEmail(e.target.value)}
-                          className="form-input"
-                        />
+                    <form onSubmit={handleUpdateEmail} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                      <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+                        <div style={{ flex: 1, minWidth: 260 }}>
+                          <input
+                            type="email"
+                            required
+                            placeholder="nama@email.com"
+                            value={profileEmail}
+                            onChange={(e) => setProfileEmail(e.target.value)}
+                            className="form-input"
+                          />
+                        </div>
+                        <button
+                          type="submit"
+                          disabled={savingEmail}
+                          className="btn btn-primary"
+                          style={{ whiteSpace: 'nowrap' }}
+                        >
+                          {savingEmail ? 'Menyimpan...' : 'Perbarui Email'}
+                        </button>
                       </div>
-                      <button
-                        type="submit"
-                        disabled={savingEmail}
-                        className="btn btn-primary"
-                        style={{ whiteSpace: 'nowrap' }}
-                      >
-                        {savingEmail ? 'Menyimpan...' : 'Perbarui Email'}
-                      </button>
+                      <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                        ℹ️ Catatan: Layanan email bawaan Supabase (Free Tier) memiliki kuota maksimal 2-3 pengiriman per jam.
+                      </span>
                     </form>
                   </div>
 

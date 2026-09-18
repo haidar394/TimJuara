@@ -394,7 +394,15 @@ export async function updateUserEmail(
 ): Promise<{ success: boolean; error: string | null }> {
   if (isSupabaseConfigured && supabase) {
     const { error } = await supabase.auth.updateUser({ email: email.trim() });
-    if (error) return { success: false, error: error.message };
+    if (error) {
+      if (error.message.toLowerCase().includes('rate limit')) {
+        return {
+          success: false,
+          error: 'Batas kuota pengiriman email Supabase terlampaui (Layanan email bawaan Supabase Free Tier membatasi 2-3 email per jam). Silakan tunggu sekitar 1 jam lagi, atau ganti Nama Lengkap & Kata Sandi saja karena tidak dibatasi kuota email.',
+        };
+      }
+      return { success: false, error: error.message };
+    }
     return { success: true, error: null };
   } else {
     const db = getDemoDb();
