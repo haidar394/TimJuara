@@ -136,17 +136,12 @@ USING (
     )
 );
 
--- Policy Team Members
+-- Policy Team Members (Non-recursive to prevent Postgres infinite recursion error 42P17)
 DROP POLICY IF EXISTS "Members viewable by team members" ON public.team_members;
-CREATE POLICY "Members viewable by team members"
+DROP POLICY IF EXISTS "Team members viewable by authenticated users" ON public.team_members;
+CREATE POLICY "Team members viewable by authenticated users"
 ON public.team_members FOR SELECT TO authenticated
-USING (
-    EXISTS (
-        SELECT 1 FROM public.team_members tm
-        WHERE tm.team_id = team_members.team_id
-        AND tm.user_id = auth.uid()
-    )
-);
+USING (true);
 
 DROP POLICY IF EXISTS "Users can insert themselves to team" ON public.team_members;
 CREATE POLICY "Users can insert themselves to team"
@@ -158,10 +153,9 @@ CREATE POLICY "Team leader can update member role"
 ON public.team_members FOR UPDATE TO authenticated
 USING (
     EXISTS (
-        SELECT 1 FROM public.team_members
-        WHERE team_members.team_id = team_members.team_id
-        AND team_members.user_id = auth.uid()
-        AND team_members.role = 'ketua'
+        SELECT 1 FROM public.teams
+        WHERE teams.id = team_members.team_id
+        AND teams.created_by = auth.uid()
     )
 );
 
@@ -172,10 +166,9 @@ USING (
     user_id = auth.uid()
     OR
     EXISTS (
-        SELECT 1 FROM public.team_members
-        WHERE team_members.team_id = team_members.team_id
-        AND team_members.user_id = auth.uid()
-        AND team_members.role = 'ketua'
+        SELECT 1 FROM public.teams
+        WHERE teams.id = team_members.team_id
+        AND teams.created_by = auth.uid()
     )
 );
 

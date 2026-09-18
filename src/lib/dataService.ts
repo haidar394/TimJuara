@@ -594,7 +594,7 @@ export async function getTeamByUsername(username: string): Promise<{ team: Team 
 
     if (error || !team) return { team: null, members: [] };
 
-    const { data: membersData } = await supabase
+    const { data: membersData, error: membersError } = await supabase
       .from('team_members')
       .select(`
         id, team_id, user_id, role, joined_at,
@@ -602,7 +602,11 @@ export async function getTeamByUsername(username: string): Promise<{ team: Team 
       `)
       .eq('team_id', team.id);
 
-    const members: TeamMember[] = (membersData || []).map((m: any) => ({
+    if (membersError) {
+      console.error('Error fetching team members:', membersError);
+    }
+
+    let members: TeamMember[] = (membersData || []).map((m: any) => ({
       id: m.id,
       team_id: m.team_id,
       user_id: m.user_id,
@@ -610,6 +614,34 @@ export async function getTeamByUsername(username: string): Promise<{ team: Team 
       joined_at: m.joined_at,
       profile: m.profiles,
     }));
+
+    // Fallback tangguh: Jika daftar anggota kosong (misal akibat kendala policy RLS recursion),
+    // pastikan pembuat tim (creator) tetap muncul di daftar sebagai Ketua
+    if (members.length === 0 && team.created_by) {
+      const { data: creatorProfile } = await supabase
+        .from('profiles')
+        .select('id, full_name, avatar_url')
+        .eq('id', team.created_by)
+        .single();
+
+      if (creatorProfile) {
+        members = [{
+          id: 'creator-' + team.id,
+          team_id: team.id,
+          user_id: team.created_by,
+          role: 'ketua',
+          joined_at: team.created_at,
+          profile: creatorProfile,
+        }];
+
+        // Coba sinkronisasi kembali row ke team_members di background
+        supabase.from('team_members').insert({
+          team_id: team.id,
+          user_id: team.created_by,
+          role: 'ketua',
+        }).then(() => {});
+      }
+    }
 
     return { team, members };
   } else {

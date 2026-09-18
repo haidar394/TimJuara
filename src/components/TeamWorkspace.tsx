@@ -171,7 +171,7 @@ export default function TeamWorkspace() {
 
   // Current User Role in this team
   const currentMember = members.find((m) => m.user_id === currentUser?.id);
-  const isKetua = currentMember?.role === 'ketua';
+  const isKetua = currentMember?.role === 'ketua' || (team && currentUser && team.created_by === currentUser.id);
 
   // Copy Team Username / Invite Link
   const handleCopyCode = () => {
