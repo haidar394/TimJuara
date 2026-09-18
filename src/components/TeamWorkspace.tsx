@@ -712,60 +712,43 @@ export default function TeamWorkspace() {
       )}
 
       {/* Top Navbar */}
-      {/* Top Navbar */}
       <header className="workspace-header">
-        <div className="container workspace-header-inner">
-          {/* Team Brand Info */}
-          <div className="team-brand-box">
-            <Link href="/onboarding" style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }} title="Pilih Tim Lain">
-              <div className="avatar-badge" style={{ width: 40, height: 40, background: 'linear-gradient(135deg, #4f46e5, #06b6d4)' }}>
-                {team.name.slice(0, 2).toUpperCase()}
-              </div>
+        <div className="container">
+          {/* Mobile Top Nav: Ganti Tim on Left, User Profile & Logout on Right */}
+          <div className="workspace-mobile-nav">
+            <Link
+              href="/onboarding"
+              className="btn btn-secondary btn-sm"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                padding: '6px 14px',
+                fontSize: '0.825rem',
+                fontWeight: 700,
+                background: '#ffffff',
+                borderColor: '#cbd5e1',
+                borderRadius: 'var(--radius-full)',
+                color: 'var(--text-main)',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+              }}
+              title="Ganti ke tim lain"
+            >
+              <Users size={15} color="var(--primary)" />
+              <span>Ganti Tim</span>
             </Link>
-            <div style={{ minWidth: 0, flex: 1 }}>
-              <div className="team-title-row">
-                <h1 className="team-name-heading">
-                  {team.name}
-                </h1>
-                {/* Role Badge */}
-                {isKetua ? (
-                  <span className="badge badge-warning" style={{ fontSize: '0.68rem', padding: '2px 8px' }}>
-                    <Crown size={11} /> Ketua Tim
-                  </span>
-                ) : (
-                  <span className="badge badge-neutral" style={{ fontSize: '0.68rem', padding: '2px 8px' }}>
-                    <User size={11} /> Anggota
-                  </span>
-                )}
-              </div>
 
-              {/* Quick Copy Username Tag */}
-              <div>
-                <button
-                  onClick={handleCopyCode}
-                  className="team-code-btn"
-                  title="Klik untuk salin kode tim"
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              {currentUser?.email?.toLowerCase() === 'admin@gmail.com' && (
+                <Link
+                  href="/admin"
+                  className="btn btn-sm"
+                  style={{ background: '#ef4444', color: '#fff', border: 'none', padding: '5px 8px', fontSize: '0.725rem', fontWeight: 700 }}
                 >
-                  {copiedCode ? <Check size={12} color="#10b981" /> : <Copy size={12} />}
-                  <span className="team-code-username">@{team.username}</span>
-                  <span style={{ color: 'var(--primary)', fontWeight: 700 }}>(Salin Kode)</span>
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* User Profile & Actions */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-            {currentUser?.email?.toLowerCase() === 'admin@gmail.com' && (
-              <Link href="/admin" className="btn btn-sm hide-mobile" style={{ background: '#ef4444', color: '#fff', border: 'none', display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700 }}>
-                <Crown size={14} /> Panel Admin
-              </Link>
-            )}
-            <Link href="/onboarding" className="btn btn-secondary btn-sm hide-mobile" title="Buka tim lain">
-              <Users size={15} /> Ganti Tim
-            </Link>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <div className="avatar-badge" style={{ width: 34, height: 34, fontSize: '0.8rem' }} title={currentUser?.full_name}>
+                  <Crown size={12} /> Admin
+                </Link>
+              )}
+              <div className="avatar-badge" style={{ width: 32, height: 32, fontSize: '0.75rem' }} title={currentUser?.full_name}>
                 {currentUser?.full_name?.slice(0, 2).toUpperCase()}
               </div>
               <button
@@ -774,18 +757,89 @@ export default function TeamWorkspace() {
                   router.push('/auth');
                 }}
                 className="btn btn-secondary btn-sm"
-                style={{ padding: '7px 10px' }}
+                style={{ padding: '6px 9px' }}
                 title="Keluar akun"
               >
                 <LogOut size={14} />
               </button>
             </div>
           </div>
+
+          {/* Main Header Inner (Team Info + Desktop Actions) */}
+          <div className="workspace-header-inner">
+            {/* Team Brand Info */}
+            <div className="team-brand-box">
+              <Link href="/onboarding" style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }} title="Pilih Tim Lain">
+                <div className="team-avatar-header">
+                  {team.name.slice(0, 2).toUpperCase()}
+                </div>
+              </Link>
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <div className="team-title-row">
+                  <h1 className="team-name-heading">
+                    {team.name}
+                  </h1>
+                </div>
+
+                <div className="team-badges-row">
+                  {/* Role Badge */}
+                  {isKetua ? (
+                    <span className="badge badge-warning" style={{ fontSize: '0.68rem', padding: '2px 8px' }}>
+                      <Crown size={11} /> Ketua Tim
+                    </span>
+                  ) : (
+                    <span className="badge badge-neutral" style={{ fontSize: '0.68rem', padding: '2px 8px' }}>
+                      <User size={11} /> Anggota
+                    </span>
+                  )}
+
+                  {/* Quick Copy Username Tag */}
+                  <button
+                    onClick={handleCopyCode}
+                    className="team-code-btn"
+                    title="Klik untuk salin kode tim"
+                  >
+                    {copiedCode ? <Check size={12} color="#10b981" /> : <Copy size={12} />}
+                    <span className="team-code-username">@{team.username}</span>
+                    <span style={{ color: 'var(--primary)', fontWeight: 700 }}>(Salin Kode)</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Desktop Actions (Hidden on Mobile) */}
+            <div className="workspace-desktop-actions">
+              {currentUser?.email?.toLowerCase() === 'admin@gmail.com' && (
+                <Link href="/admin" className="btn btn-sm" style={{ background: '#ef4444', color: '#fff', border: 'none', display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700 }}>
+                  <Crown size={14} /> Panel Admin
+                </Link>
+              )}
+              <Link href="/onboarding" className="btn btn-secondary btn-sm" title="Buka tim lain">
+                <Users size={15} /> Ganti Tim
+              </Link>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div className="avatar-badge" style={{ width: 34, height: 34, fontSize: '0.8rem' }} title={currentUser?.full_name}>
+                  {currentUser?.full_name?.slice(0, 2).toUpperCase()}
+                </div>
+                <button
+                  onClick={async () => {
+                    await signOutUser();
+                    router.push('/auth');
+                  }}
+                  className="btn btn-secondary btn-sm"
+                  style={{ padding: '7px 10px' }}
+                  title="Keluar akun"
+                >
+                  <LogOut size={14} />
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       </header>
 
       {/* Main Workspace Area */}
-      <main style={{ flex: 1, padding: '28px 0 60px' }}>
+      <main className="workspace-main" style={{ flex: 1, padding: '24px 0 60px' }}>
         <div className="container">
           {/* Navigation Tabs */}
           <div className="tab-container">
