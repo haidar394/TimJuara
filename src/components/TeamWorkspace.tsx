@@ -712,70 +712,60 @@ export default function TeamWorkspace() {
       )}
 
       {/* Top Navbar */}
-      <header style={{ borderBottom: '1px solid var(--surface-border)', background: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(8px)', position: 'sticky', top: 0, zIndex: 20 }}>
-        <div className="container" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', height: 72 }}>
+      {/* Top Navbar */}
+      <header className="workspace-header">
+        <div className="container workspace-header-inner">
           {/* Team Brand Info */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-            <Link href="/onboarding" style={{ display: 'flex', alignItems: 'center' }} title="Pilih Tim Lain">
+          <div className="team-brand-box">
+            <Link href="/onboarding" style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }} title="Pilih Tim Lain">
               <div className="avatar-badge" style={{ width: 40, height: 40, background: 'linear-gradient(135deg, #4f46e5, #06b6d4)' }}>
                 {team.name.slice(0, 2).toUpperCase()}
               </div>
             </Link>
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <h1 style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-main)' }}>
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <div className="team-title-row">
+                <h1 className="team-name-heading">
                   {team.name}
                 </h1>
                 {/* Role Badge */}
                 {isKetua ? (
-                  <span className="badge badge-warning" style={{ fontSize: '0.7rem' }}>
-                    <Crown size={12} /> Ketua Tim
+                  <span className="badge badge-warning" style={{ fontSize: '0.68rem', padding: '2px 8px' }}>
+                    <Crown size={11} /> Ketua Tim
                   </span>
                 ) : (
-                  <span className="badge badge-neutral" style={{ fontSize: '0.7rem' }}>
-                    <User size={12} /> Anggota
+                  <span className="badge badge-neutral" style={{ fontSize: '0.68rem', padding: '2px 8px' }}>
+                    <User size={11} /> Anggota
                   </span>
                 )}
               </div>
 
               {/* Quick Copy Username Tag */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
+              <div>
                 <button
                   onClick={handleCopyCode}
-                  style={{
-                    background: '#f1f5f9',
-                    border: '1px solid #e2e8f0',
-                    borderRadius: 6,
-                    padding: '2px 8px',
-                    fontSize: '0.75rem',
-                    color: '#475569',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 4,
-                  }}
+                  className="team-code-btn"
                   title="Klik untuk salin kode tim"
                 >
                   {copiedCode ? <Check size={12} color="#10b981" /> : <Copy size={12} />}
-                  <span>@{team.username}</span>
-                  <span style={{ color: 'var(--primary)', fontWeight: 600 }}>(Salin Kode)</span>
+                  <span className="team-code-username">@{team.username}</span>
+                  <span style={{ color: 'var(--primary)', fontWeight: 700 }}>(Salin Kode)</span>
                 </button>
               </div>
             </div>
           </div>
 
           {/* User Profile & Actions */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
             {currentUser?.email?.toLowerCase() === 'admin@gmail.com' && (
-              <Link href="/admin" className="btn btn-sm" style={{ background: '#ef4444', color: '#fff', border: 'none', display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700 }}>
+              <Link href="/admin" className="btn btn-sm hide-mobile" style={{ background: '#ef4444', color: '#fff', border: 'none', display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700 }}>
                 <Crown size={14} /> Panel Admin
               </Link>
             )}
             <Link href="/onboarding" className="btn btn-secondary btn-sm hide-mobile" title="Buka tim lain">
               <Users size={15} /> Ganti Tim
             </Link>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <div className="avatar-badge" style={{ width: 34, height: 34, fontSize: '0.8rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <div className="avatar-badge" style={{ width: 34, height: 34, fontSize: '0.8rem' }} title={currentUser?.full_name}>
                 {currentUser?.full_name?.slice(0, 2).toUpperCase()}
               </div>
               <button
@@ -784,6 +774,7 @@ export default function TeamWorkspace() {
                   router.push('/auth');
                 }}
                 className="btn btn-secondary btn-sm"
+                style={{ padding: '7px 10px' }}
                 title="Keluar akun"
               >
                 <LogOut size={14} />
@@ -892,41 +883,41 @@ export default function TeamWorkspace() {
               )}
 
               {/* Toolbar & Filter */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 14, marginBottom: 20 }}>
-                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              <div className="task-toolbar">
+                <div className="task-filters-scroll">
                   <button
                     onClick={() => setTaskFilter('all')}
-                    className={`btn btn-sm ${taskFilter === 'all' ? 'btn-primary' : 'btn-secondary'}`}
+                    className={`btn btn-sm task-filter-chip ${taskFilter === 'all' ? 'btn-primary' : 'btn-secondary'}`}
                   >
                     Semua ({tasks.length})
                   </button>
                   <button
                     onClick={() => setTaskFilter('todo')}
-                    className={`btn btn-sm ${taskFilter === 'todo' ? 'btn-primary' : 'btn-secondary'}`}
+                    className={`btn btn-sm task-filter-chip ${taskFilter === 'todo' ? 'btn-primary' : 'btn-secondary'}`}
                   >
                     Belum Dikerjakan ({tasks.filter((t) => t.status === 'todo').length})
                   </button>
                   <button
                     onClick={() => setTaskFilter('in_progress')}
-                    className={`btn btn-sm ${taskFilter === 'in_progress' ? 'btn-primary' : 'btn-secondary'}`}
+                    className={`btn btn-sm task-filter-chip ${taskFilter === 'in_progress' ? 'btn-primary' : 'btn-secondary'}`}
                   >
                     Sedang Dikerjakan ({tasks.filter((t) => t.status === 'in_progress').length})
                   </button>
                   <button
                     onClick={() => setTaskFilter('review')}
-                    className={`btn btn-sm ${taskFilter === 'review' ? 'btn-primary' : 'btn-secondary'}`}
+                    className={`btn btn-sm task-filter-chip ${taskFilter === 'review' ? 'btn-primary' : 'btn-secondary'}`}
                   >
-                    🔍 Menunggu Review Ketua ({inReviewTasks})
+                    🔍 Menunggu Review ({inReviewTasks})
                   </button>
                   <button
                     onClick={() => setTaskFilter('done')}
-                    className={`btn btn-sm ${taskFilter === 'done' ? 'btn-primary' : 'btn-secondary'}`}
+                    className={`btn btn-sm task-filter-chip ${taskFilter === 'done' ? 'btn-primary' : 'btn-secondary'}`}
                   >
                     Selesai ({tasks.filter((t) => t.status === 'done').length})
                   </button>
                 </div>
 
-                <button onClick={() => setShowAddTaskModal(true)} className="btn btn-primary">
+                <button onClick={() => setShowAddTaskModal(true)} className="btn btn-primary btn-add-task">
                   <Plus size={16} /> Tambah Tugas Baru
                 </button>
               </div>
@@ -962,19 +953,14 @@ export default function TeamWorkspace() {
                     return (
                       <div
                         key={task.id}
-                        className="card"
+                        className="card task-card-responsive"
                         style={{
-                          display: 'flex',
-                          alignItems: 'flex-start',
-                          justifyContent: 'space-between',
-                          gap: 16,
-                          padding: '20px 24px',
                           borderLeft: `5px solid ${borderLeftColor}`,
                           background: isReview ? '#fdfaff' : 'var(--surface)',
                           opacity: isDone ? 0.88 : 1,
                         }}
                       >
-                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14, flex: 1 }}>
+                        <div className="task-card-content">
                           {/* Status Icon */}
                           <button
                             type="button"
@@ -1005,7 +991,7 @@ export default function TeamWorkspace() {
                             {task.status === 'todo' && <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#94a3b8' }} />}
                           </button>
 
-                          <div style={{ flex: 1 }}>
+                          <div className="task-card-body">
                             <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 6 }}>
                               <h4
                                 style={{
@@ -1013,6 +999,7 @@ export default function TeamWorkspace() {
                                   fontWeight: 700,
                                   textDecoration: isDone ? 'line-through' : 'none',
                                   color: isDone ? 'var(--text-muted)' : 'var(--text-main)',
+                                  wordBreak: 'break-word',
                                 }}
                               >
                                 {task.title}
@@ -1021,7 +1008,7 @@ export default function TeamWorkspace() {
                             </div>
 
                             {task.description && (
-                              <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)', marginBottom: 12, lineHeight: 1.5 }}>
+                              <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)', marginBottom: 12, lineHeight: 1.5, wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
                                 {task.description}
                               </p>
                             )}
@@ -1037,6 +1024,8 @@ export default function TeamWorkspace() {
                                   marginBottom: 12,
                                   fontSize: '0.825rem',
                                   color: isReview ? '#5b21b6' : '#92400e',
+                                  wordBreak: 'break-word',
+                                  overflowWrap: 'anywhere',
                                 }}
                               >
                                 💬 <b>Catatan:</b> {task.review_notes}
@@ -1058,6 +1047,10 @@ export default function TeamWorkspace() {
                                     borderColor: '#c7d2fe',
                                     color: 'var(--primary)',
                                     background: '#eef2ff',
+                                    maxWidth: '100%',
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    whiteSpace: 'nowrap',
                                   }}
                                 >
                                   <ExternalLink size={13} /> Buka Link Tugas ↗
@@ -1066,7 +1059,7 @@ export default function TeamWorkspace() {
                             )}
 
                             {/* Assignee & Meta */}
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                                 <span style={{ color: 'var(--text-subtle)' }}>Penanggung Jawab:</span>
                                 {task.assignee_profile ? (
@@ -1092,9 +1085,9 @@ export default function TeamWorkspace() {
                         </div>
 
                         {/* Actions Area */}
-                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            {/* Workflow Buttons based on Role & Status */}
+                        <div className="task-card-actions">
+                          {/* Primary Workflow Buttons based on Role & Status */}
+                          <div className="task-actions-main">
                             {task.status === 'todo' && (
                               <button
                                 onClick={() => handleStartTask(task)}
@@ -1128,16 +1121,18 @@ export default function TeamWorkspace() {
                             {task.status === 'review' && (
                               <>
                                 {isKetua ? (
-                                  <div style={{ display: 'flex', gap: 6 }}>
+                                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', width: '100%' }}>
                                     <button
                                       onClick={() => handleApproveTask(task)}
                                       className="btn btn-success btn-sm"
+                                      style={{ flex: 1 }}
                                     >
                                       <Check size={14} /> Setujui Selesai
                                     </button>
                                     <button
                                       onClick={() => openRevisionModal(task)}
                                       className="btn btn-danger btn-sm"
+                                      style={{ flex: 1 }}
                                     >
                                       <RotateCcw size={14} /> Minta Revisi
                                     </button>
@@ -1159,8 +1154,10 @@ export default function TeamWorkspace() {
                                 <RotateCcw size={13} /> Buka Kembali
                               </button>
                             )}
+                          </div>
 
-                            {/* Edit Button */}
+                          {/* Secondary Buttons (Edit & Delete) */}
+                          <div className="task-actions-secondary">
                             <button
                               onClick={() => openEditTask(task)}
                               className="btn btn-secondary btn-sm"
@@ -1170,7 +1167,6 @@ export default function TeamWorkspace() {
                               <Edit size={14} />
                             </button>
 
-                            {/* Delete Button */}
                             <button
                               onClick={() => handleDeleteTask(task.id)}
                               style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: 6, borderRadius: 6 }}
@@ -1259,67 +1255,62 @@ export default function TeamWorkspace() {
                     return (
                       <div
                         key={item.user_id}
-                        className="card"
+                        className="card contributor-card-responsive"
                         style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          flexWrap: 'wrap',
-                          gap: 16,
-                          padding: '18px 24px',
                           border: idx === 0 && item.completed_count > 0 ? '2px solid #fde68a' : '1px solid var(--surface-border)',
                           background: idx === 0 && item.completed_count > 0 ? '#fffdf7' : 'var(--surface)',
                         }}
                       >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0, flex: 1 }}>
                           <span
                             style={{
                               background: rankBg,
                               color: rankColor,
                               fontWeight: 800,
                               fontSize: '0.85rem',
-                              padding: '6px 12px',
+                              padding: '6px 10px',
                               borderRadius: 8,
+                              flexShrink: 0,
                             }}
                           >
                             {rankBadge}
                           </span>
 
-                          <div className="avatar-badge" style={{ width: 42, height: 42 }}>
+                          <div className="avatar-badge" style={{ width: 40, height: 40, flexShrink: 0 }}>
                             {item.full_name.slice(0, 2).toUpperCase()}
                           </div>
 
-                          <div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                              <h4 style={{ fontSize: '1rem', fontWeight: 700 }}>{item.full_name}</h4>
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                              <h4 style={{ fontSize: '1rem', fontWeight: 700, wordBreak: 'break-word' }}>{item.full_name}</h4>
                               {item.role === 'ketua' && (
                                 <span className="badge badge-warning" style={{ fontSize: '0.65rem' }}>
                                   <Crown size={10} /> Ketua
                                 </span>
                               )}
                             </div>
-                            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                              Total {item.total_assigned} tugas dipegang • {item.in_progress_count} dikerjakan • {item.in_review_count} menunggu dicek
+                            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: 2, wordBreak: 'break-word' }}>
+                              Total {item.total_assigned} tugas dipegang • {item.in_progress_count} dikerjakan • {item.in_review_count} dicek
                             </p>
                           </div>
                         </div>
 
                         {/* Stats Counts */}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
+                        <div className="contributor-stats-group">
                           <div style={{ textAlign: 'right' }}>
-                            <div style={{ fontSize: '1.3rem', fontWeight: 800, color: item.completed_count > 0 ? 'var(--success)' : 'var(--text-muted)' }}>
+                            <div style={{ fontSize: '1.25rem', fontWeight: 800, color: item.completed_count > 0 ? 'var(--success)' : 'var(--text-muted)' }}>
                               {item.completed_count} Tugas
                             </div>
-                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                            <div style={{ fontSize: '0.725rem', color: 'var(--text-muted)' }}>
                               Telah Selesai
                             </div>
                           </div>
 
-                          <div style={{ minWidth: 100, textAlign: 'right' }}>
+                          <div style={{ minWidth: 80, textAlign: 'right' }}>
                             <div style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--primary)' }}>
                               {item.contribution_percentage}%
                             </div>
-                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                            <div style={{ fontSize: '0.725rem', color: 'var(--text-muted)' }}>
                               Porsi Kontribusi
                             </div>
                           </div>
@@ -1361,7 +1352,7 @@ export default function TeamWorkspace() {
                   </button>
                 </div>
               ) : (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 18 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 18 }}>
                   {research.map((item) => (
                     <div
                       key={item.id}
@@ -1370,7 +1361,7 @@ export default function TeamWorkspace() {
                         display: 'flex',
                         flexDirection: 'column',
                         justifyContent: 'space-between',
-                        padding: 22,
+                        padding: '20px 18px',
                       }}
                     >
                       <div>
@@ -1447,10 +1438,10 @@ export default function TeamWorkspace() {
                   Cukup berikan <b>Username Tim</b> di bawah kepada teman Anda. Teman Anda hanya perlu masuk ke TimJuara lalu memilih <b>&quot;Gabung ke Tim&quot;</b>.
                 </p>
 
-                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                <div className="share-box-inputs">
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#f8fafc', border: '1px solid var(--surface-border)', borderRadius: 'var(--radius-md)', padding: '10px 16px', flex: 1, minWidth: 220 }}>
                     <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Username Tim:</span>
-                    <code style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--primary)' }}>
+                    <code style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--primary)', wordBreak: 'break-all' }}>
                       @{team.username}
                     </code>
                   </div>
@@ -1464,7 +1455,7 @@ export default function TeamWorkspace() {
               </div>
 
               {/* Members Table */}
-              <div className="card" style={{ padding: 26 }}>
+              <div className="card" style={{ padding: '24px 20px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18, flexWrap: 'wrap', gap: 10 }}>
                   <div>
                     <h3 style={{ fontSize: '1.15rem', fontWeight: 800 }}>Daftar Anggota & Peran ({members.length})</h3>
@@ -1483,25 +1474,20 @@ export default function TeamWorkspace() {
                     return (
                       <div
                         key={m.id}
+                        className="member-card-responsive"
                         style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          padding: '14px 18px',
                           borderRadius: 'var(--radius-md)',
                           background: '#f8fafc',
                           border: '1px solid var(--surface-border)',
-                          flexWrap: 'wrap',
-                          gap: 12,
                         }}
                       >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                          <div className="avatar-badge" style={{ width: 40, height: 40 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0, flex: 1 }}>
+                          <div className="avatar-badge" style={{ width: 40, height: 40, flexShrink: 0 }}>
                             {m.profile?.full_name?.slice(0, 2).toUpperCase() || 'AG'}
                           </div>
-                          <div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                              <span style={{ fontWeight: 700, fontSize: '0.95rem' }}>
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                              <span style={{ fontWeight: 700, fontSize: '0.95rem', wordBreak: 'break-word' }}>
                                 {m.profile?.full_name || 'Anggota Tim'}
                               </span>
                               {isSelf && (
@@ -1512,21 +1498,21 @@ export default function TeamWorkspace() {
                             </div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginTop: 2 }}>
                               {m.profile?.email && (
-                                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', wordBreak: 'break-all' }}>
                                   {m.profile.email} •
                                 </span>
                               )}
                               <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                                Bergabung pada {new Date(m.joined_at).toLocaleDateString('id-ID')}
+                                Bergabung {new Date(m.joined_at).toLocaleDateString('id-ID')}
                               </span>
                             </div>
                           </div>
                         </div>
 
                         {/* Role Selector or Badge */}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <div className="member-card-actions">
                           {isKetua && !isSelf ? (
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', justifyContent: 'flex-end' }}>
                               <select
                                 value={m.role}
                                 onChange={(e) => handleChangeRole(m.id, e.target.value as Role)}
@@ -1545,7 +1531,7 @@ export default function TeamWorkspace() {
                               </button>
                             </div>
                           ) : (
-                            <div>
+                            <div style={{ marginLeft: 'auto' }}>
                               {m.role === 'ketua' ? (
                                 <span className="badge badge-warning">
                                   <Crown size={12} /> Ketua Tim
