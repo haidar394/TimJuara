@@ -1,0 +1,290 @@
+-- ==============================================================================
+-- SKRIP DATABASE SUPABASE UNTUK WEBSITE PENGELOLA TIM LOMBA / KERJA KELOMPOK
+-- ==============================================================================
+-- Jalankan skrip ini di SQL Editor dashboard Supabase Anda (Database -> SQL Editor -> New Query)
+
+-- 1. Enable extension UUID
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+-- 2. Tabel Profil Pengguna (otomatis terisi saat user register di auth.users)
+CREATE TABLE IF NOT EXISTS public.profiles (
+    id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+    full_name TEXT NOT NULL,
+    avatar_url TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- Trigger untuk membuat row di public.profiles otomatis saat akun terdaftar
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS trigger AS $$
+BEGIN
+  INSERT INTO public.profiles (id, full_name, avatar_url)
+  VALUES (
+    new.id,
+    COALESCE(new.raw_user_meta_data->>'full_name', split_part(new.email, '@', 1)),
+    COALESCE(new.raw_user_meta_data->>'avatar_url', '')
+  );
+  RETURN new;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Pasang trigger ke auth.users
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE PROCEDURE public.handle_new_user();
+
+
+-- 3. Tabel Tim
+CREATE TABLE IF NOT EXISTS public.teams (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name TEXT NOT NULL,
+    username TEXT UNIQUE NOT NULL, -- Kode unik tim untuk bergabung (misal: tim-garuda-2026)
+    description TEXT DEFAULT '',
+    created_by UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_teams_username ON public.teams(username);
+
+
+-- 4. Tabel Anggota Tim (Team Members) & Role (Ketua / Anggota)
+CREATE TABLE IF NOT EXISTS public.team_members (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    team_id UUID NOT NULL REFERENCES public.teams(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+    role TEXT NOT NULL CHECK (role IN ('ketua', 'anggota')) DEFAULT 'anggota',
+    joined_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    UNIQUE (team_id, user_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_team_members_team_id ON public.team_members(team_id);
+CREATE INDEX IF NOT EXISTS idx_team_members_user_id ON public.team_members(user_id);
+
+
+-- 5. Tabel Tugas & Deadline (Tasks)
+CREATE TABLE IF NOT EXISTS public.tasks (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    team_id UUID NOT NULL REFERENCES public.teams(id) ON DELETE CASCADE,
+    title TEXT NOT NULL,
+    description TEXT DEFAULT '',
+    task_link TEXT DEFAULT '', -- Tautan hasil pengerjaan (Google Drive / Docs / Figma)
+    assigned_to UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+    deadline TIMESTAMP WITH TIME ZONE,
+    status TEXT NOT NULL CHECK (status IN ('todo', 'in_progress', 'review', 'done')) DEFAULT 'todo',
+    completed_by UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+    review_notes TEXT DEFAULT '', -- Catatan saat pengajuan review / catatan revisi
+    created_by UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_tasks_team_id ON public.tasks(team_id);
+CREATE INDEX IF NOT EXISTS idx_tasks_status ON public.tasks(status);
+
+
+-- 6. Tabel Materi & Hasil Riset (100% Hemat Kuota via Google Drive / Link)
+CREATE TABLE IF NOT EXISTS public.research_materials (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    team_id UUID NOT NULL REFERENCES public.teams(id) ON DELETE CASCADE,
+    title TEXT NOT NULL,
+    resource_url TEXT NOT NULL, -- Tautan Google Drive, Docs, Sheets, Slide, Figma, dll.
+    resource_type TEXT NOT NULL DEFAULT 'drive' CHECK (resource_type IN ('drive', 'docs', 'sheets', 'slides', 'figma', 'link')),
+    notes TEXT DEFAULT '',      -- Catatan penting mengenai materi/riset tersebut
+    uploaded_by UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_research_team_id ON public.research_materials(team_id);
+
+
+-- 7. Atur Keamanan RLS (Row Level Security)
+ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.teams ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.team_members ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.tasks ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.research_materials ENABLE ROW LEVEL SECURITY;
+
+-- Policy Profiles
+DROP POLICY IF EXISTS "Profiles are viewable by authenticated users" ON public.profiles;
+CREATE POLICY "Profiles are viewable by authenticated users"
+ON public.profiles FOR SELECT TO authenticated USING (true);
+
+DROP POLICY IF EXISTS "Users can update their own profile" ON public.profiles;
+CREATE POLICY "Users can update their own profile"
+ON public.profiles FOR UPDATE TO authenticated USING (auth.uid() = id);
+
+-- Policy Teams
+DROP POLICY IF EXISTS "Teams viewable by anyone authenticated" ON public.teams;
+CREATE POLICY "Teams viewable by anyone authenticated"
+ON public.teams FOR SELECT TO authenticated
+USING (true);
+
+DROP POLICY IF EXISTS "Authenticated users can create teams" ON public.teams;
+CREATE POLICY "Authenticated users can create teams"
+ON public.teams FOR INSERT TO authenticated
+WITH CHECK (auth.uid() = created_by);
+
+DROP POLICY IF EXISTS "Team leader can update team" ON public.teams;
+CREATE POLICY "Team leader can update team"
+ON public.teams FOR UPDATE TO authenticated
+USING (
+    EXISTS (
+        SELECT 1 FROM public.team_members
+        WHERE team_members.team_id = teams.id
+        AND team_members.user_id = auth.uid()
+        AND team_members.role = 'ketua'
+    )
+);
+
+-- Policy Team Members
+DROP POLICY IF EXISTS "Members viewable by team members" ON public.team_members;
+CREATE POLICY "Members viewable by team members"
+ON public.team_members FOR SELECT TO authenticated
+USING (
+    EXISTS (
+        SELECT 1 FROM public.team_members tm
+        WHERE tm.team_id = team_members.team_id
+        AND tm.user_id = auth.uid()
+    )
+);
+
+DROP POLICY IF EXISTS "Users can insert themselves to team" ON public.team_members;
+CREATE POLICY "Users can insert themselves to team"
+ON public.team_members FOR INSERT TO authenticated
+WITH CHECK (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Team leader can update member role" ON public.team_members;
+CREATE POLICY "Team leader can update member role"
+ON public.team_members FOR UPDATE TO authenticated
+USING (
+    EXISTS (
+        SELECT 1 FROM public.team_members
+        WHERE team_members.team_id = team_members.team_id
+        AND team_members.user_id = auth.uid()
+        AND team_members.role = 'ketua'
+    )
+);
+
+DROP POLICY IF EXISTS "Team leader can delete members or user can leave" ON public.team_members;
+CREATE POLICY "Team leader can delete members or user can leave"
+ON public.team_members FOR DELETE TO authenticated
+USING (
+    user_id = auth.uid()
+    OR
+    EXISTS (
+        SELECT 1 FROM public.team_members
+        WHERE team_members.team_id = team_members.team_id
+        AND team_members.user_id = auth.uid()
+        AND team_members.role = 'ketua'
+    )
+);
+
+-- Policy Tasks
+DROP POLICY IF EXISTS "Tasks viewable by team members" ON public.tasks;
+CREATE POLICY "Tasks viewable by team members"
+ON public.tasks FOR SELECT TO authenticated
+USING (
+    EXISTS (
+        SELECT 1 FROM public.team_members
+        WHERE team_members.team_id = tasks.team_id
+        AND team_members.user_id = auth.uid()
+    )
+);
+
+DROP POLICY IF EXISTS "Tasks insertable by team members" ON public.tasks;
+CREATE POLICY "Tasks insertable by team members"
+ON public.tasks FOR INSERT TO authenticated
+WITH CHECK (
+    EXISTS (
+        SELECT 1 FROM public.team_members
+        WHERE team_members.team_id = tasks.team_id
+        AND team_members.user_id = auth.uid()
+    )
+);
+
+DROP POLICY IF EXISTS "Tasks updatable by team members" ON public.tasks;
+CREATE POLICY "Tasks updatable by team members"
+ON public.tasks FOR UPDATE TO authenticated
+USING (
+    EXISTS (
+        SELECT 1 FROM public.team_members
+        WHERE team_members.team_id = tasks.team_id
+        AND team_members.user_id = auth.uid()
+    )
+);
+
+DROP POLICY IF EXISTS "Tasks deletable by team members" ON public.tasks;
+CREATE POLICY "Tasks deletable by team members"
+ON public.tasks FOR DELETE TO authenticated
+USING (
+    EXISTS (
+        SELECT 1 FROM public.team_members
+        WHERE team_members.team_id = tasks.team_id
+        AND team_members.user_id = auth.uid()
+    )
+);
+
+-- Policy Research Materials
+DROP POLICY IF EXISTS "Research viewable by team members" ON public.research_materials;
+CREATE POLICY "Research viewable by team members"
+ON public.research_materials FOR SELECT TO authenticated
+USING (
+    EXISTS (
+        SELECT 1 FROM public.team_members
+        WHERE team_members.team_id = research_materials.team_id
+        AND team_members.user_id = auth.uid()
+    )
+);
+
+DROP POLICY IF EXISTS "Research insertable by team members" ON public.research_materials;
+CREATE POLICY "Research insertable by team members"
+ON public.research_materials FOR INSERT TO authenticated
+WITH CHECK (
+    EXISTS (
+        SELECT 1 FROM public.team_members
+        WHERE team_members.team_id = research_materials.team_id
+        AND team_members.user_id = auth.uid()
+    )
+);
+
+DROP POLICY IF EXISTS "Research deletable by team members" ON public.research_materials;
+CREATE POLICY "Research deletable by team members"
+ON public.research_materials FOR DELETE TO authenticated
+USING (
+    EXISTS (
+        SELECT 1 FROM public.team_members
+        WHERE team_members.team_id = research_materials.team_id
+        AND team_members.user_id = auth.uid()
+    )
+);
+
+-- ==============================================================================
+-- 8. KEBIJAKAN KHUSUS MASTER ADMIN (admin@gmail.com / masteradmin)
+-- ==============================================================================
+-- Memberikan hak akses penuh kepada admin@gmail.com untuk memantau dan menghapus tim / pengguna
+
+-- Master Admin dapat menghapus tim mana pun
+DROP POLICY IF EXISTS "Master admin can delete any team" ON public.teams;
+CREATE POLICY "Master admin can delete any team"
+ON public.teams FOR DELETE TO authenticated
+USING ((auth.jwt() ->> 'email') = 'admin@gmail.com');
+
+-- Master Admin dapat melihat seluruh anggota dari seluruh tim
+DROP POLICY IF EXISTS "Master admin can view all team members" ON public.team_members;
+CREATE POLICY "Master admin can view all team members"
+ON public.team_members FOR SELECT TO authenticated
+USING ((auth.jwt() ->> 'email') = 'admin@gmail.com');
+
+-- Master Admin dapat menghapus relasi anggota tim mana pun
+DROP POLICY IF EXISTS "Master admin can delete any team member" ON public.team_members;
+CREATE POLICY "Master admin can delete any team member"
+ON public.team_members FOR DELETE TO authenticated
+USING ((auth.jwt() ->> 'email') = 'admin@gmail.com');
+
+-- Master Admin dapat menghapus profil pengguna mana pun
+DROP POLICY IF EXISTS "Master admin can delete any profile" ON public.profiles;
+CREATE POLICY "Master admin can delete any profile"
+ON public.profiles FOR DELETE TO authenticated
+USING ((auth.jwt() ->> 'email') = 'admin@gmail.com');
+
+
