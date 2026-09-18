@@ -207,7 +207,16 @@ export async function signUpUser(fullName: string, email: string, password: stri
       },
     });
 
-    if (error) return { user: null, error: error.message };
+    if (error) {
+      const errMsg = error.message.toLowerCase();
+      if (errMsg.includes('disabled') || (error as any).code === 'email_provider_disabled') {
+        return {
+          user: null,
+          error: 'Provider Email di Supabase Anda sedang NONAKTIF. Buka Supabase -> Authentication -> Providers -> Email, lalu aktifkan toggle "Enable Email provider" (ON).',
+        };
+      }
+      return { user: null, error: error.message };
+    }
     if (!data.user) return { user: null, error: 'Pendaftaran gagal.' };
 
     const needsEmailConfirmation = !data.session;
@@ -270,6 +279,12 @@ export async function signInUser(email: string, password: string): Promise<{ use
 
     if (error) {
       const errMsg = error.message.toLowerCase();
+      if (errMsg.includes('disabled') || (error as any).code === 'email_provider_disabled') {
+        return {
+          user: null,
+          error: 'Provider Email di Supabase Anda sedang NONAKTIF (Disabled). Buka Dashboard Supabase -> Authentication -> Providers -> Email, lalu aktifkan toggle paling atas "Enable Email provider" (ON).',
+        };
+      }
       if (errMsg.includes('email not confirmed')) {
         return {
           user: null,
