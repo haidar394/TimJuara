@@ -798,7 +798,7 @@ export async function getTeamTasks(teamId: string): Promise<Task[]> {
     const { data, error } = await supabase
       .from('tasks')
       .select(`
-        id, team_id, title, description, assigned_to, deadline, status, created_by, created_at,
+        id, team_id, title, description, task_link, assigned_to, deadline, status, completed_by, review_notes, created_by, created_at,
         profiles!tasks_assigned_to_fkey (id, full_name, avatar_url)
       `)
       .eq('team_id', teamId)
@@ -936,6 +936,9 @@ export async function updateTask(taskId: string, updates: Partial<Task>): Promis
   }
   if ('completed_by' in cleanUpdates) {
     cleanUpdates.completed_by = cleanUpdates.completed_by && cleanUpdates.completed_by.trim() ? cleanUpdates.completed_by.trim() : null;
+  }
+  if ('task_link' in cleanUpdates) {
+    cleanUpdates.task_link = cleanUpdates.task_link?.trim() || '';
   }
   delete cleanUpdates.assignee_profile;
   delete cleanUpdates.profiles;
