@@ -21,6 +21,30 @@ Aplikasi web ini menggunakan stack gratis dan mudah dipublikasikan:
    - **Project URL** (misal: `https://xyzcompany.supabase.co`)
    - **Project API Keys** -> `anon` `public` key
 
+### ⚠️ PENTING: Matikan Verifikasi Email & Buat Akun Master Admin
+
+**1. Kenapa ada permintaan "Confirm your email address" saat daftar/login?**
+Secara *default*, Supabase mengunci pendaftaran baru dan mewajibkan verifikasi lewat link email. Agar pengguna tim atau saat presentasi lomba bisa langsung daftar dan login tanpa ribet:
+- Buka Dashboard Supabase -> Menu **Authentication** (di sidebar kiri) -> Klik **Providers**.
+- Klik provider **Email**.
+- Matikan toggle **"Confirm email"** (ubah menjadi **OFF** / abu-abu).
+- Klik **Save** di bagian bawah.
+
+**2. Kenapa tidak bisa login `admin@gmail.com` / `masteradmin` di Vercel?**
+Karena akun `admin@gmail.com` belum ada di tabel autentikasi Supabase Anda (atau statusnya belum terkonfirmasi).
+Untuk mengaktifkannya, pilih salah satu cara termudah berikut:
+- **Cara 1 (Lewat Menu Users Supabase - Rekomendasi)**:
+  1. Buka menu **Authentication** -> **Users**.
+  2. Jika sudah ada `admin@gmail.com`, klik titik tiga di kanannya lalu **Delete user**.
+  3. Klik tombol **Add user** (kanan atas) -> pilih **Create user**.
+  4. Masukkan:
+     - Email: `admin@gmail.com`
+     - Password: `masteradmin`
+     - Pastikan centang **"Auto Confirm User?"** tetap aktif (**ON**).
+  5. Klik **Create user**.
+- **Cara 2 (Lewat SQL Editor)**:
+  Cukup jalankan query Bagian 9 pada file [`supabase-schema.sql`](./supabase-schema.sql) di menu SQL Editor Supabase.
+
 ---
 
 ## Langkah 2: Setup Environment Variable Lokal

@@ -197,7 +197,7 @@ export async function getCurrentUser(): Promise<Profile | null> {
   }
 }
 
-export async function signUpUser(fullName: string, email: string, password: string): Promise<{ user: Profile | null; error: string | null }> {
+export async function signUpUser(fullName: string, email: string, password: string): Promise<{ user: Profile | null; error: string | null; needsEmailConfirmation?: boolean }> {
   if (isSupabaseConfigured && supabase) {
     const { data, error } = await supabase.auth.signUp({
       email,
@@ -210,6 +210,8 @@ export async function signUpUser(fullName: string, email: string, password: stri
     if (error) return { user: null, error: error.message };
     if (!data.user) return { user: null, error: 'Pendaftaran gagal.' };
 
+    const needsEmailConfirmation = !data.session;
+
     return {
       user: {
         id: data.user.id,
@@ -217,6 +219,7 @@ export async function signUpUser(fullName: string, email: string, password: stri
         email,
       },
       error: null,
+      needsEmailConfirmation,
     };
   } else {
     // Demo Mode
@@ -239,7 +242,7 @@ export async function signUpUser(fullName: string, email: string, password: stri
     if (typeof window !== 'undefined') {
       localStorage.setItem(DEMO_USER_KEY, JSON.stringify(profile));
     }
-    return { user: profile, error: null };
+    return { user: profile, error: null, needsEmailConfirmation: false };
   }
 }
 
@@ -265,7 +268,22 @@ export async function signInUser(email: string, password: string): Promise<{ use
       }
     }
 
-    if (error) return { user: null, error: error.message };
+    if (error) {
+      const errMsg = error.message.toLowerCase();
+      if (errMsg.includes('email not confirmed')) {
+        return {
+          user: null,
+          error: 'Email belum dikonfirmasi di Supabase. Silakan buka Supabase Dashboard -> Authentication -> Providers -> Email, lalu matikan toggle "Confirm email" (OFF) agar pendaftaran langsung aktif tanpa verifikasi email.',
+        };
+      }
+      if (cleanEmail === 'admin@gmail.com') {
+        return {
+          user: null,
+          error: 'Akun Master Admin di Supabase belum aktif atau password salah. Di dashboard Supabase (Authentication -> Users), pastikan user admin@gmail.com dibuat dengan centang "Auto Confirm User", atau jalankan skrip SQL Master Admin dari supabase-schema.sql.',
+        };
+      }
+      return { user: null, error: error.message };
+    }
     if (!data.user) return { user: null, error: 'Login gagal.' };
 
     const { data: profile } = await supabase

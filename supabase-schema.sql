@@ -288,3 +288,65 @@ ON public.profiles FOR DELETE TO authenticated
 USING ((auth.jwt() ->> 'email') = 'admin@gmail.com');
 
 
+-- ==============================================================================
+-- 9. SETUP & AKTIVASI AKUN MASTER ADMIN (admin@gmail.com / masteradmin)
+-- ==============================================================================
+-- Jalankan bagian ini di SQL Editor untuk langsung mengaktifkan akun Master Admin
+-- tanpa perlu menunggu konfirmasi email.
+
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
+DO $$
+DECLARE
+  new_admin_id UUID := gen_random_uuid();
+BEGIN
+  IF EXISTS (SELECT 1 FROM auth.users WHERE email = 'admin@gmail.com') THEN
+    -- Jika sudah pernah dibuat tapi belum aktif/terkonfirmasi, aktifkan langsung
+    UPDATE auth.users
+    SET email_confirmed_at = COALESCE(email_confirmed_at, now()),
+        encrypted_password = crypt('masteradmin', gen_salt('bf')),
+        raw_user_meta_data = jsonb_build_object('full_name', 'Master Admin TimJuara'),
+        updated_at = now()
+    WHERE email = 'admin@gmail.com';
+  ELSE
+    -- Jika belum ada di auth.users, buat akun langsung terkonfirmasi (instant confirmed)
+    INSERT INTO auth.users (
+      id,
+      instance_id,
+      email,
+      encrypted_password,
+      email_confirmed_at,
+      raw_app_meta_data,
+      raw_user_meta_data,
+      aud,
+      role,
+      created_at,
+      updated_at,
+      confirmation_token
+    )
+    VALUES (
+      new_admin_id,
+      '00000000-0000-0000-0000-000000000000',
+      'admin@gmail.com',
+      crypt('masteradmin', gen_salt('bf')),
+      now(),
+      '{"provider":"email","providers":["email"]}'::jsonb,
+      '{"full_name":"Master Admin TimJuara"}'::jsonb,
+      'authenticated',
+      'authenticated',
+      now(),
+      now(),
+      ''
+    );
+  END IF;
+
+  -- Pastikan profil Master Admin tercatat di public.profiles
+  INSERT INTO public.profiles (id, full_name)
+  SELECT id, 'Master Admin TimJuara'
+  FROM auth.users
+  WHERE email = 'admin@gmail.com'
+  ON CONFLICT (id) DO UPDATE SET full_name = 'Master Admin TimJuara';
+END $$;
+
+
+

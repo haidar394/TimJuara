@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { signInUser, signUpUser, getUserTeams } from '@/lib/dataService';
-import { LogIn, UserPlus, ArrowRight, Shield, AlertCircle } from 'lucide-react';
+import { LogIn, UserPlus, ArrowRight, Shield, AlertCircle, CheckCircle } from 'lucide-react';
 import Link from 'next/link';
 
 export default function AuthPage() {
@@ -14,10 +14,12 @@ export default function AuthPage() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
+    setSuccessMsg(null);
     setLoading(true);
 
     try {
@@ -27,13 +29,19 @@ export default function AuthPage() {
           setLoading(false);
           return;
         }
-        const { user, error } = await signUpUser(fullName.trim(), email.trim(), password);
+        const { user, error, needsEmailConfirmation } = await signUpUser(fullName.trim(), email.trim(), password);
         if (error) {
           setErrorMsg(error);
           setLoading(false);
           return;
         }
         if (user) {
+          if (needsEmailConfirmation) {
+            setSuccessMsg('Pendaftaran akun berhasil! Verifikasi email aktif di Supabase Anda: Silakan buka inbox email Anda untuk klik tautan konfirmasi, atau matikan opsi "Confirm email" di pengaturan Supabase (Auth -> Providers -> Email).');
+            setIsRegister(false);
+            setLoading(false);
+            return;
+          }
           router.push('/onboarding');
         }
       } else {
@@ -135,8 +143,16 @@ export default function AuthPage() {
           {/* Error Banner */}
           {errorMsg && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', background: 'var(--danger-light)', border: '1px solid var(--danger-border)', borderRadius: 'var(--radius-md)', color: 'var(--danger)', fontSize: '0.85rem', marginBottom: 18 }}>
-              <AlertCircle size={16} flex-shrink="0" />
+              <AlertCircle size={16} style={{ flexShrink: 0 }} />
               <span>{errorMsg}</span>
+            </div>
+          )}
+
+          {/* Success Banner */}
+          {successMsg && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', background: 'var(--success-light, #ecfdf5)', border: '1px solid var(--success-border, #a7f3d0)', borderRadius: 'var(--radius-md)', color: 'var(--success, #059669)', fontSize: '0.85rem', marginBottom: 18 }}>
+              <CheckCircle size={16} style={{ flexShrink: 0 }} />
+              <span>{successMsg}</span>
             </div>
           )}
 
