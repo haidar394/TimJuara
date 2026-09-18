@@ -182,6 +182,14 @@ USING (
         WHERE team_members.team_id = tasks.team_id
         AND team_members.user_id = auth.uid()
     )
+    OR
+    EXISTS (
+        SELECT 1 FROM public.teams
+        WHERE teams.id = tasks.team_id
+        AND teams.created_by = auth.uid()
+    )
+    OR
+    ((auth.jwt() ->> 'email') = 'admin@gmail.com')
 );
 
 DROP POLICY IF EXISTS "Tasks insertable by team members" ON public.tasks;
@@ -193,6 +201,14 @@ WITH CHECK (
         WHERE team_members.team_id = tasks.team_id
         AND team_members.user_id = auth.uid()
     )
+    OR
+    EXISTS (
+        SELECT 1 FROM public.teams
+        WHERE teams.id = tasks.team_id
+        AND teams.created_by = auth.uid()
+    )
+    OR
+    ((auth.jwt() ->> 'email') = 'admin@gmail.com')
 );
 
 DROP POLICY IF EXISTS "Tasks updatable by team members" ON public.tasks;
@@ -204,6 +220,14 @@ USING (
         WHERE team_members.team_id = tasks.team_id
         AND team_members.user_id = auth.uid()
     )
+    OR
+    EXISTS (
+        SELECT 1 FROM public.teams
+        WHERE teams.id = tasks.team_id
+        AND teams.created_by = auth.uid()
+    )
+    OR
+    ((auth.jwt() ->> 'email') = 'admin@gmail.com')
 );
 
 DROP POLICY IF EXISTS "Tasks deletable by team members" ON public.tasks;
@@ -215,6 +239,14 @@ USING (
         WHERE team_members.team_id = tasks.team_id
         AND team_members.user_id = auth.uid()
     )
+    OR
+    EXISTS (
+        SELECT 1 FROM public.teams
+        WHERE teams.id = tasks.team_id
+        AND teams.created_by = auth.uid()
+    )
+    OR
+    ((auth.jwt() ->> 'email') = 'admin@gmail.com')
 );
 
 -- Policy Research Materials
@@ -227,6 +259,14 @@ USING (
         WHERE team_members.team_id = research_materials.team_id
         AND team_members.user_id = auth.uid()
     )
+    OR
+    EXISTS (
+        SELECT 1 FROM public.teams
+        WHERE teams.id = research_materials.team_id
+        AND teams.created_by = auth.uid()
+    )
+    OR
+    ((auth.jwt() ->> 'email') = 'admin@gmail.com')
 );
 
 DROP POLICY IF EXISTS "Research insertable by team members" ON public.research_materials;
@@ -238,6 +278,14 @@ WITH CHECK (
         WHERE team_members.team_id = research_materials.team_id
         AND team_members.user_id = auth.uid()
     )
+    OR
+    EXISTS (
+        SELECT 1 FROM public.teams
+        WHERE teams.id = research_materials.team_id
+        AND teams.created_by = auth.uid()
+    )
+    OR
+    ((auth.jwt() ->> 'email') = 'admin@gmail.com')
 );
 
 DROP POLICY IF EXISTS "Research deletable by team members" ON public.research_materials;
@@ -249,6 +297,14 @@ USING (
         WHERE team_members.team_id = research_materials.team_id
         AND team_members.user_id = auth.uid()
     )
+    OR
+    EXISTS (
+        SELECT 1 FROM public.teams
+        WHERE teams.id = research_materials.team_id
+        AND teams.created_by = auth.uid()
+    )
+    OR
+    ((auth.jwt() ->> 'email') = 'admin@gmail.com')
 );
 
 -- ==============================================================================

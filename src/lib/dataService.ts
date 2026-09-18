@@ -830,45 +830,100 @@ export async function createTask(taskData: {
   status: TaskStatus;
   created_by?: string;
   completed_by?: string;
-}): Promise<Task | null> {
+}): Promise<{ task: Task | null; error: string | null }> {
+  const cleanData: any = {
+    team_id: taskData.team_id,
+    title: taskData.title.trim(),
+    description: taskData.description?.trim() || '',
+    task_link: taskData.task_link?.trim() || '',
+    status: taskData.status || 'todo',
+    review_notes: '',
+  };
+
+  if (taskData.assigned_to && taskData.assigned_to.trim()) {
+    cleanData.assigned_to = taskData.assigned_to.trim();
+  } else {
+    cleanData.assigned_to = null;
+  }
+
+  if (taskData.deadline && taskData.deadline.trim()) {
+    cleanData.deadline = taskData.deadline.trim();
+  } else {
+    cleanData.deadline = null;
+  }
+
+  if (taskData.created_by && taskData.created_by.trim()) {
+    cleanData.created_by = taskData.created_by.trim();
+  } else {
+    cleanData.created_by = null;
+  }
+
+  if (taskData.completed_by && taskData.completed_by.trim()) {
+    cleanData.completed_by = taskData.completed_by.trim();
+  } else {
+    cleanData.completed_by = null;
+  }
+
   if (isSupabaseConfigured && supabase) {
     const { data, error } = await supabase
       .from('tasks')
-      .insert(taskData)
+      .insert(cleanData)
       .select()
       .single();
 
-    if (error) return null;
-    return data;
+    if (error) {
+      console.error('Error creating task in Supabase:', error);
+      return { task: null, error: error.message };
+    }
+    return { task: data, error: null };
   } else {
     const db = getDemoDb();
     const newTask: Task = {
       id: 'task-' + Date.now(),
-      ...taskData,
+      ...cleanData,
       created_at: new Date().toISOString(),
     };
     db.tasks.push(newTask);
     saveDemoDb(db);
-    return newTask;
+    return { task: newTask, error: null };
   }
 }
 
-export async function updateTask(taskId: string, updates: Partial<Task>): Promise<boolean> {
+export async function updateTask(taskId: string, updates: Partial<Task>): Promise<{ success: boolean; error: string | null }> {
+  const cleanUpdates: any = { ...updates };
+  if ('assigned_to' in cleanUpdates) {
+    cleanUpdates.assigned_to = cleanUpdates.assigned_to && cleanUpdates.assigned_to.trim() ? cleanUpdates.assigned_to.trim() : null;
+  }
+  if ('deadline' in cleanUpdates) {
+    cleanUpdates.deadline = cleanUpdates.deadline && cleanUpdates.deadline.trim() ? cleanUpdates.deadline.trim() : null;
+  }
+  if ('completed_by' in cleanUpdates) {
+    cleanUpdates.completed_by = cleanUpdates.completed_by && cleanUpdates.completed_by.trim() ? cleanUpdates.completed_by.trim() : null;
+  }
+  delete cleanUpdates.assignee_profile;
+  delete cleanUpdates.profiles;
+  delete cleanUpdates.id;
+
   if (isSupabaseConfigured && supabase) {
     const { error } = await supabase
       .from('tasks')
-      .update(updates)
+      .update(cleanUpdates)
       .eq('id', taskId);
-    return !error;
+
+    if (error) {
+      console.error('Error updating task in Supabase:', error);
+      return { success: false, error: error.message };
+    }
+    return { success: true, error: null };
   } else {
     const db = getDemoDb();
     const idx = db.tasks.findIndex(t => t.id === taskId);
     if (idx !== -1) {
-      db.tasks[idx] = { ...db.tasks[idx], ...updates };
+      db.tasks[idx] = { ...db.tasks[idx], ...cleanUpdates };
       saveDemoDb(db);
-      return true;
+      return { success: true, error: null };
     }
-    return false;
+    return { success: false, error: 'Tugas tidak ditemukan' };
   }
 }
 
@@ -884,7 +939,8 @@ export async function updateTaskStatus(
   if (reviewNotes !== undefined) updates.review_notes = reviewNotes;
   if (taskLink !== undefined) updates.task_link = taskLink;
 
-  return updateTask(taskId, updates);
+  const res = await updateTask(taskId, updates);
+  return res.success;
 }
 
 export async function deleteTask(taskId: string): Promise<boolean> {
@@ -941,26 +997,38 @@ export async function addResearchMaterial(item: {
   resource_type: ResourceType;
   notes?: string;
   uploaded_by?: string;
-}): Promise<ResearchMaterial | null> {
+}): Promise<{ material: ResearchMaterial | null; error: string | null }> {
+  const cleanItem: any = {
+    team_id: item.team_id,
+    title: item.title.trim(),
+    resource_url: item.resource_url.trim(),
+    resource_type: item.resource_type,
+    notes: item.notes?.trim() || '',
+    uploaded_by: item.uploaded_by && item.uploaded_by.trim() ? item.uploaded_by.trim() : null,
+  };
+
   if (isSupabaseConfigured && supabase) {
     const { data, error } = await supabase
       .from('research_materials')
-      .insert(item)
+      .insert(cleanItem)
       .select()
       .single();
 
-    if (error) return null;
-    return data;
+    if (error) {
+      console.error('Error adding research material in Supabase:', error);
+      return { material: null, error: error.message };
+    }
+    return { material: data, error: null };
   } else {
     const db = getDemoDb();
     const newMaterial: ResearchMaterial = {
       id: 'res-' + Date.now(),
-      ...item,
+      ...cleanItem,
       created_at: new Date().toISOString(),
     };
     db.research.unshift(newMaterial);
     saveDemoDb(db);
-    return newMaterial;
+    return { material: newMaterial, error: null };
   }
 }
 

@@ -196,19 +196,33 @@ export default function TeamWorkspace() {
     e.preventDefault();
     if (!team || !currentUser || !taskTitle.trim()) return;
 
-    // Jika user tidak memilih penanggung jawab dan dia adalah satu-satunya member, pasang ke dirinya
-    const assigned = taskAssignee || currentUser.id;
+    let deadlineIso: string | undefined = undefined;
+    if (taskDeadline && taskDeadline.trim()) {
+      try {
+        const d = new Date(taskDeadline);
+        if (!isNaN(d.getTime())) {
+          deadlineIso = d.toISOString();
+        }
+      } catch (err) {
+        console.error('Invalid deadline format:', err);
+      }
+    }
 
-    await createTask({
+    const { task, error } = await createTask({
       team_id: team.id,
       title: taskTitle.trim(),
       description: taskDesc.trim(),
       task_link: taskLink.trim(),
-      assigned_to: assigned,
-      deadline: taskDeadline ? new Date(taskDeadline).toISOString() : undefined,
+      assigned_to: taskAssignee || currentUser.id,
+      deadline: deadlineIso,
       status: taskStatusInput,
       created_by: currentUser.id,
     });
+
+    if (error) {
+      showToast(`Gagal menambahkan tugas: ${error}`);
+      return;
+    }
 
     setTaskTitle('');
     setTaskDesc('');
@@ -217,7 +231,7 @@ export default function TeamWorkspace() {
     setTaskDeadline('');
     setTaskStatusInput('todo');
     setShowAddTaskModal(false);
-    showToast('Tugas baru berhasil ditambahkan!');
+    showToast('Tugas baru berhasil ditambahkan! 📋');
 
     const updated = await getTeamTasks(team.id);
     setTasks(updated);
@@ -239,18 +253,35 @@ export default function TeamWorkspace() {
     e.preventDefault();
     if (!selectedTask || !taskTitle.trim()) return;
 
-    await updateTask(selectedTask.id, {
+    let deadlineIso: string | undefined = undefined;
+    if (taskDeadline && taskDeadline.trim()) {
+      try {
+        const d = new Date(taskDeadline);
+        if (!isNaN(d.getTime())) {
+          deadlineIso = d.toISOString();
+        }
+      } catch (err) {
+        console.error('Invalid deadline format:', err);
+      }
+    }
+
+    const { success, error } = await updateTask(selectedTask.id, {
       title: taskTitle.trim(),
       description: taskDesc.trim(),
       task_link: taskLink.trim(),
       assigned_to: taskAssignee || undefined,
-      deadline: taskDeadline ? new Date(taskDeadline).toISOString() : undefined,
+      deadline: deadlineIso,
       status: taskStatusInput,
     });
 
+    if (error) {
+      showToast(`Gagal memperbarui tugas: ${error}`);
+      return;
+    }
+
     setShowEditTaskModal(false);
     setSelectedTask(null);
-    showToast('Perubahan tugas berhasil disimpan!');
+    showToast('Perubahan tugas berhasil disimpan! ✨');
 
     if (team) {
       const updated = await getTeamTasks(team.id);
@@ -391,7 +422,7 @@ export default function TeamWorkspace() {
     else if (validUrl.includes('drive.google.com')) detectedType = 'drive';
     else if (validUrl.includes('figma.com')) detectedType = 'figma';
 
-    await addResearchMaterial({
+    const { material, error } = await addResearchMaterial({
       team_id: team.id,
       title: researchTitle.trim(),
       resource_url: validUrl,
@@ -400,12 +431,17 @@ export default function TeamWorkspace() {
       uploaded_by: currentUser.id,
     });
 
+    if (error) {
+      showToast(`Gagal menyimpan materi: ${error}`);
+      return;
+    }
+
     setResearchTitle('');
     setResearchUrl('');
     setResearchType('drive');
     setResearchNotes('');
     setShowAddResearchModal(false);
-    showToast('Link materi/riset berhasil disimpan!');
+    showToast('Link materi/riset berhasil disimpan! 📁');
 
     const updated = await getTeamResearch(team.id);
     setResearch(updated);
