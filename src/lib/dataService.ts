@@ -405,11 +405,41 @@ export async function signOutUser(): Promise<void> {
   }
 }
 
+export function formatDirectImageUrl(url: string): string {
+  if (!url) return '';
+  const trimmed = url.trim();
+
+  // Konversi otomatis link Google Drive menjadi direct image thumbnail
+  if (trimmed.includes('drive.google.com') || trimmed.includes('docs.google.com')) {
+    let fileId = '';
+    const fileDMatch = trimmed.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+    if (fileDMatch && fileDMatch[1]) {
+      fileId = fileDMatch[1];
+    } else {
+      const idParamMatch = trimmed.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+      if (idParamMatch && idParamMatch[1]) {
+        fileId = idParamMatch[1];
+      }
+    }
+
+    if (fileId) {
+      return `https://drive.google.com/thumbnail?id=${fileId}&sz=w800`;
+    }
+  }
+
+  // Konversi otomatis link Dropbox menjadi direct link
+  if (trimmed.includes('dropbox.com')) {
+    return trimmed.replace('dl=0', 'raw=1');
+  }
+
+  return trimmed;
+}
+
 export async function updateUserAvatar(
   userId: string,
   avatarUrl: string
 ): Promise<{ success: boolean; error: string | null }> {
-  const cleanUrl = avatarUrl.trim();
+  const cleanUrl = formatDirectImageUrl(avatarUrl);
   if (isSupabaseConfigured && supabase) {
     const { error: profileError } = await supabase
       .from('profiles')
@@ -767,7 +797,7 @@ export async function updateTeamAvatar(
   teamId: string,
   avatarUrl: string
 ): Promise<{ success: boolean; error: string | null }> {
-  const cleanUrl = avatarUrl.trim();
+  const cleanUrl = formatDirectImageUrl(avatarUrl);
   if (typeof window !== 'undefined') {
     try {
       localStorage.setItem(`timjuara_team_avatar_${teamId}`, cleanUrl);

@@ -27,6 +27,7 @@ import {
   updateUserPhoneNumber,
   updateUserAvatar,
   updateTeamAvatar,
+  formatDirectImageUrl,
   getUserTeamsWithDetails,
   getUserAllActiveTasks,
   createTeam,
@@ -348,11 +349,13 @@ export default function TeamWorkspace() {
   const handleSaveTeamAvatar = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!team) return;
+    const directUrl = formatDirectImageUrl(teamAvatarUrl);
     setSavingTeamAvatar(true);
-    const { success, error } = await updateTeamAvatar(team.id, teamAvatarUrl);
+    const { success, error } = await updateTeamAvatar(team.id, directUrl);
     setSavingTeamAvatar(false);
     if (success) {
-      setTeam((prev) => prev ? { ...prev, avatar_url: teamAvatarUrl.trim() } : null);
+      setTeamAvatarUrl(directUrl);
+      setTeam((prev) => prev ? { ...prev, avatar_url: directUrl } : null);
       setShowTeamAvatarModal(false);
       showToast('Foto profil tim berhasil diperbarui!');
     } else {
@@ -363,11 +366,13 @@ export default function TeamWorkspace() {
   const handleUpdateUserAvatar = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentUser) return;
+    const directUrl = formatDirectImageUrl(userAvatarUrl);
     setSavingUserAvatar(true);
-    const { success, error } = await updateUserAvatar(currentUser.id, userAvatarUrl);
+    const { success, error } = await updateUserAvatar(currentUser.id, directUrl);
     setSavingUserAvatar(false);
     if (success) {
-      setCurrentUser((prev) => prev ? { ...prev, avatar_url: userAvatarUrl.trim() } : null);
+      setUserAvatarUrl(directUrl);
+      setCurrentUser((prev) => prev ? { ...prev, avatar_url: directUrl } : null);
       showToast('Foto profil Anda berhasil disimpan!');
     } else {
       showToast(`Gagal menyimpan foto profil: ${error}`);
@@ -3118,7 +3123,7 @@ export default function TeamWorkspace() {
                           {userAvatarUrl ? 'Foto profil kustom aktif' : 'Menggunakan avatar inisial (bawaan)'}
                         </span>
                         <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                          Tempel link URL gambar langsung (contoh: dari Unsplash, GitHub, dsb.)
+                          Tempel tautan gambar (Mendukung link Google Drive, Unsplash, Imgur, GitHub, dsb.)
                         </span>
                       </div>
                     </div>
@@ -3126,7 +3131,7 @@ export default function TeamWorkspace() {
                       <div style={{ flex: 1, minWidth: 260 }}>
                         <input
                           type="url"
-                          placeholder="https://images.unsplash.com/... atau tautan gambar online"
+                          placeholder="https://drive.google.com/... atau https://images.unsplash.com/..."
                           value={userAvatarUrl}
                           onChange={(e) => setUserAvatarUrl(e.target.value)}
                           className="form-input"
@@ -3159,6 +3164,11 @@ export default function TeamWorkspace() {
                           Reset ke Inisial
                         </button>
                       )}
+                      <div style={{ width: '100%', marginTop: 2 }}>
+                        <span className="form-hint" style={{ fontSize: '0.75rem', color: 'var(--text-muted)', lineHeight: 1.4 }}>
+                          💡 <b>Tips Google Drive:</b> Anda bisa langsung menempelkan link Google Drive! Pastikan setelan akses berkas di Google Drive sudah disetel ke <i>&quot;Siapa saja yang memiliki link&quot;</i> (Publik) agar fotonya dapat diakses browser.
+                        </span>
+                      </div>
                     </form>
                   </div>
 
@@ -4283,13 +4293,13 @@ export default function TeamWorkspace() {
                   <input
                     type="url"
                     required
-                    placeholder="https://images.unsplash.com/... atau link foto lainnya"
+                    placeholder="https://drive.google.com/... atau https://images.unsplash.com/..."
                     value={teamAvatarUrl}
                     onChange={(e) => setTeamAvatarUrl(e.target.value)}
                     className="form-input"
                   />
-                  <span className="form-hint">
-                    Gunakan tautan gambar langsung yang diawali http:// atau https://
+                  <span className="form-hint" style={{ lineHeight: 1.4, marginTop: 6, display: 'block' }}>
+                    💡 <b>Mendukung Google Drive:</b> Anda bisa memakai link Google Drive (pastikan akses disetel ke <i>&quot;Siapa saja yang memiliki link&quot;</i> agar foto dapat tampil), Unsplash, Imgur, dsb.
                   </span>
                 </div>
               </div>
