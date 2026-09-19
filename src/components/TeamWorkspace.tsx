@@ -155,6 +155,14 @@ export default function TeamWorkspace() {
   // Revision request state (Ketua -> Member)
   const [revisionNotes, setRevisionNotes] = useState('');
 
+  // Ketua Review & Verification Modal state
+  const [showKetuaReviewModal, setShowKetuaReviewModal] = useState(false);
+  const [ketuaReviewTask, setKetuaReviewTask] = useState<Task | null>(null);
+  const [ketuaReviewNotes, setKetuaReviewNotes] = useState('');
+  const [ketuaReviewLoading, setKetuaReviewLoading] = useState(false);
+  const [ketuaReviewComments, setKetuaReviewComments] = useState<TaskComment[]>([]);
+  const [loadingReviewComments, setLoadingReviewComments] = useState(false);
+
   // Form State: Add / Edit Research Material
   const [researchTitle, setResearchTitle] = useState('');
   const [researchUrl, setResearchUrl] = useState('');
@@ -577,55 +585,170 @@ export default function TeamWorkspace() {
     setTasks(updated);
   };
 
-  // Reject / Request Revision (Ketua -> Member)
+  // Open Ketua Review & Verification Modal
+  const openKetuaReviewModal = async (task: Task) => {
+    setKetuaReviewTask(task);
+    setKetuaReviewNotes('');
+    setShowKetuaReviewModal(true);
+    setLoadingReviewComments(true);
+    try {
+      const comments = await getTaskComments(task.id);
+      setKetuaReviewComments(comments);
+    } catch {
+      setKetuaReviewComments([]);
+    } finally {
+      setLoadingReviewComments(false);
+    }
+  };
+
+  // Reject / Request Revision (Ketua -> Member) with Comment integration
+  const handleKetuaRequestRevision = async () => {
+    if (!ketuaReviewTask || !team || !currentUser) return;
+    if (!ketuaReviewNotes.trim()) {
+      showToast('⚠️ Mohon tuliskan poin revisi/instruksi perbaikan untuk pengerja.');
+      return;
+    }
+
+    setKetuaReviewLoading(true);
+    try {
+      // 1. Simpan komentar revisi otomatis ke riwayat diskusi tugas (task_comments)
+      await addTaskComment(
+        ketuaReviewTask.id,
+        currentUser.id,
+        `⚠️ [PERMINTAAN REVISI]: ${ketuaReviewNotes.trim()}`
+      );
+
+      // 2. Perbarui tugas ke status in_progress dengan catatan revisi
+      await updateTask(ketuaReviewTask.id, {
+        status: 'in_progress',
+        review_notes: `Catatan Revisi dari Ketua: ${ketuaReviewNotes.trim()}`,
+      });
+
+      // 3. Notifikasi In-App & WA Real-Time ke seluruh PIC
+      const assignedIds = ketuaReviewTask.assigned_to_ids && ketuaReviewTask.assigned_to_ids.length > 0
+        ? ketuaReviewTask.assigned_to_ids
+        : ketuaReviewTask.assigned_to
+        ? [ketuaReviewTask.assigned_to]
+        : [];
+
+      const picMembers = members.filter((m) => assignedIds.includes(m.user_id));
+      picMembers.forEach((m) => {
+        createNotification(
+          m.user_id,
+          '⚠️ Permintaan Revisi Tugas',
+          `Ketua meminta revisi pada "${ketuaReviewTask.title}": "${ketuaReviewNotes.trim()}"`,
+          `/team/${team.username}`,
+          team.id
+        );
+      });
+
+      const waPhones = picMembers
+        .map((m) => m.profile?.phone_number)
+        .filter((p): p is string => Boolean(p && p.trim()));
+
+      if (waPhones.length > 0) {
+        const waMsg = `⚠️ *PERMINTAAN REVISI TUGAS - TIMJUARA*\n\nHalo Rekan Tim! 👋\nTugas *${ketuaReviewTask.title}* di tim *${team.name}* memerlukan revisi dari Ketua Tim:\n📝 Catatan Revisi: "${ketuaReviewNotes.trim()}"\n\nYuk segera diperiksa dan diperbaiki di TimJuara: ${window.location.origin}/team/${team.username}`;
+        sendRealtimeWhatsAppNotification(waPhones, waMsg, team.wa_gateway_token);
+      }
+
+      setShowKetuaReviewModal(false);
+      setShowRevisionModal(false);
+      setKetuaReviewTask(null);
+      setKetuaReviewNotes('');
+      showToast('Permintaan revisi dan komentar berhasil dikirim ke pengerja.');
+
+      const updated = await getTeamTasks(team.id);
+      setTasks(updated);
+    } catch (err: any) {
+      showToast('Gagal mengirim revisi: ' + (err?.message || 'Terjadi kesalahan'));
+    } finally {
+      setKetuaReviewLoading(false);
+    }
+  };
+
+  // Approve Task (Ketua -> Done) with optional comment integration
+  const handleKetuaApproveTask = async () => {
+    if (!ketuaReviewTask || !team || !currentUser) return;
+
+    setKetuaReviewLoading(true);
+    try {
+      // 1. Jika Ketua menulis catatan apresiasi/masukan, simpan ke komentar
+      if (ketuaReviewNotes.trim()) {
+        await addTaskComment(
+          ketuaReviewTask.id,
+          currentUser.id,
+          `✅ [DISETUJUI SELESAI]: ${ketuaReviewNotes.trim()}`
+        );
+      }
+
+      // 2. Tandai tugas resmi selesai
+      const completedBy = ketuaReviewTask.completed_by || ketuaReviewTask.assigned_to || currentUser.id;
+      await updateTask(ketuaReviewTask.id, {
+        status: 'done',
+        completed_by: completedBy,
+        review_notes: ketuaReviewNotes.trim()
+          ? `Disetujui: ${ketuaReviewNotes.trim()}`
+          : (ketuaReviewTask.review_notes || 'Telah disetujui selesai oleh Ketua.'),
+      });
+
+      confetti({
+        particleCount: 100,
+        spread: 70,
+        origin: { y: 0.6 },
+      });
+
+      // 3. Notifikasi In-App & WA Real-Time ke seluruh PIC
+      const assignedIds = ketuaReviewTask.assigned_to_ids && ketuaReviewTask.assigned_to_ids.length > 0
+        ? ketuaReviewTask.assigned_to_ids
+        : ketuaReviewTask.assigned_to
+        ? [ketuaReviewTask.assigned_to]
+        : [];
+
+      const picMembers = members.filter((m) => assignedIds.includes(m.user_id));
+      picMembers.forEach((m) => {
+        if (m.user_id !== currentUser.id) {
+          createNotification(
+            m.user_id,
+            '🎉 Tugas Telah Disetujui!',
+            `Selamat! Tugas "${ketuaReviewTask.title}" telah disetujui selesai oleh Ketua.${ketuaReviewNotes.trim() ? ` Catatan: "${ketuaReviewNotes.trim()}"` : ''}`,
+            `/team/${team.username}`,
+            team.id
+          );
+        }
+      });
+
+      const waPhones = picMembers
+        .filter((m) => m.user_id !== currentUser.id)
+        .map((m) => m.profile?.phone_number)
+        .filter((p): p is string => Boolean(p && p.trim()));
+
+      if (waPhones.length > 0) {
+        const waMsg = `🎉 *TUGAS TELAH DISETUJUI - TIMJUARA*\n\nHalo Rekan Tim! 🚀\nSelamat! Tugas *${ketuaReviewTask.title}* pada tim *${team.name}* telah diverifikasi dan disetujui selesai oleh Ketua Tim.\n${ketuaReviewNotes.trim() ? `📝 Catatan Ketua: "${ketuaReviewNotes.trim()}"\n` : ''}Terima kasih atas kerja kerasmu! 💪\nBuka TimJuara: ${window.location.origin}/team/${team.username}`;
+        sendRealtimeWhatsAppNotification(waPhones, waMsg, team.wa_gateway_token);
+      }
+
+      setShowKetuaReviewModal(false);
+      setKetuaReviewTask(null);
+      setKetuaReviewNotes('');
+      showToast('🎉 Tugas telah disetujui & ditandai selesai!');
+
+      const updated = await getTeamTasks(team.id);
+      setTasks(updated);
+    } catch (err: any) {
+      showToast('Gagal menyelesaikan tugas: ' + (err?.message || 'Terjadi kesalahan'));
+    } finally {
+      setKetuaReviewLoading(false);
+    }
+  };
+
+  // Compatibility helper
   const openRevisionModal = (task: Task) => {
-    setSelectedTask(task);
-    setRevisionNotes('');
-    setShowRevisionModal(true);
+    openKetuaReviewModal(task);
   };
 
   const handleConfirmRevision = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedTask || !team) return;
-
-    await updateTask(selectedTask.id, {
-      status: 'in_progress',
-      review_notes: revisionNotes.trim() ? `Catatan Revisi dari Ketua: ${revisionNotes.trim()}` : 'Perlu revisi dari Ketua.',
-    });
-
-    // Notifikasi In-App & WA Real-Time ke seluruh PIC
-    const assignedIds = selectedTask.assigned_to_ids && selectedTask.assigned_to_ids.length > 0
-      ? selectedTask.assigned_to_ids
-      : selectedTask.assigned_to
-      ? [selectedTask.assigned_to]
-      : [];
-
-    const picMembers = members.filter((m) => assignedIds.includes(m.user_id));
-    picMembers.forEach((m) => {
-      createNotification(
-        m.user_id,
-        '⚠️ Permintaan Revisi Tugas',
-        `Ketua meminta revisi pada "${selectedTask.title}": "${revisionNotes.trim()}"`,
-        `/team/${team.username}`,
-        team.id
-      );
-    });
-
-    const waPhones = picMembers
-      .map((m) => m.profile?.phone_number)
-      .filter((p): p is string => Boolean(p && p.trim()));
-
-    if (waPhones.length > 0) {
-      const waMsg = `⚠️ *PERMINTAAN REVISI TUGAS - TIMJUARA*\n\nHalo Rekan Tim! 👋\nTugas *${selectedTask.title}* di tim *${team.name}* memerlukan revisi dari Ketua Tim:\n📝 Catatan Revisi: "${revisionNotes.trim()}"\n\nYuk segera diperiksa di TimJuara: ${window.location.origin}/team/${team.username}`;
-      sendRealtimeWhatsAppNotification(waPhones, waMsg, team.wa_gateway_token);
-    }
-
-    setShowRevisionModal(false);
-    setSelectedTask(null);
-    showToast('Permintaan revisi berhasil dikirim ke anggota.');
-
-    const updated = await getTeamTasks(team.id);
-    setTasks(updated);
+    await handleKetuaRequestRevision();
   };
 
   // Reopen Task (Kembalikan status ke Sedang Dikerjakan)
@@ -1666,6 +1789,43 @@ export default function TeamWorkspace() {
                                 {task.title}
                               </h4>
                               {getDeadlineBadge(task.deadline, task.status)}
+                              {task.status === 'review' ? (
+                                <span
+                                  className="badge badge-purple"
+                                  style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: 4,
+                                    fontSize: '0.75rem',
+                                    fontWeight: 700,
+                                    background: isDarkMode ? 'rgba(168, 85, 247, 0.2)' : '#f3e8ff',
+                                    color: isDarkMode ? '#c084fc' : '#7e22ce',
+                                    border: `1px solid ${isDarkMode ? 'rgba(168, 85, 247, 0.4)' : '#ddd6fe'}`,
+                                    padding: '2px 8px',
+                                    borderRadius: 6,
+                                  }}
+                                >
+                                  🔍 Menunggu Review Ketua
+                                </span>
+                              ) : isInProgress && task.review_notes?.toLowerCase().includes('revisi') ? (
+                                <span
+                                  className="badge badge-warning"
+                                  style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: 4,
+                                    fontSize: '0.75rem',
+                                    fontWeight: 700,
+                                    background: isDarkMode ? 'rgba(245, 158, 11, 0.2)' : '#fef3c7',
+                                    color: isDarkMode ? '#fbbf24' : '#b45309',
+                                    border: `1px solid ${isDarkMode ? 'rgba(245, 158, 11, 0.4)' : '#fde68a'}`,
+                                    padding: '2px 8px',
+                                    borderRadius: 6,
+                                  }}
+                                >
+                                  ⚠️ Perlu Revisi
+                                </span>
+                              ) : null}
                             </div>
 
                             {task.description && (
@@ -1678,11 +1838,15 @@ export default function TeamWorkspace() {
                             {task.review_notes && (
                               <div
                                 style={{
-                                  background: isReview
+                                  background: task.review_notes.toLowerCase().includes('revisi')
+                                    ? isDarkMode ? 'rgba(239, 68, 68, 0.12)' : '#fef2f2'
+                                    : isReview
                                     ? isDarkMode ? 'rgba(168, 85, 247, 0.12)' : '#f5f3ff'
                                     : isDarkMode ? 'rgba(245, 158, 11, 0.12)' : '#fffbeb',
                                   border: `1px solid ${
-                                    isReview
+                                    task.review_notes.toLowerCase().includes('revisi')
+                                      ? isDarkMode ? 'rgba(239, 68, 68, 0.35)' : '#fecaca'
+                                      : isReview
                                       ? isDarkMode ? 'rgba(168, 85, 247, 0.3)' : '#ddd6fe'
                                       : isDarkMode ? 'rgba(245, 158, 11, 0.3)' : '#fde68a'
                                   }`,
@@ -1690,14 +1854,18 @@ export default function TeamWorkspace() {
                                   padding: '8px 12px',
                                   marginBottom: 12,
                                   fontSize: '0.825rem',
-                                  color: isReview
+                                  color: task.review_notes.toLowerCase().includes('revisi')
+                                    ? isDarkMode ? '#fca5a5' : '#b91c1c'
+                                    : isReview
                                     ? isDarkMode ? '#d8b4fe' : '#5b21b6'
                                     : isDarkMode ? '#fcd34d' : '#92400e',
                                   wordBreak: 'break-word',
                                   overflowWrap: 'anywhere',
                                 }}
                               >
-                                💬 <b>Catatan:</b> {task.review_notes}
+                                {task.review_notes.toLowerCase().includes('revisi') ? '⚠️ ' : '💬 '}
+                                <b>{task.review_notes.toLowerCase().includes('revisi') ? 'Catatan Revisi dari Ketua:' : 'Catatan:'}</b>{' '}
+                                {task.review_notes.replace(/^Catatan Revisi dari Ketua:\s*/i, '')}
                               </div>
                             )}
 
@@ -1768,7 +1936,7 @@ export default function TeamWorkspace() {
                               <>
                                 {isKetua ? (
                                   <button
-                                    onClick={() => handleApproveTask(task)}
+                                    onClick={() => openKetuaReviewModal(task)}
                                     className="btn btn-success btn-sm"
                                   >
                                     <Check size={14} /> Tandai Selesai (Ketua)
@@ -1779,7 +1947,7 @@ export default function TeamWorkspace() {
                                     className="btn btn-primary btn-sm"
                                     style={{ background: 'linear-gradient(135deg, #7c3aed, #4f46e5)' }}
                                   >
-                                    <Send size={13} /> Ajukan Dicek Ketua
+                                    <Send size={13} /> {task.review_notes?.toLowerCase().includes('revisi') ? 'Ajukan Ulang Hasil Revisi' : 'Ajukan Dicek Ketua'}
                                   </button>
                                 )}
                               </>
@@ -1790,14 +1958,14 @@ export default function TeamWorkspace() {
                                 {isKetua ? (
                                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', width: '100%' }}>
                                     <button
-                                      onClick={() => handleApproveTask(task)}
+                                      onClick={() => openKetuaReviewModal(task)}
                                       className="btn btn-success btn-sm"
                                       style={{ flex: 1 }}
                                     >
-                                      <Check size={14} /> Setujui Selesai
+                                      <Check size={14} /> Review & Selesaikan
                                     </button>
                                     <button
-                                      onClick={() => openRevisionModal(task)}
+                                      onClick={() => openKetuaReviewModal(task)}
                                       className="btn btn-danger btn-sm"
                                       style={{ flex: 1 }}
                                     >
@@ -2762,44 +2930,281 @@ export default function TeamWorkspace() {
       )}
 
       {/* ========================================================================= */}
-      {/* MODAL: MINTA REVISI DARI KETUA                                            */}
+      {/* MODAL: VERIFIKASI & REVIEW TUGAS OLEH KETUA                                */}
       {/* ========================================================================= */}
-      {showRevisionModal && (
-        <div className="modal-overlay" onClick={() => setShowRevisionModal(false)}>
-          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3 style={{ fontSize: '1.15rem', fontWeight: 800 }}>Minta Revisi kepada Anggota</h3>
-              <button onClick={() => setShowRevisionModal(false)} style={{ background: 'none', border: 'none', fontSize: '1.2rem', cursor: 'pointer', color: 'var(--text-muted)' }}>
+      {showKetuaReviewModal && ketuaReviewTask && (
+        <div className="modal-overlay" onClick={() => !ketuaReviewLoading && setShowKetuaReviewModal(false)}>
+          <div
+            className="modal-card"
+            style={{ maxWidth: 600, maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="modal-header" style={{ padding: '16px 20px', borderBottom: '1px solid var(--surface-border)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div
+                  style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: 10,
+                    background: isDarkMode ? 'rgba(16, 185, 129, 0.15)' : '#ecfdf5',
+                    color: '#10b981',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <CheckCircle2 size={22} />
+                </div>
+                <div>
+                  <h3 style={{ fontSize: '1.15rem', fontWeight: 800, margin: 0, color: 'var(--text-main)' }}>
+                    Verifikasi & Review Tugas
+                  </h3>
+                  <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '2px 0 0 0' }}>
+                    Periksa hasil pengerjaan, beri arahan revisi, atau konfirmasi penyelesaian tugas.
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => !ketuaReviewLoading && setShowKetuaReviewModal(false)}
+                disabled={ketuaReviewLoading}
+                style={{ background: 'none', border: 'none', fontSize: '1.2rem', cursor: 'pointer', color: 'var(--text-muted)' }}
+              >
                 ✕
               </button>
             </div>
-            <form onSubmit={handleConfirmRevision}>
-              <div className="modal-body">
-                <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: 14 }}>
-                  Tugas <b>&quot;{selectedTask?.title}&quot;</b> akan dikembalikan ke status <b>Sedang Dikerjakan</b>.
-                </p>
 
-                <div className="form-group">
-                  <label className="form-label">Poin Revisi / Catatan Perbaikan</label>
-                  <textarea
-                    rows={4}
-                    required
-                    placeholder="Jelaskan bagian mana yang perlu diperbaiki oleh anggota tim..."
-                    value={revisionNotes}
-                    onChange={(e) => setRevisionNotes(e.target.value)}
-                    className="form-textarea"
-                  />
+            {/* Modal Body */}
+            <div className="modal-body" style={{ overflowY: 'auto', flex: 1, padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {/* Task Summary Box */}
+              <div
+                style={{
+                  background: isDarkMode ? 'rgba(255, 255, 255, 0.03)' : '#f8fafc',
+                  border: '1px solid var(--surface-border)',
+                  borderRadius: 10,
+                  padding: 14,
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
+                  <h4 style={{ fontSize: '1rem', fontWeight: 700, margin: 0, color: 'var(--text-main)' }}>
+                    {ketuaReviewTask.title}
+                  </h4>
+                  {ketuaReviewTask.status === 'review' ? (
+                    <span className="badge badge-purple" style={{ fontSize: '0.75rem', padding: '2px 8px' }}>
+                      🔍 Menunggu Review
+                    </span>
+                  ) : ketuaReviewTask.review_notes?.toLowerCase().includes('revisi') ? (
+                    <span className="badge badge-warning" style={{ fontSize: '0.75rem', padding: '2px 8px' }}>
+                      ⚠️ Dalam Masa Revisi
+                    </span>
+                  ) : (
+                    <span className="badge badge-blue" style={{ fontSize: '0.75rem', padding: '2px 8px' }}>
+                      Sedang Dikerjakan
+                    </span>
+                  )}
+                </div>
+
+                {ketuaReviewTask.description && (
+                  <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: '0 0 10px 0', lineHeight: 1.5 }}>
+                    {ketuaReviewTask.description}
+                  </p>
+                )}
+
+                {/* PIC Info & Deadline */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ color: 'var(--text-subtle)' }}>Penanggung Jawab:</span>
+                    <span style={{ fontWeight: 600, color: 'var(--text-main)' }}>
+                      {ketuaReviewTask.assignee_profiles && ketuaReviewTask.assignee_profiles.length > 0
+                        ? ketuaReviewTask.assignee_profiles.map((p) => p.full_name).join(', ')
+                        : ketuaReviewTask.assignee_profile?.full_name || 'Belum ditugaskan'}
+                    </span>
+                  </div>
+
+                  {ketuaReviewTask.deadline && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <Calendar size={13} />
+                      <span>Deadline: {new Date(ketuaReviewTask.deadline).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Link Tugas bila ada */}
+                {ketuaReviewTask.task_link && (
+                  <div style={{ marginTop: 12, paddingTop: 10, borderTop: '1px dashed var(--surface-border)' }}>
+                    <a
+                      href={ketuaReviewTask.task_link.startsWith('http') ? ketuaReviewTask.task_link : `https://${ketuaReviewTask.task_link}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="btn btn-secondary btn-sm"
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 6,
+                        color: 'var(--primary)',
+                        borderColor: 'var(--primary)',
+                        fontSize: '0.825rem',
+                        fontWeight: 600,
+                      }}
+                    >
+                      <ExternalLink size={14} /> Buka & Periksa Link Hasil Kerja ↗
+                    </a>
+                  </div>
+                )}
+              </div>
+
+              {/* Catatan Terakhir dari Anggota/Sebelumnya */}
+              {ketuaReviewTask.review_notes && (
+                <div
+                  style={{
+                    background: isDarkMode ? 'rgba(168, 85, 247, 0.1)' : '#f5f3ff',
+                    border: `1px solid ${isDarkMode ? 'rgba(168, 85, 247, 0.25)' : '#ddd6fe'}`,
+                    borderRadius: 8,
+                    padding: '10px 12px',
+                    fontSize: '0.825rem',
+                    color: isDarkMode ? '#d8b4fe' : '#5b21b6',
+                  }}
+                >
+                  💬 <b>Catatan Sebelumnya:</b>
+                  <div style={{ marginTop: 4, whiteSpace: 'pre-wrap' }}>{ketuaReviewTask.review_notes}</div>
+                </div>
+              )}
+
+              {/* Riwayat Komentar Singkat */}
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                  <label className="form-label" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <MessageSquare size={14} /> Riwayat Diskusi ({ketuaReviewComments.length})
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => openTaskComments(ketuaReviewTask)}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: 'var(--primary)',
+                      fontSize: '0.75rem',
+                      cursor: 'pointer',
+                      padding: 0,
+                    }}
+                  >
+                    Buka Kolom Diskusi Penuh ↗
+                  </button>
+                </div>
+
+                <div
+                  style={{
+                    background: isDarkMode ? 'rgba(0, 0, 0, 0.2)' : '#f1f5f9',
+                    borderRadius: 8,
+                    padding: 10,
+                    maxHeight: 120,
+                    overflowY: 'auto',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 6,
+                  }}
+                >
+                  {loadingReviewComments ? (
+                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', textAlign: 'center', padding: 8 }}>
+                      Memuat komentar...
+                    </div>
+                  ) : ketuaReviewComments.length === 0 ? (
+                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', textAlign: 'center', padding: 8 }}>
+                      Belum ada komentar pada tugas ini. Berikan catatan pertama di bawah!
+                    </div>
+                  ) : (
+                    ketuaReviewComments.slice(-3).map((c) => (
+                      <div
+                        key={c.id}
+                        style={{
+                          fontSize: '0.8rem',
+                          background: isDarkMode ? '#1e293b' : '#ffffff',
+                          padding: '6px 10px',
+                          borderRadius: 6,
+                          border: '1px solid var(--surface-border)',
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                          <span style={{ fontWeight: 700, color: 'var(--text-main)', fontSize: '0.75rem' }}>
+                            {c.author_profile?.full_name || 'Anggota'}
+                          </span>
+                          <span style={{ fontSize: '0.7rem', color: 'var(--text-subtle)' }}>
+                            {new Date(c.created_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        </div>
+                        <div style={{ color: 'var(--text-muted)', wordBreak: 'break-word' }}>{c.content}</div>
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
-              <div className="modal-footer">
-                <button type="button" onClick={() => setShowRevisionModal(false)} className="btn btn-secondary">
-                  Batal
+
+              {/* Form Input Catatan Ketua */}
+              <div className="form-group" style={{ margin: 0 }}>
+                <label className="form-label" style={{ fontWeight: 700 }}>
+                  Catatan Evaluasi / Instruksi Ketua
+                </label>
+                <textarea
+                  rows={3}
+                  placeholder="Tulis poin revisi jika perlu perbaikan (misal: lengkapi analisis bab 2), atau catatan apresiasi jika sudah sesuai..."
+                  value={ketuaReviewNotes}
+                  onChange={(e) => setKetuaReviewNotes(e.target.value)}
+                  className="form-textarea"
+                  style={{ resize: 'vertical' }}
+                  disabled={ketuaReviewLoading}
+                />
+                <span className="form-hint" style={{ fontSize: '0.75rem' }}>
+                  💡 Catatan ini akan otomatis masuk ke riwayat diskusi tugas & dikirim ke WhatsApp/In-App anggota tim.
+                </span>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div
+              className="modal-footer"
+              style={{
+                padding: '14px 20px',
+                borderTop: '1px solid var(--surface-border)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 10,
+                flexWrap: 'wrap',
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => setShowKetuaReviewModal(false)}
+                disabled={ketuaReviewLoading}
+                className="btn btn-secondary"
+              >
+                Batal
+              </button>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  onClick={handleKetuaRequestRevision}
+                  disabled={ketuaReviewLoading}
+                  className="btn btn-danger"
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                  title="Kembalikan tugas ke status pengerjaan dengan catatan revisi"
+                >
+                  <RotateCcw size={14} /> Minta Revisi
                 </button>
-                <button type="submit" className="btn btn-danger">
-                  Kirim Catatan Revisi
+
+                <button
+                  type="button"
+                  onClick={handleKetuaApproveTask}
+                  disabled={ketuaReviewLoading}
+                  className="btn btn-success"
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                  title="Setujui hasil kerja dan tandai selesai resmi"
+                >
+                  <Check size={15} /> Sudah Oke, Tandai Selesai
                 </button>
               </div>
-            </form>
+            </div>
           </div>
         </div>
       )}
