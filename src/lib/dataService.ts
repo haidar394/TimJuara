@@ -1550,6 +1550,14 @@ export async function getTeamTasks(teamId: string): Promise<Task[]> {
         assignee_profiles: assigneeProfiles.length > 0 ? assigneeProfiles : (t.profiles ? [t.profiles] : []),
         comments_count: commentCountMap[t.id] || 0,
       };
+    }).sort((a, b) => {
+      const aDone = a.status === 'done';
+      const bDone = b.status === 'done';
+      if (!aDone && bDone) return -1;
+      if (aDone && !bDone) return 1;
+      if (!a.deadline) return 1;
+      if (!b.deadline) return -1;
+      return new Date(a.deadline).getTime() - new Date(b.deadline).getTime();
     });
   } else {
     const db = getDemoDb();
@@ -1584,6 +1592,10 @@ export async function getTeamTasks(teamId: string): Promise<Task[]> {
         };
       })
       .sort((a, b) => {
+        const aDone = a.status === 'done';
+        const bDone = b.status === 'done';
+        if (!aDone && bDone) return -1;
+        if (aDone && !bDone) return 1;
         if (!a.deadline) return 1;
         if (!b.deadline) return -1;
         return new Date(a.deadline).getTime() - new Date(b.deadline).getTime();

@@ -1557,10 +1557,44 @@ export default function TeamWorkspace() {
   // -------------------------------------------------------------
   const { contributions, totalTasks, completedTasks, inReviewTasks, overallProgress } = calculateContributionStats(members, tasks);
 
-  const filteredTasks = tasks.filter((t) => {
-    if (taskFilter === 'all') return true;
-    return t.status === taskFilter;
-  });
+  const filteredTasks = [...tasks]
+    .filter((t) => {
+      if (taskFilter === 'all') return true;
+      return t.status === taskFilter;
+    })
+    .sort((a, b) => {
+      // 1. Tugas yang sudah selesai ('done') SELALU ditaruh di paling bawah
+      const aDone = a.status === 'done';
+      const bDone = b.status === 'done';
+      if (!aDone && bDone) return -1; // a (belum selesai) selalu di atas b (selesai)
+      if (aDone && !bDone) return 1;  // a (selesai) selalu di bawah b (belum selesai)
+
+      // 2. Jika sama-sama belum selesai:
+      if (!aDone && !bDone) {
+        // Urutkan deadline yang mendesak terlebih dahulu
+        if (a.deadline && b.deadline) {
+          const diff = new Date(a.deadline).getTime() - new Date(b.deadline).getTime();
+          if (diff !== 0) return diff;
+        } else if (a.deadline && !b.deadline) {
+          return -1;
+        } else if (!a.deadline && b.deadline) {
+          return 1;
+        }
+
+        // Urutkan status tindakan: review (butuh dicek) > in_progress (sedang dikerjakan) > todo (belum mulai)
+        const statusWeight: Record<TaskStatus, number> = {
+          review: 3,
+          in_progress: 2,
+          todo: 1,
+          done: 0,
+        };
+        const swDiff = (statusWeight[b.status] || 0) - (statusWeight[a.status] || 0);
+        if (swDiff !== 0) return swDiff;
+      }
+
+      // Jika status sama, urutkan tugas terbaru di atas
+      return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+    });
 
   const getDeadlineBadge = (deadlineStr?: string, status?: TaskStatus) => {
     if (status === 'done') {
