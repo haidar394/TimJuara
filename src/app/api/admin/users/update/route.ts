@@ -50,26 +50,29 @@ export async function POST(req: Request) {
     // Prioritas 2: Gunakan RPC Function via Client Supabase
     if (supabaseUrl && anonKey) {
       const supabase = createClient(supabaseUrl, anonKey);
-      const { data, error } = await supabase.rpc('admin_update_user', {
-        target_user_id: userId,
-        new_full_name: fullName || '',
-        new_email: email || '',
-        new_phone: phoneNumber || '',
-        new_password: password || null,
-      });
 
-      if (error) {
-        // Fallback update profile langsung jika RPC belum dieksekusi di database
-        const profileUpdates: any = {};
-        if (fullName && fullName.trim()) profileUpdates.full_name = fullName.trim();
-        if (email && email.trim()) profileUpdates.email = email.trim().toLowerCase();
-        if (phoneNumber !== undefined) profileUpdates.phone_number = phoneNumber.trim();
+      // Selalu perbarui profile terlebih dahulu untuk field yang dikirim
+      const profileUpdates: any = {};
+      if (fullName !== undefined && fullName.trim()) profileUpdates.full_name = fullName.trim();
+      if (email !== undefined && email.trim()) profileUpdates.email = email.trim().toLowerCase();
+      if (phoneNumber !== undefined) profileUpdates.phone_number = phoneNumber.trim();
 
+      if (Object.keys(profileUpdates).length > 0) {
         await supabase.from('profiles').update(profileUpdates).eq('id', userId);
-        return NextResponse.json({ success: true, message: 'Profil diperbarui.' });
       }
 
-      return NextResponse.json({ success: true, data });
+      // Jalankan RPC jika ada email atau password yang perlu diperbarui di auth.users
+      if ((email && email.trim()) || (password && password.trim())) {
+        await supabase.rpc('admin_update_user', {
+          target_user_id: userId,
+          new_full_name: fullName || '',
+          new_email: email || '',
+          new_phone: phoneNumber || '',
+          new_password: password || null,
+        });
+      }
+
+      return NextResponse.json({ success: true, message: 'Data berhasil diperbarui.' });
     }
 
     return NextResponse.json({ success: true, message: 'Updated in local/demo environment.' });

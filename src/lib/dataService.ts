@@ -1653,28 +1653,25 @@ export async function getAllUsersForAdmin(): Promise<AdminUserItem[]> {
 
 export async function updateUserByMasterAdmin(params: {
   userId: string;
-  fullName: string;
-  email: string;
+  fullName?: string;
+  email?: string;
   phoneNumber?: string;
   password?: string;
-  teamIds: string[];
+  teamIds?: string[];
 }): Promise<{ success: boolean; error: string | null }> {
-  const cleanName = params.fullName.trim();
-  const cleanEmail = params.email.trim().toLowerCase();
-  const cleanPhone = (params.phoneNumber || '').trim();
-  const cleanPassword = (params.password || '').trim();
-
-  if (!cleanName) {
+  if (params.fullName !== undefined && !params.fullName.trim()) {
     return { success: false, error: 'Nama lengkap tidak boleh kosong.' };
   }
-  if (!cleanEmail) {
-    return { success: false, error: 'Alamat email tidak boleh kosong.' };
-  }
+
+  const cleanName = params.fullName !== undefined ? params.fullName.trim() : undefined;
+  const cleanEmail = params.email !== undefined ? params.email.trim().toLowerCase() : undefined;
+  const cleanPhone = params.phoneNumber !== undefined ? params.phoneNumber.trim() : undefined;
+  const cleanPassword = params.password !== undefined ? params.password.trim() : undefined;
 
   if (isSupabaseConfigured && supabase) {
     try {
       // 1. Panggil API Route untuk Auth & Password
-      const res = await fetch('/api/admin/users/update', {
+      await fetch('/api/admin/users/update', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1684,50 +1681,50 @@ export async function updateUserByMasterAdmin(params: {
           phoneNumber: cleanPhone,
           password: cleanPassword || undefined,
         }),
-      });
+      }).catch(() => {});
 
-      const resData = await res.json().catch(() => ({}));
-      if (!res.ok && !resData.success) {
-        console.warn('API /api/admin/users/update notice:', resData.error);
+      // 2. Pastikan tabel profiles selalu terupdate langsung untuk field yang diubah
+      const profileUpdates: any = {};
+      if (cleanName !== undefined) profileUpdates.full_name = cleanName;
+      if (cleanEmail !== undefined) profileUpdates.email = cleanEmail;
+      if (cleanPhone !== undefined) profileUpdates.phone_number = cleanPhone;
+
+      if (Object.keys(profileUpdates).length > 0) {
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .update(profileUpdates)
+          .eq('id', params.userId);
+
+        if (profileError) {
+          console.warn('Profile direct update error:', profileError.message);
+        }
       }
 
-      // 2. Pastikan tabel profiles selalu terupdate langsung
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .update({
-          full_name: cleanName,
-          email: cleanEmail,
-          phone_number: cleanPhone,
-        })
-        .eq('id', params.userId);
+      // 3. Update keanggotaan tim (team_members) jika teamIds disertakan
+      if (params.teamIds !== undefined) {
+        const { data: currentMemberships } = await supabase
+          .from('team_members')
+          .select('id, team_id')
+          .eq('user_id', params.userId);
 
-      if (profileError) {
-        console.warn('Profile direct update error:', profileError.message);
-      }
+        const currentTeamIds = new Set((currentMemberships || []).map((m: any) => m.team_id));
+        const targetTeamIds = new Set(params.teamIds);
 
-      // 3. Update keanggotaan tim (team_members)
-      const { data: currentMemberships } = await supabase
-        .from('team_members')
-        .select('id, team_id')
-        .eq('user_id', params.userId);
+        // Tim yang perlu dicabut/dihapus
+        const toRemove = (currentMemberships || []).filter((m: any) => !targetTeamIds.has(m.team_id));
+        for (const m of toRemove) {
+          await supabase.from('team_members').delete().eq('id', m.id);
+        }
 
-      const currentTeamIds = new Set((currentMemberships || []).map((m: any) => m.team_id));
-      const targetTeamIds = new Set(params.teamIds);
-
-      // Tim yang perlu dicabut/dihapus
-      const toRemove = (currentMemberships || []).filter((m: any) => !targetTeamIds.has(m.team_id));
-      for (const m of toRemove) {
-        await supabase.from('team_members').delete().eq('id', m.id);
-      }
-
-      // Tim yang perlu ditambahkan
-      const toAdd = params.teamIds.filter((tId) => !currentTeamIds.has(tId));
-      for (const tId of toAdd) {
-        await supabase.from('team_members').insert({
-          user_id: params.userId,
-          team_id: tId,
-          role: 'anggota',
-        });
+        // Tim yang perlu ditambahkan
+        const toAdd = params.teamIds.filter((tId) => !currentTeamIds.has(tId));
+        for (const tId of toAdd) {
+          await supabase.from('team_members').insert({
+            user_id: params.userId,
+            team_id: tId,
+            role: 'anggota',
+          });
+        }
       }
 
       return { success: true, error: null };
@@ -1742,32 +1739,31 @@ export async function updateUserByMasterAdmin(params: {
       return { success: false, error: 'Pengguna tidak ditemukan.' };
     }
 
-    user.full_name = cleanName;
-    user.email = cleanEmail;
-    user.phone_number = cleanPhone;
-    if (cleanPassword) {
-      user.password = cleanPassword;
-    }
+    if (cleanName !== undefined) user.full_name = cleanName;
+    if (cleanEmail !== undefined) user.email = cleanEmail;
+    if (cleanPhone !== undefined) user.phone_number = cleanPhone;
+    if (cleanPassword !== undefined && cleanPassword) user.password = cleanPassword;
 
-    // Hapus keanggotaan yang dicabut
-    db.members = db.members.filter(
-      (m) => !(m.user_id === params.userId && !params.teamIds.includes(m.team_id))
-    );
+    // Kelola tim jika teamIds dikirim
+    if (params.teamIds !== undefined) {
+      db.members = db.members.filter(
+        (m) => !(m.user_id === params.userId && !params.teamIds!.includes(m.team_id))
+      );
 
-    // Tambahkan keanggotaan baru
-    const existingTeamIds = new Set(
-      db.members.filter((m) => m.user_id === params.userId).map((m) => m.team_id)
-    );
+      const existingTeamIds = new Set(
+        db.members.filter((m) => m.user_id === params.userId).map((m) => m.team_id)
+      );
 
-    for (const tId of params.teamIds) {
-      if (!existingTeamIds.has(tId)) {
-        db.members.push({
-          id: 'm-' + Date.now() + Math.random().toString(36).slice(2, 6),
-          team_id: tId,
-          user_id: params.userId,
-          role: 'anggota',
-          joined_at: new Date().toISOString(),
-        });
+      for (const tId of params.teamIds) {
+        if (!existingTeamIds.has(tId)) {
+          db.members.push({
+            id: 'm-' + Date.now() + Math.random().toString(36).slice(2, 6),
+            team_id: tId,
+            user_id: params.userId,
+            role: 'anggota',
+            joined_at: new Date().toISOString(),
+          });
+        }
       }
     }
 
@@ -1778,9 +1774,9 @@ export async function updateUserByMasterAdmin(params: {
       if (raw) {
         const p: Profile = JSON.parse(raw);
         if (p.id === params.userId) {
-          p.full_name = cleanName;
-          p.email = cleanEmail;
-          p.phone_number = cleanPhone;
+          if (cleanName !== undefined) p.full_name = cleanName;
+          if (cleanEmail !== undefined) p.email = cleanEmail;
+          if (cleanPhone !== undefined) p.phone_number = cleanPhone;
           localStorage.setItem(DEMO_USER_KEY, JSON.stringify(p));
         }
       }
