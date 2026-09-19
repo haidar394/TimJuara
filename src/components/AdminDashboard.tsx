@@ -18,6 +18,8 @@ import {
   sendTestWhatsAppMessage,
   triggerDeadlineReminders,
   updateUserByMasterAdmin,
+  updateTeamWhatsAppGroup,
+  getWhatsAppGroups,
 } from '@/lib/dataService';
 import {
   Profile,
@@ -102,6 +104,15 @@ export default function AdminDashboard() {
   const [editSelectedTeamIds, setEditSelectedTeamIds] = useState<string[]>([]);
   const [showEditPassword, setShowEditPassword] = useState(false);
   const [isSavingUser, setIsSavingUser] = useState(false);
+
+  // WhatsApp Group Connect Modal (Per-Team, Master Admin)
+  const [teamToConnectGroup, setTeamToConnectGroup] = useState<AdminTeamItem | null>(null);
+  const [groupInputId, setGroupInputId] = useState('');
+  const [groupInputName, setGroupInputName] = useState('');
+  const [availableGroups, setAvailableGroups] = useState<Array<{ id: string; name: string }>>([]);
+  const [loadingGroups, setLoadingGroups] = useState(false);
+  const [isSavingGroup, setIsSavingGroup] = useState(false);
+  const [isTestingGroup, setIsTestingGroup] = useState(false);
 
   // Dark Mode State
   const [isDarkMode, setIsDarkMode] = useState(false);
@@ -221,6 +232,113 @@ export default function AdminDashboard() {
       }
     } else {
       showToast(`Gagal mengirim notifikasi: ${res.error}`);
+    }
+  };
+
+  // WhatsApp Group Connect Modal Handlers
+  const handleOpenConnectGroupModal = (team: AdminTeamItem) => {
+    setTeamToConnectGroup(team);
+    setGroupInputId(team.wa_group_id || '');
+    setGroupInputName(team.wa_group_name || '');
+    // Muat daftar grup bot jika belum ada
+    if (availableGroups.length === 0) {
+      handleFetchBotGroups(false);
+    }
+  };
+
+  const handleFetchBotGroups = async (refresh: boolean = false) => {
+    setLoadingGroups(true);
+    try {
+      const res = await getWhatsAppGroups(waToken || undefined, refresh);
+      if (res.success) {
+        setAvailableGroups(res.groups);
+        if (res.groups.length === 0) {
+          showToast('Bot belum terdaftar di grup WhatsApp manapun. Tambahkan nomor bot ke grup Anda.');
+        } else {
+          showToast(`Berhasil memuat ${res.groups.length} grup WhatsApp dari bot Fonnte.`);
+        }
+      } else {
+        showToast(res.error || 'Gagal memuat grup dari server.');
+      }
+    } catch (e: any) {
+      showToast('Terjadi kesalahan saat memuat grup WhatsApp.');
+    } finally {
+      setLoadingGroups(false);
+    }
+  };
+
+  const handleSaveTeamGroup = async () => {
+    if (!teamToConnectGroup) return;
+    setIsSavingGroup(true);
+    try {
+      const res = await updateTeamWhatsAppGroup(
+        teamToConnectGroup.id,
+        groupInputId.trim(),
+        groupInputName.trim()
+      );
+      if (res.success) {
+        setTeams((prev) =>
+          prev.map((t) =>
+            t.id === teamToConnectGroup.id
+              ? {
+                  ...t,
+                  wa_group_id: groupInputId.trim() || undefined,
+                  wa_group_name: groupInputName.trim() || undefined,
+                }
+              : t
+          )
+        );
+        showToast(`✅ Grup WhatsApp untuk tim "${teamToConnectGroup.name}" berhasil disimpan!`);
+        setTeamToConnectGroup(null);
+      } else {
+        showToast(`Gagal menyimpan grup: ${res.error}`);
+      }
+    } catch (e: any) {
+      showToast('Terjadi kesalahan saat menyimpan pengaturan grup.');
+    } finally {
+      setIsSavingGroup(false);
+    }
+  };
+
+  const handleDisconnectTeamGroup = async () => {
+    if (!teamToConnectGroup) return;
+    setIsSavingGroup(true);
+    try {
+      await updateTeamWhatsAppGroup(teamToConnectGroup.id, '', '');
+      setTeams((prev) =>
+        prev.map((t) =>
+          t.id === teamToConnectGroup.id
+            ? { ...t, wa_group_id: undefined, wa_group_name: undefined }
+            : t
+        )
+      );
+      showToast(`Hubungan grup WhatsApp untuk tim "${teamToConnectGroup.name}" telah diputuskan.`);
+      setTeamToConnectGroup(null);
+    } catch (e) {
+      showToast('Gagal memutuskan grup.');
+    } finally {
+      setIsSavingGroup(false);
+    }
+  };
+
+  const handleTestSendToGroup = async () => {
+    if (!groupInputId.trim()) {
+      showToast('⚠️ Masukkan atau pilih ID Grup WhatsApp terlebih dahulu.');
+      return;
+    }
+    setIsTestingGroup(true);
+    try {
+      const testMsg = `🤖 *TES KONEKSI BOT TIMJUARA KE GRUP TIM*\n\nHalo Rekan Tim! 👋\nGrup WhatsApp ini berhasil dihubungkan dengan bot notifikasi tim *${teamToConnectGroup?.name || 'TimJuara'}*.\n\nNotifikasi otomatis bot ke grup ini meliputi:\n1. 📋 *Tugas Baru Ditugaskan*: Judul, PIC, & batas waktu tugas\n2. 🎉 *Tugas Selesai & Disetujui*: Pengumuman tugas selesai & catatan review\n\nSemangat berkolaborasi dan raih juara! 🚀💪`;
+      const res = await sendTestWhatsAppMessage(groupInputId.trim(), testMsg, waToken || undefined);
+      if (res.success) {
+        showToast('✅ Berhasil mengirim pesan uji coba ke grup WhatsApp!');
+      } else {
+        showToast(`❌ Gagal kirim ke grup: ${res.error}`);
+      }
+    } catch (e: any) {
+      showToast('Terjadi kesalahan jaringan saat mengirim ke grup.');
+    } finally {
+      setIsTestingGroup(false);
     }
   };
 
@@ -809,6 +927,7 @@ export default function AdminDashboard() {
                         <th style={{ padding: '12px 14px', fontWeight: 700 }}>Pembuat (Ketua)</th>
                         <th style={{ padding: '12px 14px', fontWeight: 700, textAlign: 'center' }}>Anggota</th>
                         <th style={{ padding: '12px 14px', fontWeight: 700, textAlign: 'center' }}>Tugas</th>
+                        <th style={{ padding: '12px 14px', fontWeight: 700 }}>WhatsApp Grup</th>
                         <th style={{ padding: '12px 14px', fontWeight: 700 }}>Dibuat Pada</th>
                         <th style={{ padding: '12px 14px', fontWeight: 700, textAlign: 'right' }}>Aksi</th>
                       </tr>
@@ -866,11 +985,66 @@ export default function AdminDashboard() {
                                 <CheckCircle2 size={12} /> {t.task_count}
                               </span>
                             </td>
+                            <td style={{ padding: '14px' }}>
+                              {t.wa_group_id ? (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                                  <span
+                                    className="badge badge-success"
+                                    style={{
+                                      fontSize: '0.725rem',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: 5,
+                                      padding: '3px 8px',
+                                      width: 'fit-content',
+                                    }}
+                                    title={`ID Grup: ${t.wa_group_id}`}
+                                  >
+                                    <MessageSquare size={11} /> {t.wa_group_name || 'Grup Terhubung'}
+                                  </span>
+                                  <span
+                                    style={{
+                                      fontFamily: 'monospace',
+                                      fontSize: '0.675rem',
+                                      color: 'var(--text-muted)',
+                                      maxWidth: 130,
+                                      whiteSpace: 'nowrap',
+                                      overflow: 'hidden',
+                                      textOverflow: 'ellipsis',
+                                    }}
+                                    title={t.wa_group_id}
+                                  >
+                                    {t.wa_group_id}
+                                  </span>
+                                </div>
+                              ) : (
+                                <span
+                                  className="badge badge-neutral"
+                                  style={{ fontSize: '0.725rem', color: 'var(--text-muted)', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                                >
+                                  Belum Terhubung
+                                </span>
+                              )}
+                            </td>
                             <td style={{ padding: '14px', color: 'var(--text-muted)', fontSize: '0.8rem' }}>
                               {new Date(t.created_at).toLocaleDateString('id-ID', { year: 'numeric', month: 'short', day: 'numeric' })}
                             </td>
                             <td style={{ padding: '14px', textAlign: 'right' }}>
                               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8 }}>
+                                <button
+                                  onClick={() => handleOpenConnectGroupModal(t)}
+                                  className="btn btn-secondary btn-sm"
+                                  style={{
+                                    fontSize: '0.75rem',
+                                    padding: '5px 10px',
+                                    borderColor: t.wa_group_id ? (isDarkMode ? 'rgba(34, 197, 94, 0.4)' : '#86efac') : undefined,
+                                    color: t.wa_group_id ? (isDarkMode ? '#4ade80' : '#16a34a') : undefined,
+                                    background: t.wa_group_id ? (isDarkMode ? 'rgba(34, 197, 94, 0.08)' : '#f0fdf4') : undefined,
+                                  }}
+                                  title="Hubungkan atau ubah ID grup WhatsApp tim ini"
+                                >
+                                  <MessageSquare size={13} /> {t.wa_group_id ? 'Atur Grup' : 'Koneksi Grup'}
+                                </button>
                                 <Link
                                   href={`/team/${t.username}`}
                                   className="btn btn-secondary btn-sm"
@@ -1289,6 +1463,266 @@ export default function AdminDashboard() {
           )}
         </div>
       </main>
+
+      {/* ========================================================================= */}
+      {/* MODAL KONEKSI GRUP WHATSAPP TIM (MASTER ADMIN)                            */}
+      {/* ========================================================================= */}
+      {teamToConnectGroup && (
+        <div
+          className="modal-overlay"
+          onClick={() => !isSavingGroup && !isTestingGroup && setTeamToConnectGroup(null)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(15, 23, 42, 0.75)',
+            backdropFilter: 'blur(8px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            padding: 16,
+          }}
+        >
+          <div
+            className="modal-card"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              maxWidth: 540,
+              width: '100%',
+              background: isDarkMode ? 'var(--surface)' : '#ffffff',
+              borderRadius: 20,
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.35), 0 0 0 1px var(--surface-border)',
+              padding: 26,
+              position: 'relative',
+              maxHeight: '90vh',
+              overflowY: 'auto',
+            }}
+          >
+            {/* Close Button */}
+            <button
+              onClick={() => !isSavingGroup && !isTestingGroup && setTeamToConnectGroup(null)}
+              style={{
+                position: 'absolute',
+                top: 18,
+                right: 18,
+                background: isDarkMode ? 'var(--surface-secondary)' : '#f1f5f9',
+                border: 'none',
+                width: 32,
+                height: 32,
+                borderRadius: 8,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                color: 'var(--text-muted)',
+              }}
+            >
+              <X size={16} />
+            </button>
+
+            {/* Modal Header */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+              <div
+                style={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: 12,
+                  background: isDarkMode ? 'rgba(34, 197, 94, 0.2)' : '#dcfce7',
+                  color: isDarkMode ? '#4ade80' : '#16a34a',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                }}
+              >
+                <MessageSquare size={24} />
+              </div>
+              <div>
+                <h3 style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-main)', margin: 0 }}>
+                  Koneksi Grup WhatsApp Tim
+                </h3>
+                <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: 0, marginTop: 2 }}>
+                  Tim: <strong style={{ color: 'var(--text-main)' }}>{teamToConnectGroup.name}</strong> (@{teamToConnectGroup.username})
+                </p>
+              </div>
+            </div>
+
+            {/* Informasi Alur Otomatis */}
+            <div
+              style={{
+                background: isDarkMode ? 'rgba(34, 197, 94, 0.08)' : '#f0fdf4',
+                border: isDarkMode ? '1px solid rgba(34, 197, 94, 0.25)' : '1px solid #bbf7d0',
+                borderRadius: 12,
+                padding: '12px 14px',
+                fontSize: '0.825rem',
+                color: isDarkMode ? '#86efac' : '#166534',
+                lineHeight: 1.5,
+                marginBottom: 18,
+              }}
+            >
+              <strong>🤖 Fitur Notifikasi Otomatis ke Grup:</strong>
+              <ul style={{ margin: '6px 0 0 0', paddingLeft: 18 }}>
+                <li><b>Tugas Baru</b>: Bot otomatis mengirim detail tugas baru (judul, PIC, deadline) ke grup tim ini.</li>
+                <li><b>Tugas Selesai & Disetujui</b>: Bot otomatis mengirim ucapan apresiasi & konfirmasi tugas selesai ke grup tim ini.</li>
+              </ul>
+            </div>
+
+            {/* Pilihan 1: Ambil dari Daftar Grup Bot WhatsApp */}
+            <div style={{ marginBottom: 18 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                <label className="form-label" style={{ fontWeight: 700, margin: 0, fontSize: '0.875rem' }}>
+                  Pilih dari Grup yang Diikuti Bot WhatsApp:
+                </label>
+                <button
+                  type="button"
+                  onClick={() => handleFetchBotGroups(true)}
+                  disabled={loadingGroups}
+                  className="btn btn-secondary btn-sm"
+                  style={{ fontSize: '0.75rem', padding: '4px 10px', display: 'flex', alignItems: 'center', gap: 5 }}
+                  title="Ambil dan sinkronisasi daftar grup WhatsApp dari Fonnte"
+                >
+                  <RefreshCw size={12} className={loadingGroups ? 'spin' : ''} />
+                  {loadingGroups ? 'Memuat...' : '🔄 Muat / Sinkron Grup'}
+                </button>
+              </div>
+
+              {availableGroups.length > 0 ? (
+                <select
+                  className="form-input"
+                  style={{ fontSize: '0.875rem' }}
+                  onChange={(e) => {
+                    const sel = availableGroups.find((g) => g.id === e.target.value);
+                    if (sel) {
+                      setGroupInputId(sel.id);
+                      setGroupInputName(sel.name);
+                    }
+                  }}
+                  value={groupInputId}
+                >
+                  <option value="">-- Pilih Grup WhatsApp dari Bot --</option>
+                  {availableGroups.map((g) => (
+                    <option key={g.id} value={g.id}>
+                      {g.name} ({g.id})
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <div
+                  style={{
+                    fontSize: '0.8rem',
+                    color: 'var(--text-muted)',
+                    background: isDarkMode ? 'var(--surface-secondary)' : '#f8fafc',
+                    padding: '8px 12px',
+                    borderRadius: 8,
+                    border: '1px dashed var(--surface-border)',
+                  }}
+                >
+                  Belum ada grup yang termuat. Klik tombol <b>"Muat / Sinkron Grup"</b> di atas, atau masukkan ID Grup secara manual di bawah.
+                </div>
+              )}
+            </div>
+
+            {/* Pilihan 2: Input Manual ID Grup WhatsApp */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 20 }}>
+              <div>
+                <label className="form-label" style={{ fontWeight: 700, fontSize: '0.85rem' }}>
+                  ID Grup WhatsApp <span style={{ color: '#ef4444' }}>*</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="Contoh: 120363028391823901@g.us"
+                  value={groupInputId}
+                  onChange={(e) => setGroupInputId(e.target.value)}
+                  className="form-input"
+                  style={{ fontFamily: 'monospace', fontSize: '0.875rem' }}
+                />
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 4, display: 'block' }}>
+                  Format ID Grup WhatsApp Fonnte biasanya berakhiran <code>@g.us</code>.
+                </span>
+              </div>
+
+              <div>
+                <label className="form-label" style={{ fontWeight: 700, fontSize: '0.85rem' }}>
+                  Nama Tampilan Grup (Opsional)
+                </label>
+                <input
+                  type="text"
+                  placeholder="Contoh: Tim 1 Garuda Juara"
+                  value={groupInputName}
+                  onChange={(e) => setGroupInputName(e.target.value)}
+                  className="form-input"
+                  style={{ fontSize: '0.875rem' }}
+                />
+              </div>
+            </div>
+
+            {/* Test Kirim & Simpan Button Actions */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  onClick={handleTestSendToGroup}
+                  disabled={isTestingGroup || !groupInputId.trim()}
+                  className="btn btn-secondary btn-sm"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    fontSize: '0.825rem',
+                    color: isDarkMode ? '#4ade80' : '#16a34a',
+                    borderColor: isDarkMode ? 'rgba(34, 197, 94, 0.4)' : '#86efac',
+                  }}
+                  title="Kirim pesan tes ke grup ini untuk verifikasi bot bisa mengirim pesan"
+                >
+                  <MessageSquare size={14} />
+                  {isTestingGroup ? 'Mengirim...' : 'Kirim Pesan Tes ke Grup'}
+                </button>
+
+                {teamToConnectGroup.wa_group_id && (
+                  <button
+                    type="button"
+                    onClick={handleDisconnectTeamGroup}
+                    disabled={isSavingGroup}
+                    className="btn btn-danger btn-sm"
+                    style={{ fontSize: '0.8rem', padding: '6px 12px' }}
+                  >
+                    Putuskan Grup
+                  </button>
+                )}
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 10, marginTop: 6 }}>
+                <button
+                  type="button"
+                  onClick={() => setTeamToConnectGroup(null)}
+                  disabled={isSavingGroup || isTestingGroup}
+                  className="btn btn-secondary"
+                  style={{ fontSize: '0.875rem' }}
+                >
+                  Batal
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveTeamGroup}
+                  disabled={isSavingGroup || !groupInputId.trim()}
+                  className="btn btn-primary"
+                  style={{
+                    fontSize: '0.875rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
+                    borderColor: '#16a34a',
+                  }}
+                >
+                  <Check size={16} />
+                  {isSavingGroup ? 'Menyimpan...' : 'Simpan Pengaturan Grup'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ========================================================================= */}
       {/* MODAL KONFIRMASI: HAPUS TIM                                               */}

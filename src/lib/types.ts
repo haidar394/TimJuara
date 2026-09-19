@@ -23,6 +23,8 @@ export interface Team {
   created_at: string;
   wa_gateway_token?: string; // Token API Fonnte tim
   wa_notifications_enabled?: boolean; // Status aktif notifikasi bot WhatsApp
+  wa_group_id?: string; // ID grup WhatsApp tim (misal: 120363028391823901@g.us)
+  wa_group_name?: string; // Nama grup WhatsApp tim (misal: Tim Garuda 2026 Official)
 }
 
 export interface TeamMember {

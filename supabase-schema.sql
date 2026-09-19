@@ -437,6 +437,9 @@ ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS phone_number TEXT DEFAULT '
 -- Kolom konfigurasi bot WhatsApp Fonnte pada tim
 ALTER TABLE public.teams ADD COLUMN IF NOT EXISTS wa_gateway_token TEXT DEFAULT '';
 ALTER TABLE public.teams ADD COLUMN IF NOT EXISTS wa_notifications_enabled BOOLEAN DEFAULT true;
+-- Kolom ID dan Nama Grup WhatsApp untuk masing-masing tim (Beda tim, beda ID grup)
+ALTER TABLE public.teams ADD COLUMN IF NOT EXISTS wa_group_id TEXT DEFAULT '';
+ALTER TABLE public.teams ADD COLUMN IF NOT EXISTS wa_group_name TEXT DEFAULT '';
 
 -- Update trigger handle_new_user agar otomatis menangkap phone_number saat pendaftaran baru
 CREATE OR REPLACE FUNCTION public.handle_new_user()

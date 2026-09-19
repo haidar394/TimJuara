@@ -1,8 +1,20 @@
 import { NextResponse } from 'next/server';
 
-// Fungsi normalisasi nomor telepon Indonesia ke format 628...
+// Fungsi normalisasi nomor telepon Indonesia atau target ID WhatsApp (Pribadi/Grup)
 export function normalizeIndonesianPhone(phone: string): string {
-  let cleaned = phone.replace(/[^0-9]/g, '');
+  const trimmed = (phone || '').trim();
+
+  // Jika target adalah WhatsApp Group ID (@g.us) atau broadcast channel (@broadcast)
+  if (trimmed.includes('@g.us') || trimmed.includes('@broadcast') || trimmed.includes('@')) {
+    return trimmed;
+  }
+
+  // Jika pengguna memasukkan deretan digit ID grup tanpa akhiran @g.us (misal format Fonnte 18 digit seperti 120363...)
+  if (trimmed.startsWith('120363') && trimmed.length >= 15) {
+    return trimmed + '@g.us';
+  }
+
+  let cleaned = trimmed.replace(/[^0-9]/g, '');
   if (cleaned.startsWith('0')) {
     cleaned = '62' + cleaned.slice(1);
   } else if (cleaned.startsWith('8')) {

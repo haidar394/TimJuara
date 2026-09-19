@@ -43,6 +43,8 @@ import {
   markNotificationAsRead,
   markAllNotificationsAsRead,
   sendRealtimeWhatsAppNotification,
+  updateTeamWhatsAppGroup,
+  getWhatsAppGroups,
 } from '@/lib/dataService';
 import {
   Profile,
@@ -106,6 +108,7 @@ import {
   Sun,
   Moon,
   MessageCircle,
+  RefreshCw,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -150,6 +153,16 @@ export default function TeamWorkspace() {
   const [savingTeamAvatar, setSavingTeamAvatar] = useState(false);
   const [userAvatarUrl, setUserAvatarUrl] = useState('');
   const [savingUserAvatar, setSavingUserAvatar] = useState(false);
+
+  // WhatsApp Group Connect Modal (TeamWorkspace)
+  const [showConnectTeamGroupModal, setShowConnectTeamGroupModal] = useState(false);
+  const [teamGroupInputId, setTeamGroupInputId] = useState('');
+  const [teamGroupInputName, setTeamGroupInputName] = useState('');
+  const [teamAvailableGroups, setTeamAvailableGroups] = useState<Array<{ id: string; name: string }>>([]);
+  const [loadingTeamGroups, setLoadingTeamGroups] = useState(false);
+  const [isSavingTeamGroup, setIsSavingTeamGroup] = useState(false);
+  const [isTestingTeamGroup, setIsTestingTeamGroup] = useState(false);
+  const [isSendingGroupRecap, setIsSendingGroupRecap] = useState(false);
 
   // Unread Comments Tracking (task_id -> last_known_count)
   const [readCommentsMap, setReadCommentsMap] = useState<Record<string, number>>({});
@@ -589,6 +602,21 @@ export default function TeamWorkspace() {
       sendRealtimeWhatsAppNotification(waPhones, waMsg, team.wa_gateway_token);
     }
 
+    // Notifikasi Otomatis Bot ke Grup WhatsApp Tim
+    const teamGroupId = team.wa_group_id || (typeof window !== 'undefined' ? localStorage.getItem('timjuara_team_wa_group_' + team.id) || undefined : undefined);
+    if (teamGroupId) {
+      const deadlineText = deadlineIso
+        ? new Date(deadlineIso).toLocaleDateString('id-ID', { dateStyle: 'full' })
+        : 'Tidak ada batas waktu';
+      const picNames = targetMembers.map((m) => m.profile?.full_name || 'Anggota').join(', ') || 'Seluruh Tim';
+
+      const groupWaMsg = `📢 *TUGAS BARU - ${team.name.toUpperCase()}* 🚀\n\nHalo Rekan-rekan Tim! 👋\nAda tugas baru yang baru saja ditambahkan ke workspace:\n\n📌 *Judul*: *${taskTitle.trim()}*\n👤 *Ditugaskan ke*: *${picNames}*\n📅 *Deadline*: *${deadlineText}*\n${taskDesc.trim() ? `📝 *Catatan*: ${taskDesc.trim()}\n` : ''}${taskLink.trim() ? `🔗 *Link*: ${taskLink.trim()}\n` : ''}\nYuk segera berproses bersama di TimJuara:\n👉 ${window.location.origin}/team/${team.username}\n\nSemangat berkolaborasi dan raih juara! 🔥`;
+
+      sendTestWhatsAppMessage(teamGroupId, groupWaMsg, team.wa_gateway_token).catch((e) => {
+        console.warn('Gagal kirim bot ke grup:', e);
+      });
+    }
+
     setTaskTitle('');
     setTaskDesc('');
     setTaskLink('');
@@ -776,6 +804,18 @@ export default function TeamWorkspace() {
       sendRealtimeWhatsAppNotification(waPhones, waMsg, team.wa_gateway_token);
     }
 
+    // Notifikasi Otomatis Bot ke Grup WhatsApp Tim saat Tugas Selesai
+    const teamGroupId = team.wa_group_id || (typeof window !== 'undefined' ? localStorage.getItem('timjuara_team_wa_group_' + team.id) || undefined : undefined);
+    if (teamGroupId) {
+      const completerProfile = members.find((m) => m.user_id === completedBy)?.profile;
+      const completerName = completerProfile?.full_name || 'Rekan Tim';
+      const groupWaMsg = `🎉 *TUGAS SELESAI & DISETUJUI - ${team.name.toUpperCase()}* 🏆\n\nKabar gembira untuk seluruh tim! Tugas berikut telah resmi diverifikasi & disetujui selesai:\n\n✅ *Tugas*: *${task.title}*\n👤 *Diselesaikan oleh*: *${completerName}*\n${task.task_link ? `🔗 *Hasil Kerja*: ${task.task_link}\n` : ''}\nHebat tim! Satu langkah lebih dekat menuju kemenangan! 🚀💪\n👉 Buka Workspace: ${window.location.origin}/team/${team.username}`;
+
+      sendTestWhatsAppMessage(teamGroupId, groupWaMsg, team.wa_gateway_token).catch((e) => {
+        console.warn('Gagal kirim bot selesai ke grup:', e);
+      });
+    }
+
     showToast('🎉 Tugas telah disetujui selesai oleh Ketua!');
 
     const updated = await getTeamTasks(team.id);
@@ -922,6 +962,18 @@ export default function TeamWorkspace() {
       if (waPhones.length > 0) {
         const waMsg = `🎉 *TUGAS TELAH DISETUJUI - TIMJUARA*\n\nHalo Rekan Tim! 🚀\nSelamat! Tugas *${ketuaReviewTask.title}* pada tim *${team.name}* telah diverifikasi dan disetujui selesai oleh Ketua Tim.\n${ketuaReviewNotes.trim() ? `📝 Catatan Ketua: "${ketuaReviewNotes.trim()}"\n` : ''}Terima kasih atas kerja kerasmu! 💪\nBuka TimJuara: ${window.location.origin}/team/${team.username}`;
         sendRealtimeWhatsAppNotification(waPhones, waMsg, team.wa_gateway_token);
+      }
+
+      // Notifikasi Otomatis Bot ke Grup WhatsApp Tim saat Tugas Selesai Diverifikasi Ketua
+      const teamGroupId = team.wa_group_id || (typeof window !== 'undefined' ? localStorage.getItem('timjuara_team_wa_group_' + team.id) || undefined : undefined);
+      if (teamGroupId) {
+        const completerProfile = members.find((m) => m.user_id === completedBy)?.profile;
+        const completerName = completerProfile?.full_name || 'Rekan Tim';
+        const groupWaMsg = `🎉 *TUGAS SELESAI & DISETUJUI - ${team.name.toUpperCase()}* 🏆\n\nKabar luar biasa untuk tim! Tugas berikut telah diverifikasi & disetujui selesai oleh Ketua:\n\n✅ *Tugas*: *${ketuaReviewTask.title}*\n👤 *Diselesaikan oleh*: *${completerName}*\n${ketuaReviewNotes.trim() ? `📝 *Catatan Ketua*: "${ketuaReviewNotes.trim()}"\n` : ''}${ketuaReviewTask.task_link ? `🔗 *Hasil Kerja*: ${ketuaReviewTask.task_link}\n` : ''}\nKerja bagus rekan-rekan! Terus melaju menuju target tim! 🚀💪\n👉 Workspace: ${window.location.origin}/team/${team.username}`;
+
+        sendTestWhatsAppMessage(teamGroupId, groupWaMsg, team.wa_gateway_token).catch((e) => {
+          console.warn('Gagal kirim bot selesai ke grup:', e);
+        });
       }
 
       setShowKetuaReviewModal(false);
@@ -1300,6 +1352,164 @@ export default function TeamWorkspace() {
 
     const waUrl = `https://wa.me/?text=${encodeURIComponent(text)}`;
     window.open(waUrl, '_blank');
+  };
+
+  const handleSendBotGroupRecap = async () => {
+    if (!team) return;
+    const teamGroupId = team.wa_group_id || (typeof window !== 'undefined' ? localStorage.getItem('timjuara_team_wa_group_' + team.id) || undefined : undefined);
+    if (!teamGroupId) {
+      handleShareGroupRecap();
+      return;
+    }
+
+    const pendingTasks = tasks.filter((t) => t.status !== 'done');
+    if (pendingTasks.length === 0) {
+      showToast('Semua tugas tim sudah selesai! 🎉');
+      return;
+    }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    let text = `📢 *REKAP TUGAS & DEADLINE TIM: ${team.name.toUpperCase()}*\n`;
+    text += `_Diperbarui: ${new Date().toLocaleDateString('id-ID', { dateStyle: 'full' })}_\n\n`;
+
+    pendingTasks.forEach((t, idx) => {
+      let deadlineNote = 'Tanpa Deadline';
+      if (t.deadline) {
+        const d = new Date(t.deadline);
+        d.setHours(0, 0, 0, 0);
+        const diffDays = Math.round((d.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+        if (diffDays < 0) deadlineNote = `⚠️ *TERLEWAT ${Math.abs(diffDays)} HARI!*`;
+        else if (diffDays === 0) deadlineNote = `🚨 *HARI INI!*`;
+        else if (diffDays === 1) deadlineNote = `⏳ *BESOK!*`;
+        else deadlineNote = `📅 ${diffDays} hari lagi (${new Date(t.deadline).toLocaleDateString('id-ID')})`;
+      }
+
+      const statusText = t.status === 'review' ? 'Menunggu Dicek' : t.status === 'in_progress' ? 'Dikerjakan' : 'Belum Mulai';
+      const picNames = t.assignee_profiles && t.assignee_profiles.length > 0
+        ? t.assignee_profiles.map((p) => p.full_name).join(', ')
+        : (t.assignee_profile?.full_name || 'Belum ditugaskan');
+      text += `${idx + 1}. *${t.title}*\n`;
+      text += `   • Member: ${picNames}\n`;
+      text += `   • Status: ${statusText}\n`;
+      text += `   • Deadline: ${deadlineNote}\n`;
+      if (t.task_link) text += `   • Link: ${t.task_link}\n`;
+      text += `\n`;
+    });
+
+    text += `Semangat rekan-rekan tim! Pantau progress lengkap di TimJuara:\n👉 ${window.location.origin}/team/${team.username}`;
+
+    setIsSendingGroupRecap(true);
+    showToast('Mengirimkan rekap tugas ke Grup WhatsApp tim via Bot...');
+    try {
+      const tokenToUse = team.wa_gateway_token || globalWaToken || undefined;
+      const res = await sendTestWhatsAppMessage(teamGroupId, text, tokenToUse);
+      if (res.success) {
+        showToast('✅ Berhasil mengirim rekap tugas ke Grup WhatsApp via Bot!');
+      } else {
+        showToast(`Gagal kirim bot ke grup: ${res.error}. Membuka WhatsApp manual...`);
+        handleShareGroupRecap();
+      }
+    } catch {
+      showToast('Terjadi kesalahan jaringan.');
+    } finally {
+      setIsSendingGroupRecap(false);
+    }
+  };
+
+  const handleOpenConnectTeamGroupModal = () => {
+    if (!team) return;
+    const currentGroupId = team.wa_group_id || (typeof window !== 'undefined' ? localStorage.getItem('timjuara_team_wa_group_' + team.id) || '' : '');
+    const currentGroupName = team.wa_group_name || (typeof window !== 'undefined' ? localStorage.getItem('timjuara_team_wa_group_name_' + team.id) || '' : '');
+    setTeamGroupInputId(currentGroupId);
+    setTeamGroupInputName(currentGroupName);
+    setShowConnectTeamGroupModal(true);
+    if (teamAvailableGroups.length === 0) {
+      handleFetchTeamBotGroups(false);
+    }
+  };
+
+  const handleFetchTeamBotGroups = async (refresh: boolean = false) => {
+    setLoadingTeamGroups(true);
+    try {
+      const tokenToUse = team?.wa_gateway_token || globalWaToken || undefined;
+      const res = await getWhatsAppGroups(tokenToUse, refresh);
+      if (res.success) {
+        setTeamAvailableGroups(res.groups);
+        if (res.groups.length === 0) {
+          showToast('Bot belum terdaftar di grup WhatsApp manapun. Tambahkan bot ke grup Anda.');
+        } else {
+          showToast(`Berhasil memuat ${res.groups.length} grup WhatsApp dari bot Fonnte.`);
+        }
+      } else {
+        showToast(res.error || 'Gagal memuat grup dari bot.');
+      }
+    } catch {
+      showToast('Terjadi kesalahan saat memuat grup WhatsApp.');
+    } finally {
+      setLoadingTeamGroups(false);
+    }
+  };
+
+  const handleSaveTeamGroupSettings = async () => {
+    if (!team) return;
+    setIsSavingTeamGroup(true);
+    try {
+      const res = await updateTeamWhatsAppGroup(team.id, teamGroupInputId.trim(), teamGroupInputName.trim());
+      if (res.success) {
+        setTeam((prev) => prev ? {
+          ...prev,
+          wa_group_id: teamGroupInputId.trim() || undefined,
+          wa_group_name: teamGroupInputName.trim() || undefined,
+        } : null);
+        showToast('✅ Pengaturan Grup WhatsApp Tim berhasil disimpan!');
+        setShowConnectTeamGroupModal(false);
+      } else {
+        showToast(`Gagal menyimpan: ${res.error}`);
+      }
+    } catch {
+      showToast('Terjadi kesalahan saat menyimpan pengaturan grup.');
+    } finally {
+      setIsSavingTeamGroup(false);
+    }
+  };
+
+  const handleDisconnectTeamGroupSettings = async () => {
+    if (!team) return;
+    setIsSavingTeamGroup(true);
+    try {
+      await updateTeamWhatsAppGroup(team.id, '', '');
+      setTeam((prev) => prev ? { ...prev, wa_group_id: undefined, wa_group_name: undefined } : null);
+      showToast('Hubungan grup WhatsApp tim telah diputuskan.');
+      setShowConnectTeamGroupModal(false);
+    } catch {
+      showToast('Gagal memutuskan grup.');
+    } finally {
+      setIsSavingTeamGroup(false);
+    }
+  };
+
+  const handleTestSendToTeamGroup = async () => {
+    if (!teamGroupInputId.trim()) {
+      showToast('⚠️ Masukkan atau pilih ID Grup WhatsApp terlebih dahulu.');
+      return;
+    }
+    setIsTestingTeamGroup(true);
+    try {
+      const testMsg = `🤖 *TES KONEKSI BOT TIMJUARA KE GRUP TIM*\n\nHalo Rekan Tim! 👋\nGrup WhatsApp ini berhasil dihubungkan dengan bot notifikasi tim *${team?.name || 'TimJuara'}*.\n\nNotifikasi otomatis bot ke grup ini meliputi:\n1. 📋 *Tugas Baru*: Pemberitahuan saat ada tugas baru ditugaskan\n2. 🎉 *Tugas Selesai*: Pengumuman resmi saat tugas disetujui selesai\n\nSemangat berproses bersama dan raih kemenangan! 🚀💪`;
+      const tokenToUse = team?.wa_gateway_token || globalWaToken || undefined;
+      const res = await sendTestWhatsAppMessage(teamGroupInputId.trim(), testMsg, tokenToUse);
+      if (res.success) {
+        showToast('✅ Berhasil mengirim pesan uji coba ke grup WhatsApp!');
+      } else {
+        showToast(`❌ Gagal kirim ke grup: ${res.error}`);
+      }
+    } catch {
+      showToast('Terjadi kesalahan saat mengirim ke grup.');
+    } finally {
+      setIsTestingTeamGroup(false);
+    }
   };
 
   const handleSendTaskWAReminder = async (task: Task) => {
@@ -2548,17 +2758,21 @@ export default function TeamWorkspace() {
 
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                     <button
-                      onClick={handleShareGroupRecap}
+                      onClick={team?.wa_group_id ? handleSendBotGroupRecap : handleShareGroupRecap}
+                      disabled={isSendingGroupRecap}
                       className="btn btn-secondary btn-sm btn-rekap-wa"
                       style={{
                         display: 'inline-flex',
                         alignItems: 'center',
                         gap: 6,
                         fontWeight: 600,
+                        color: team?.wa_group_id ? (isDarkMode ? '#4ade80' : '#16a34a') : undefined,
+                        borderColor: team?.wa_group_id ? (isDarkMode ? 'rgba(34, 197, 94, 0.4)' : '#86efac') : undefined,
+                        background: team?.wa_group_id ? (isDarkMode ? 'rgba(34, 197, 94, 0.08)' : '#f0fdf4') : undefined,
                       }}
-                      title="Kirim ringkasan semua tugas & deadline ke WhatsApp / Grup WA"
+                      title={team?.wa_group_id ? "Kirim ringkasan semua tugas & deadline langsung ke Grup WhatsApp tim via Bot" : "Kirim ringkasan semua tugas & deadline ke WhatsApp / Grup WA"}
                     >
-                      <Share2 size={15} /> Rekap ke WA
+                      <Share2 size={15} /> {isSendingGroupRecap ? 'Mengirim ke Grup...' : team?.wa_group_id ? '🤖 Rekap ke Grup WA' : 'Rekap ke WA'}
                     </button>
                     <button onClick={openAddTaskModal} className="btn btn-primary btn-add-task">
                       <Plus size={16} /> Tambah Tugas Baru
@@ -3228,6 +3442,97 @@ export default function TeamWorkspace() {
                   <button onClick={handleCopyInviteLink} className="btn btn-secondary">
                     <ExternalLink size={16} /> Salin Tautan Undangan
                   </button>
+                </div>
+              </div>
+
+              {/* WhatsApp Group Connection Card */}
+              <div
+                className="card"
+                style={{
+                  padding: '22px 24px',
+                  marginBottom: 24,
+                  border: team.wa_group_id
+                    ? (isDarkMode ? '1px solid rgba(34, 197, 94, 0.3)' : '1px solid #bbf7d0')
+                    : '1px solid var(--surface-border)',
+                  background: team.wa_group_id
+                    ? (isDarkMode ? 'linear-gradient(to bottom, rgba(34, 197, 94, 0.08) 0%, var(--surface) 180px)' : 'linear-gradient(to bottom, #f0fdf4 0%, var(--surface) 180px)')
+                    : 'var(--surface)',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 14 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 14, minWidth: 260, flex: 1 }}>
+                    <div
+                      style={{
+                        width: 48,
+                        height: 48,
+                        borderRadius: 14,
+                        background: team.wa_group_id ? (isDarkMode ? 'rgba(34, 197, 94, 0.2)' : '#dcfce7') : 'var(--surface-secondary)',
+                        color: team.wa_group_id ? (isDarkMode ? '#4ade80' : '#16a34a') : 'var(--text-muted)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0,
+                      }}
+                    >
+                      <MessageSquare size={24} />
+                    </div>
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 4 }}>
+                        <h3 style={{ fontSize: '1.15rem', fontWeight: 800, margin: 0 }}>Grup WhatsApp Tim</h3>
+                        {team.wa_group_id ? (
+                          <span className="badge badge-success" style={{ fontSize: '0.75rem' }}>
+                            🟢 Terhubung
+                          </span>
+                        ) : (
+                          <span className="badge badge-neutral" style={{ fontSize: '0.75rem' }}>
+                            ⚪ Belum Terhubung
+                          </span>
+                        )}
+                      </div>
+                      <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: 0 }}>
+                        {team.wa_group_id ? (
+                          <span>
+                            Grup: <strong style={{ color: 'var(--text-main)' }}>{team.wa_group_name || 'Grup Tim'}</strong> ({team.wa_group_id}). Bot otomatis mengumumkan tugas baru & tugas selesai ke grup ini!
+                          </span>
+                        ) : (
+                          <span>
+                            Hubungkan grup WhatsApp tim agar bot dapat otomatis mengirim pengumuman <b>Tugas Baru</b> dan <b>Tugas Selesai & Disetujui</b>.
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                    {team.wa_group_id && (
+                      <button
+                        type="button"
+                        onClick={handleSendBotGroupRecap}
+                        disabled={isSendingGroupRecap}
+                        className="btn btn-secondary btn-sm"
+                        style={{
+                          color: isDarkMode ? '#4ade80' : '#16a34a',
+                          borderColor: isDarkMode ? 'rgba(34, 197, 94, 0.35)' : '#86efac',
+                        }}
+                        title="Kirim pesan rekap tugas sekarang ke grup tim via Bot"
+                      >
+                        <BellRing size={14} /> {isSendingGroupRecap ? 'Mengirim...' : 'Kirim Rekap ke Grup'}
+                      </button>
+                    )}
+                    {canManageMembers && (
+                      <button
+                        type="button"
+                        onClick={handleOpenConnectTeamGroupModal}
+                        className="btn btn-primary btn-sm"
+                        style={{
+                          background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
+                          borderColor: '#16a34a',
+                        }}
+                      >
+                        <MessageSquare size={14} /> {team.wa_group_id ? 'Ubah Grup WhatsApp' : 'Hubungkan Grup WhatsApp'}
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -4617,6 +4922,190 @@ export default function TeamWorkspace() {
                 </div>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL: HUBUNGKAN GRUP WHATSAPP TIM (TEAM WORKSPACE)                       */}
+      {/* ========================================================================= */}
+      {showConnectTeamGroupModal && team && (
+        <div className="modal-overlay" onClick={() => !isSavingTeamGroup && !isTestingTeamGroup && setShowConnectTeamGroupModal(false)}>
+          <div className="modal-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 520 }}>
+            <div className="modal-header">
+              <h3 style={{ fontSize: '1.15rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <MessageSquare size={20} color="#16a34a" /> Hubungkan Grup WhatsApp Tim
+              </h3>
+              <button
+                onClick={() => !isSavingTeamGroup && !isTestingTeamGroup && setShowConnectTeamGroupModal(false)}
+                style={{ background: 'none', border: 'none', fontSize: '1.2rem', cursor: 'pointer', color: 'var(--text-muted)' }}
+              >
+                ✕
+              </button>
+            </div>
+            <div className="modal-body">
+              <div
+                style={{
+                  background: isDarkMode ? 'rgba(34, 197, 94, 0.08)' : '#f0fdf4',
+                  border: isDarkMode ? '1px solid rgba(34, 197, 94, 0.25)' : '1px solid #bbf7d0',
+                  borderRadius: 10,
+                  padding: '10px 14px',
+                  fontSize: '0.8rem',
+                  color: isDarkMode ? '#86efac' : '#166534',
+                  lineHeight: 1.5,
+                  marginBottom: 16,
+                }}
+              >
+                <strong>🤖 Bot WhatsApp TimJuara:</strong>
+                <ul style={{ margin: '4px 0 0 0', paddingLeft: 18 }}>
+                  <li>Pemberitahuan otomatis saat <b>Tugas Baru</b> ditugaskan ke anggota.</li>
+                  <li>Pengumuman apresiasi saat <b>Tugas Selesai & Disetujui</b> oleh Ketua.</li>
+                </ul>
+              </div>
+
+              {/* Pilihan 1: Pilih dari Grup WhatsApp Bot */}
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                  <label className="form-label" style={{ fontWeight: 700, margin: 0, fontSize: '0.85rem' }}>
+                    Pilih dari Grup Bot WhatsApp:
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => handleFetchTeamBotGroups(true)}
+                    disabled={loadingTeamGroups}
+                    className="btn btn-secondary btn-sm"
+                    style={{ fontSize: '0.725rem', padding: '3px 8px', display: 'flex', alignItems: 'center', gap: 4 }}
+                    title="Sinkronkan daftar grup yang diikuti nomor bot"
+                  >
+                    <RefreshCw size={11} className={loadingTeamGroups ? 'spin' : ''} />
+                    {loadingTeamGroups ? 'Memuat...' : '🔄 Muat / Sinkron'}
+                  </button>
+                </div>
+
+                {teamAvailableGroups.length > 0 ? (
+                  <select
+                    className="form-input"
+                    style={{ fontSize: '0.85rem' }}
+                    onChange={(e) => {
+                      const sel = teamAvailableGroups.find((g) => g.id === e.target.value);
+                      if (sel) {
+                        setTeamGroupInputId(sel.id);
+                        setTeamGroupInputName(sel.name);
+                      }
+                    }}
+                    value={teamGroupInputId}
+                  >
+                    <option value="">-- Pilih Grup WhatsApp --</option>
+                    {teamAvailableGroups.map((g) => (
+                      <option key={g.id} value={g.id}>
+                        {g.name} ({g.id})
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <div
+                    style={{
+                      fontSize: '0.775rem',
+                      color: 'var(--text-muted)',
+                      background: isDarkMode ? 'var(--surface-secondary)' : '#f8fafc',
+                      padding: '8px 12px',
+                      borderRadius: 8,
+                      border: '1px dashed var(--surface-border)',
+                    }}
+                  >
+                    Belum ada grup termuat. Klik <b>&quot;Muat / Sinkron&quot;</b> atau masukkan ID grup di bawah.
+                  </div>
+                )}
+              </div>
+
+              {/* Pilihan 2: Input Manual ID Grup WhatsApp */}
+              <div className="form-group" style={{ marginBottom: 12 }}>
+                <label className="form-label" style={{ fontWeight: 700, fontSize: '0.85rem' }}>
+                  ID Grup WhatsApp <span style={{ color: '#ef4444' }}>*</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="Contoh: 120363028391823901@g.us"
+                  value={teamGroupInputId}
+                  onChange={(e) => setTeamGroupInputId(e.target.value)}
+                  className="form-input"
+                  style={{ fontFamily: 'monospace', fontSize: '0.85rem' }}
+                />
+                <span className="form-hint" style={{ fontSize: '0.725rem', marginTop: 4, display: 'block' }}>
+                  Format ID Grup WhatsApp Fonnte biasanya berakhiran <code>@g.us</code>.
+                </span>
+              </div>
+
+              <div className="form-group" style={{ marginBottom: 18 }}>
+                <label className="form-label" style={{ fontWeight: 700, fontSize: '0.85rem' }}>
+                  Nama Grup (Opsional)
+                </label>
+                <input
+                  type="text"
+                  placeholder={`Contoh: Grup ${team.name}`}
+                  value={teamGroupInputName}
+                  onChange={(e) => setTeamGroupInputName(e.target.value)}
+                  className="form-input"
+                  style={{ fontSize: '0.85rem' }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  onClick={handleTestSendToTeamGroup}
+                  disabled={isTestingTeamGroup || !teamGroupInputId.trim()}
+                  className="btn btn-secondary btn-sm"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    fontSize: '0.8rem',
+                    color: isDarkMode ? '#4ade80' : '#16a34a',
+                    borderColor: isDarkMode ? 'rgba(34, 197, 94, 0.4)' : '#86efac',
+                  }}
+                  title="Kirim pesan uji coba ke grup ini"
+                >
+                  <MessageSquare size={13} />
+                  {isTestingTeamGroup ? 'Mengirim...' : 'Kirim Pesan Tes'}
+                </button>
+
+                {team.wa_group_id && (
+                  <button
+                    type="button"
+                    onClick={handleDisconnectTeamGroupSettings}
+                    disabled={isSavingTeamGroup}
+                    className="btn btn-danger btn-sm"
+                    style={{ fontSize: '0.775rem' }}
+                  >
+                    Putuskan Grup
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div className="modal-footer" style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+              <button
+                type="button"
+                onClick={() => setShowConnectTeamGroupModal(false)}
+                disabled={isSavingTeamGroup || isTestingTeamGroup}
+                className="btn btn-secondary"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveTeamGroupSettings}
+                disabled={isSavingTeamGroup || !teamGroupInputId.trim()}
+                className="btn btn-primary"
+                style={{
+                  background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
+                  borderColor: '#16a34a',
+                }}
+              >
+                {isSavingTeamGroup ? 'Menyimpan...' : 'Simpan Grup'}
+              </button>
+            </div>
           </div>
         </div>
       )}

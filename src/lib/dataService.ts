@@ -874,6 +874,121 @@ export async function updateTeamAvatar(
   }
 }
 
+export async function updateTeamWhatsAppGroup(
+  teamId: string,
+  groupId: string,
+  groupName?: string
+): Promise<{ success: boolean; error: string | null }> {
+  const cleanGroupId = (groupId || '').trim();
+  const cleanGroupName = (groupName || '').trim();
+
+  // 1. Simpan ke browser local storage untuk persistensi instan & offline
+  if (typeof window !== 'undefined') {
+    try {
+      if (cleanGroupId) {
+        localStorage.setItem(`timjuara_team_wa_group_${teamId}`, cleanGroupId);
+      } else {
+        localStorage.removeItem(`timjuara_team_wa_group_${teamId}`);
+      }
+      if (cleanGroupName) {
+        localStorage.setItem(`timjuara_team_wa_group_name_${teamId}`, cleanGroupName);
+      } else {
+        localStorage.removeItem(`timjuara_team_wa_group_name_${teamId}`);
+      }
+    } catch (e) {
+      console.error('LocalStorage wa_group save error:', e);
+    }
+  }
+
+  // 2. Simpan ke Supabase jika terkonfigurasi
+  if (isSupabaseConfigured && supabase) {
+    try {
+      const { error } = await supabase
+        .from('teams')
+        .update({
+          wa_group_id: cleanGroupId || null,
+          wa_group_name: cleanGroupName || null,
+        })
+        .eq('id', teamId);
+
+      if (error) {
+        const errMsg = error.message.toLowerCase();
+        if (
+          errMsg.includes('wa_group_id') ||
+          errMsg.includes('wa_group_name') ||
+          errMsg.includes('column of \'teams\'') ||
+          errMsg.includes('schema cache')
+        ) {
+          console.warn('Kolom wa_group_id belum ada di tabel Supabase teams, tersimpan di localStorage.', error.message);
+          return { success: true, error: null };
+        }
+        return { success: false, error: error.message };
+      }
+      return { success: true, error: null };
+    } catch (err: any) {
+      console.warn('Gagal update wa_group_id ke Supabase, fallback aktif:', err);
+      return { success: true, error: null };
+    }
+  } else {
+    // 3. Simpan ke Demo Database
+    const db = getDemoDb();
+    const t = db.teams.find((item) => item.id === teamId);
+    if (t) {
+      t.wa_group_id = cleanGroupId || undefined;
+      t.wa_group_name = cleanGroupName || undefined;
+      saveDemoDb(db);
+    }
+    return { success: true, error: null };
+  }
+}
+
+export async function getWhatsAppGroups(
+  token?: string,
+  refresh?: boolean
+): Promise<{ success: boolean; groups: Array<{ id: string; name: string }>; error: string | null }> {
+  try {
+    const params = new URLSearchParams();
+    if (token) params.set('token', token);
+    if (refresh) params.set('refresh', 'true');
+
+    const url = `/api/whatsapp/groups${params.toString() ? `?${params.toString()}` : ''}`;
+    const res = await fetch(url, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      return { success: false, groups: [], error: data.error || 'Gagal memuat daftar grup WhatsApp.' };
+    }
+
+    return { success: true, groups: data.groups || [], error: null };
+  } catch (err: any) {
+    return { success: false, groups: [], error: err.message || 'Terjadi kesalahan saat memuat grup.' };
+  }
+}
+
+export async function sendTeamGroupWhatsAppMessage(
+  team: Team,
+  message: string,
+  overrideToken?: string
+): Promise<{ success: boolean; error: string | null; message?: string }> {
+  let groupId = team.wa_group_id;
+  if (!groupId && typeof window !== 'undefined') {
+    groupId = localStorage.getItem(`timjuara_team_wa_group_${team.id}`) || undefined;
+  }
+
+  if (!groupId) {
+    return {
+      success: false,
+      error: `Tim ${team.name} belum menghubungkan ID Grup WhatsApp. Atur ID grup di Master Admin atau Pengaturan Tim.`,
+    };
+  }
+
+  const tokenToUse = overrideToken || team.wa_gateway_token;
+  return await sendTestWhatsAppMessage(groupId, message, tokenToUse);
+}
+
 export async function sendTestWhatsAppMessage(
   targetPhone: string,
   customMessageOrToken?: string,
@@ -1131,6 +1246,19 @@ export async function getTeamByUsername(username: string): Promise<{ team: Team 
       }
     }
 
+    if (!team.wa_group_id && typeof window !== 'undefined') {
+      const localGroupId = localStorage.getItem(`timjuara_team_wa_group_${team.id}`);
+      if (localGroupId) {
+        team.wa_group_id = localGroupId;
+      }
+    }
+    if (!team.wa_group_name && typeof window !== 'undefined') {
+      const localGroupName = localStorage.getItem(`timjuara_team_wa_group_name_${team.id}`);
+      if (localGroupName) {
+        team.wa_group_name = localGroupName;
+      }
+    }
+
     const { data: membersData, error: membersError } = await supabase
       .from('team_members')
       .select(`
@@ -1185,6 +1313,21 @@ export async function getTeamByUsername(username: string): Promise<{ team: Team 
     const db = getDemoDb();
     const team = db.teams.find(t => t.username.toLowerCase() === username.toLowerCase()) || null;
     if (!team) return { team: null, members: [] };
+
+    if (typeof window !== 'undefined') {
+      if (!team.avatar_url) {
+        const localAvatar = localStorage.getItem(`timjuara_team_avatar_${team.id}`);
+        if (localAvatar) team.avatar_url = localAvatar;
+      }
+      if (!team.wa_group_id) {
+        const localGroupId = localStorage.getItem(`timjuara_team_wa_group_${team.id}`);
+        if (localGroupId) team.wa_group_id = localGroupId;
+      }
+      if (!team.wa_group_name) {
+        const localGroupName = localStorage.getItem(`timjuara_team_wa_group_name_${team.id}`);
+        if (localGroupName) team.wa_group_name = localGroupName;
+      }
+    }
 
     const members: TeamMember[] = db.members
       .filter(m => m.team_id === team.id)
@@ -2230,26 +2373,51 @@ export async function getAllTeamsForAdmin(): Promise<AdminTeamItem[]> {
       taskCounts[t.team_id] = (taskCounts[t.team_id] || 0) + 1;
     });
 
-    return teamsData.map((t: any) => ({
-      id: t.id,
-      name: t.name,
-      username: t.username,
-      description: t.description,
-      created_by: t.created_by,
-      created_at: t.created_at,
-      creator_name: t.profiles?.full_name || 'Tidak Diketahui',
-      member_count: memberCounts[t.id] || 0,
-      task_count: taskCounts[t.id] || 0,
-    }));
+    return teamsData.map((t: any) => {
+      let wa_group_id = t.wa_group_id;
+      let wa_group_name = t.wa_group_name;
+      if (!wa_group_id && typeof window !== 'undefined') {
+        wa_group_id = localStorage.getItem('timjuara_team_wa_group_' + t.id) || undefined;
+      }
+      if (!wa_group_name && typeof window !== 'undefined') {
+        wa_group_name = localStorage.getItem('timjuara_team_wa_group_name_' + t.id) || undefined;
+      }
+      return {
+        id: t.id,
+        name: t.name,
+        username: t.username,
+        description: t.description,
+        avatar_url: t.avatar_url,
+        created_by: t.created_by,
+        created_at: t.created_at,
+        wa_gateway_token: t.wa_gateway_token,
+        wa_notifications_enabled: t.wa_notifications_enabled,
+        wa_group_id: wa_group_id || undefined,
+        wa_group_name: wa_group_name || undefined,
+        creator_name: t.profiles?.full_name || 'Tidak Diketahui',
+        member_count: memberCounts[t.id] || 0,
+        task_count: taskCounts[t.id] || 0,
+      };
+    });
   } else {
     const db = getDemoDb();
     return db.teams.map((t) => {
       const creator = db.users.find((u) => u.id === t.created_by);
       const memberCount = db.members.filter((m) => m.team_id === t.id).length;
       const taskCount = db.tasks.filter((tk) => tk.team_id === t.id).length;
+      let wa_group_id = t.wa_group_id;
+      let wa_group_name = t.wa_group_name;
+      if (!wa_group_id && typeof window !== 'undefined') {
+        wa_group_id = localStorage.getItem('timjuara_team_wa_group_' + t.id) || undefined;
+      }
+      if (!wa_group_name && typeof window !== 'undefined') {
+        wa_group_name = localStorage.getItem('timjuara_team_wa_group_name_' + t.id) || undefined;
+      }
 
       return {
         ...t,
+        wa_group_id: wa_group_id || undefined,
+        wa_group_name: wa_group_name || undefined,
         creator_name: creator?.full_name || 'Tidak Diketahui',
         member_count: memberCount,
         task_count: taskCount,
