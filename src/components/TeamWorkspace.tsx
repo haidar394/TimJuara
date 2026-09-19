@@ -1696,30 +1696,11 @@ export default function TeamWorkspace() {
                               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                                 <span style={{ color: 'var(--text-subtle)' }}>Penanggung Jawab:</span>
                                 {task.assignee_profiles && task.assignee_profiles.length > 0 ? (
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                                    <div className="pic-avatar-stack">
-                                      {task.assignee_profiles.slice(0, 3).map((p, idx) => (
-                                        <span
-                                          key={p.id}
-                                          className="pic-stack-avatar"
-                                          title={p.full_name}
-                                          style={{
-                                            background: ['#6366f1', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6'][idx % 5],
-                                          }}
-                                        >
-                                          {p.full_name.slice(0, 1).toUpperCase()}
-                                        </span>
-                                      ))}
-                                    </div>
-                                    <span style={{ fontWeight: 600, color: 'var(--text-main)' }}>
-                                      {task.assignee_profiles.map((p) => p.full_name).join(', ')}
-                                    </span>
-                                  </div>
+                                  <span style={{ fontWeight: 600, color: 'var(--text-main)' }}>
+                                    {task.assignee_profiles.map((p) => p.full_name).join(', ')}
+                                  </span>
                                 ) : task.assignee_profile ? (
-                                  <span style={{ fontWeight: 600, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: 5 }}>
-                                    <span style={{ width: 22, height: 22, borderRadius: '50%', background: '#6366f1', color: 'white', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.7rem' }}>
-                                      {task.assignee_profile.full_name.slice(0, 1)}
-                                    </span>
+                                  <span style={{ fontWeight: 600, color: 'var(--text-main)' }}>
                                     {task.assignee_profile.full_name}
                                   </span>
                                 ) : (

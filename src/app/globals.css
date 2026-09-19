@@ -108,9 +108,7 @@
 /* Dark Mode Header & Sticky Navigation */
 [data-theme="dark"] .workspace-header,
 .dark .workspace-header {
-  background: rgba(11, 17, 32, 0.92) !important;
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  background: #0b1120 !important;
   border-bottom: 1px solid rgba(36, 52, 85, 0.8) !important;
   box-shadow: 0 4px 24px -2px rgba(0, 0, 0, 0.6) !important;
 }
@@ -621,16 +619,14 @@ button, input, select, textarea {
 /* Workspace Header (Sticky & High-Contrast) */
 .workspace-header {
   border-bottom: 1px solid var(--surface-border);
-  background: rgba(255, 255, 255, 0.94);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  background: #ffffff;
   position: -webkit-sticky;
   position: sticky;
   top: 0;
   z-index: 100;
   padding-top: max(12px, env(safe-area-inset-top, 12px));
   padding-bottom: 12px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05);
   transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
