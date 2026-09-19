@@ -727,6 +727,14 @@ export async function sendTestWhatsAppMessage(
       }
     }
 
+    // Jika token masih kosong dan berjalan di client browser, gunakan token Master Admin yang tersimpan
+    if (!finalToken && typeof window !== 'undefined') {
+      const savedMasterToken = localStorage.getItem('master_wa_token');
+      if (savedMasterToken) {
+        finalToken = savedMasterToken;
+      }
+    }
+
     const res = await fetch('/api/whatsapp/send', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

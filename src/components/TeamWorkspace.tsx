@@ -719,7 +719,7 @@ export default function TeamWorkspace() {
       text += `\n`;
     });
 
-    text += `Semangat teman-teman! Pantau progress lengkap di TimJuara:\n${window.location.origin}/workspace/${team.username}`;
+    text += `Semangat teman-teman! Pantau progress lengkap di TimJuara:\n${window.location.origin}/team/${team.username}`;
 
     const waUrl = `https://wa.me/?text=${encodeURIComponent(text)}`;
     window.open(waUrl, '_blank');
@@ -737,16 +737,17 @@ export default function TeamWorkspace() {
       deadlineStr = new Date(task.deadline).toLocaleDateString('id-ID', { dateStyle: 'full' });
     }
 
-    const message = `Halo *${task.assignee_profile.full_name}*! 👋\n\nPengingat tugas dari Tim *${team?.name}*:\n📌 *${task.title}*\n📅 Deadline: *${deadlineStr}*\nStatus: *${task.status === 'review' ? 'Menunggu Dicek' : task.status === 'in_progress' ? 'Sedang Dikerjakan' : 'Belum Selesai'}*\n\nYuk segera diselesaikan atau dicek! 💪\nBuka TimJuara: ${window.location.origin}/workspace/${team?.username}`;
+    const message = `Halo *${task.assignee_profile.full_name}*! 👋\n\nPengingat tugas dari Tim *${team?.name}*:\n📌 *${task.title}*\n📅 Deadline: *${deadlineStr}*\nStatus: *${task.status === 'review' ? 'Menunggu Dicek' : task.status === 'in_progress' ? 'Sedang Dikerjakan' : 'Belum Selesai'}*\n\nYuk segera diselesaikan atau dicek! 💪\nBuka TimJuara: ${window.location.origin}/team/${team?.username}`;
 
-    showToast(`Mengirim pesan pengingat WA ke ${task.assignee_profile.full_name}...`);
-    const res = await sendTestWhatsAppMessage(phone, message);
+    showToast(`Mengirim pesan pengingat otomatis via Bot ke ${task.assignee_profile.full_name}...`);
+    const res = await sendTestWhatsAppMessage(phone, message, team?.wa_gateway_token);
     if (res.success) {
-      showToast(`Pengingat berhasil dikirim ke WA ${task.assignee_profile.full_name}! 📲`);
+      showToast(`Pengingat berhasil dikirim oleh Bot ke WA ${task.assignee_profile.full_name}! 📲`);
       return;
     }
 
-    // Fallback: buka wa.me langsung
+    // Fallback: jika bot belum aktif/gagal, beri info transparan lalu buka wa.me langsung
+    showToast(`⚠️ Bot WA gagal (${res.error || 'belum terhubung'}). Mengalihkan ke WhatsApp manual...`);
     const cleanPhone = phone.replace(/[^0-9]/g, '').replace(/^0/, '62');
     const waUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
     window.open(waUrl, '_blank');
