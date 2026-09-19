@@ -3155,13 +3155,13 @@ export default function TeamWorkspace() {
                               await updateUserAvatar(currentUser.id, '');
                               setSavingUserAvatar(false);
                               setCurrentUser((prev) => prev ? { ...prev, avatar_url: '' } : null);
-                              showToast('Foto profil direset ke inisial nama.');
+                              showToast('Foto profil berhasil dihapus.');
                             }
                           }}
                           className="btn btn-secondary"
                           style={{ whiteSpace: 'nowrap' }}
                         >
-                          Reset ke Inisial
+                          Hapus Foto Profil
                         </button>
                       )}
                       <div style={{ width: '100%', marginTop: 2 }}>
@@ -4303,21 +4303,42 @@ export default function TeamWorkspace() {
                   </span>
                 </div>
               </div>
-              <div className="modal-footer">
-                <button
-                  type="button"
-                  onClick={() => setShowTeamAvatarModal(false)}
-                  className="btn btn-secondary"
-                >
-                  Batal
-                </button>
-                <button
-                  type="submit"
-                  disabled={savingTeamAvatar}
-                  className="btn btn-primary"
-                >
-                  {savingTeamAvatar ? 'Menyimpan...' : 'Simpan Foto Tim'}
-                </button>
+              <div className="modal-footer" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                {team?.avatar_url ? (
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (!team) return;
+                      setSavingTeamAvatar(true);
+                      await updateTeamAvatar(team.id, '');
+                      setSavingTeamAvatar(false);
+                      setTeamAvatarUrl('');
+                      setTeam((prev) => prev ? { ...prev, avatar_url: '' } : null);
+                      setShowTeamAvatarModal(false);
+                      showToast('Foto profil tim berhasil dihapus.');
+                    }}
+                    disabled={savingTeamAvatar}
+                    className="btn btn-danger btn-sm"
+                  >
+                    Hapus Foto Tim
+                  </button>
+                ) : <div />}
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button
+                    type="button"
+                    onClick={() => setShowTeamAvatarModal(false)}
+                    className="btn btn-secondary"
+                  >
+                    Batal
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={savingTeamAvatar}
+                    className="btn btn-primary"
+                  >
+                    {savingTeamAvatar ? 'Menyimpan...' : 'Simpan Foto Tim'}
+                  </button>
+                </div>
               </div>
             </form>
           </div>
