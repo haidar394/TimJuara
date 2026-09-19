@@ -1594,92 +1594,9 @@ export default function TeamWorkspace() {
         </div>
 
         {/* Sidebar Footer */}
-        <div style={{ padding: '16px 14px', borderTop: '1px solid var(--surface-border)', display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            {/* Dark Mode Toggle */}
-            <button
-              onClick={toggleDarkMode}
-              className="theme-toggle-btn"
-              style={{ width: 34, height: 34 }}
-              title={isDarkMode ? 'Mode Terang' : 'Mode Gelap'}
-            >
-              {isDarkMode ? <Sun size={16} color="#f59e0b" /> : <Moon size={16} color="#6366f1" />}
-            </button>
-
-            {/* In-App Notifications */}
-            <div style={{ position: 'relative' }}>
-              <button
-                onClick={() => setShowNotifPopover((prev) => !prev)}
-                className="notif-btn"
-                style={{ width: 34, height: 34 }}
-                title="Notifikasi"
-              >
-                <Bell size={16} />
-                {notifications.filter((n) => !n.is_read).length > 0 && (
-                  <span className="notif-badge">
-                    {notifications.filter((n) => !n.is_read).length}
-                  </span>
-                )}
-              </button>
-
-              {showNotifPopover && (
-                <div className="notif-popover" style={{ bottom: 44, top: 'auto', left: 0, width: 280 }}>
-                  <div className="notif-header">
-                    <span>🔔 Notifikasi</span>
-                    {notifications.some((n) => !n.is_read) && (
-                      <button
-                        onClick={handleMarkAllRead}
-                        style={{ background: 'none', border: 'none', color: 'var(--primary)', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}
-                      >
-                        Semua dibaca
-                      </button>
-                    )}
-                  </div>
-                  <div className="notif-list" style={{ maxHeight: 240 }}>
-                    {notifications.length === 0 ? (
-                      <div style={{ padding: '20px 12px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.8rem' }}>
-                        Tidak ada notifikasi baru
-                      </div>
-                    ) : (
-                      notifications.map((n) => (
-                        <div
-                          key={n.id}
-                          onClick={async () => {
-                            if (!n.is_read) {
-                              await markNotificationAsRead(n.id);
-                              setNotifications((prev) =>
-                                prev.map((item) => (item.id === n.id ? { ...item, is_read: true } : item))
-                              );
-                            }
-                            setShowNotifPopover(false);
-                          }}
-                          className={`notif-item ${!n.is_read ? 'unread' : ''}`}
-                        >
-                          <div style={{ flex: 1 }}>
-                            <div className="notif-item-title">{n.title}</div>
-                            <div className="notif-item-msg">{n.message}</div>
-                            <div className="notif-item-time">
-                              {new Date(n.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })}
-                            </div>
-                          </div>
-                          {!n.is_read && (
-                            <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--primary)', alignSelf: 'center', flexShrink: 0 }} />
-                          )}
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <Link href="/onboarding" className="btn btn-secondary btn-sm" title="Overview Seluruh Akun / Ganti Tim">
-              <Users size={14} />
-            </Link>
-          </div>
-
+        <div style={{ padding: '16px 14px', borderTop: '1px solid var(--surface-border)' }}>
           {/* User Mini Profile */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, paddingTop: 10, borderTop: '1px solid var(--surface-border)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             {currentUser?.avatar_url ? (
               <img
                 src={currentUser.avatar_url}
@@ -2225,59 +2142,10 @@ export default function TeamWorkspace() {
             {/* ========================================================================= */}
             {activeTab === 'tasks' && (
               <div className="animate-fade-in">
-                {/* Dropdown Pemilih Tim Aktif & Quick Actions */}
-                <div className="card" style={{ padding: '16px 20px', marginBottom: 20, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 14, background: 'var(--surface)' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1, minWidth: 260 }}>
-                    <label style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
-                      Pilih Tim Aktif:
-                    </label>
-                    <select
-                      value={team?.username}
-                      onChange={(e) => {
-                        if (e.target.value && e.target.value !== team?.username) {
-                          router.push(`/team/${e.target.value}`);
-                        }
-                      }}
-                      className="form-select"
-                      style={{ fontWeight: 700, minWidth: 200, maxWidth: 340 }}
-                    >
-                      {userTeams.length > 0 ? (
-                        userTeams.map((ut) => (
-                          <option key={ut.id} value={ut.username}>
-                            {ut.name} (@{ut.username})
-                          </option>
-                        ))
-                      ) : (
-                        <option value={team?.username}>{team?.name} (@{team?.username})</option>
-                      )}
-                    </select>
-                  </div>
-
-                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                    <button
-                      onClick={() => setShowTeamAvatarModal(true)}
-                      className="btn btn-secondary btn-sm"
-                      title="Ganti Foto Profil Tim (Dapat diedit oleh seluruh anggota)"
-                    >
-                      <Camera size={14} /> Ganti Foto Tim
-                    </button>
-                    <button onClick={handleCopyCode} className="btn btn-secondary btn-sm" title="Salin kode username tim">
-                      <Copy size={14} /> Salin Kode
-                    </button>
-                    <button onClick={handleCopyInviteLink} className="btn btn-secondary btn-sm" title="Salin tautan bergabung">
-                      <ExternalLink size={14} /> Undangan
-                    </button>
-                  </div>
-                </div>
-
                 {/* Team Info Banner */}
                 <div className="card" style={{ padding: '20px 24px', marginBottom: 20, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16, background: 'var(--surface)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 16, minWidth: 0, flex: 1 }}>
-                    <div
-                      style={{ position: 'relative', cursor: 'pointer', flexShrink: 0 }}
-                      onClick={() => setShowTeamAvatarModal(true)}
-                      title="Klik untuk ganti foto profil tim"
-                    >
+                    <div style={{ flexShrink: 0 }}>
                       {team?.avatar_url ? (
                         <img
                           src={team.avatar_url}
@@ -2290,25 +2158,6 @@ export default function TeamWorkspace() {
                           {team?.name.slice(0, 2).toUpperCase()}
                         </div>
                       )}
-                      <div
-                        style={{
-                          position: 'absolute',
-                          bottom: -2,
-                          right: -2,
-                          width: 20,
-                          height: 20,
-                          borderRadius: '50%',
-                          background: 'var(--primary)',
-                          color: 'white',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          border: '2px solid var(--surface)',
-                          boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
-                        }}
-                      >
-                        <Camera size={10} />
-                      </div>
                     </div>
 
                     <div style={{ minWidth: 0, flex: 1 }}>
@@ -2339,6 +2188,16 @@ export default function TeamWorkspace() {
                         <span>{tasks.length} Seluruh Tugas</span>
                       </div>
                     </div>
+                  </div>
+
+                  {/* Tombol Aksi Cepat: Salin Kode & Undangan */}
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                    <button onClick={handleCopyCode} className="btn btn-secondary btn-sm" title="Salin kode username tim">
+                      <Copy size={14} /> Salin Kode
+                    </button>
+                    <button onClick={handleCopyInviteLink} className="btn btn-secondary btn-sm" title="Salin tautan bergabung">
+                      <ExternalLink size={14} /> Undangan
+                    </button>
                   </div>
                 </div>
 
