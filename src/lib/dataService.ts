@@ -1357,7 +1357,20 @@ export async function getTaskComments(taskId: string): Promise<TaskComment[]> {
         .eq('task_id', taskId)
         .order('created_at', { ascending: true });
 
-      if (error || !data) return [];
+      if (error) {
+        console.warn('Supabase task_comments error, using local fallback:', error.message);
+        const db = getDemoDb();
+        const comments = (db.task_comments || []).filter(c => c.task_id === taskId);
+        return comments.map(c => {
+          const u = db.users.find(user => user.id === c.user_id);
+          return {
+            ...c,
+            author_profile: u ? { id: u.id, full_name: u.full_name, email: u.email } : undefined,
+          };
+        }).sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+      }
+
+      if (!data) return [];
       return data.map((c: any) => ({
         id: c.id,
         task_id: c.task_id,
@@ -1367,7 +1380,8 @@ export async function getTaskComments(taskId: string): Promise<TaskComment[]> {
         author_profile: c.profiles,
       }));
     } catch {
-      return [];
+      const db = getDemoDb();
+      return (db.task_comments || []).filter(c => c.task_id === taskId);
     }
   } else {
     const db = getDemoDb();
@@ -1391,34 +1405,79 @@ export async function addTaskComment(
   if (!cleanContent) return { comment: null, error: 'Komentar tidak boleh kosong.' };
 
   if (isSupabaseConfigured && supabase) {
-    const { data, error } = await supabase
-      .from('task_comments')
-      .insert({
+    try {
+      const { data, error } = await supabase
+        .from('task_comments')
+        .insert({
+          task_id: taskId,
+          user_id: userId,
+          content: cleanContent,
+        })
+        .select(`
+          id, task_id, user_id, content, created_at,
+          profiles (id, full_name, avatar_url)
+        `)
+        .single();
+
+      if (error) {
+        console.warn('Supabase task_comments not found or errored. Falling back to local storage:', error.message);
+        const db = getDemoDb();
+        if (!db.task_comments) db.task_comments = [];
+        const newComment: TaskComment = {
+          id: 'comm-' + Date.now() + Math.random().toString(36).slice(2, 6),
+          task_id: taskId,
+          user_id: userId,
+          content: cleanContent,
+          created_at: new Date().toISOString(),
+        };
+        db.task_comments.push(newComment);
+        saveDemoDb(db);
+
+        let authorProfile: Profile | undefined = undefined;
+        try {
+          const { data: prof } = await supabase.from('profiles').select('id, full_name, avatar_url, email').eq('id', userId).single();
+          if (prof) authorProfile = prof;
+        } catch {}
+        if (!authorProfile) {
+          const u = db.users.find(user => user.id === userId);
+          if (u) authorProfile = { id: u.id, full_name: u.full_name, email: u.email };
+        }
+
+        return {
+          comment: {
+            ...newComment,
+            author_profile: authorProfile,
+          },
+          error: null,
+        };
+      }
+
+      return {
+        comment: {
+          id: data.id,
+          task_id: data.task_id,
+          user_id: data.user_id,
+          content: data.content,
+          created_at: data.created_at,
+          author_profile: (data as any).profiles,
+        },
+        error: null,
+      };
+    } catch (err: any) {
+      console.warn('Supabase task_comments catch error, falling back to local storage:', err);
+      const db = getDemoDb();
+      if (!db.task_comments) db.task_comments = [];
+      const newComment: TaskComment = {
+        id: 'comm-' + Date.now() + Math.random().toString(36).slice(2, 6),
         task_id: taskId,
         user_id: userId,
         content: cleanContent,
-      })
-      .select(`
-        id, task_id, user_id, content, created_at,
-        profiles (id, full_name, avatar_url)
-      `)
-      .single();
-
-    if (error) {
-      console.error('Error adding comment:', error);
-      return { comment: null, error: error.message };
+        created_at: new Date().toISOString(),
+      };
+      db.task_comments.push(newComment);
+      saveDemoDb(db);
+      return { comment: newComment, error: null };
     }
-    return {
-      comment: {
-        id: data.id,
-        task_id: data.task_id,
-        user_id: data.user_id,
-        content: data.content,
-        created_at: data.created_at,
-        author_profile: (data as any).profiles,
-      },
-      error: null,
-    };
   } else {
     const db = getDemoDb();
     if (!db.task_comments) db.task_comments = [];
@@ -1456,10 +1515,15 @@ export async function getUserNotifications(userId: string): Promise<AppNotificat
         .order('created_at', { ascending: false })
         .limit(30);
 
-      if (error || !data) return [];
+      if (error) {
+        const db = getDemoDb();
+        return (db.notifications || []).filter(n => n.user_id === userId).slice(0, 30);
+      }
+      if (!data) return [];
       return data;
     } catch {
-      return [];
+      const db = getDemoDb();
+      return (db.notifications || []).filter(n => n.user_id === userId).slice(0, 30);
     }
   } else {
     const db = getDemoDb();
@@ -1487,26 +1551,24 @@ export async function createNotification(
         link,
         is_read: false,
       });
-      return !error;
-    } catch {
-      return false;
-    }
-  } else {
-    const db = getDemoDb();
-    if (!db.notifications) db.notifications = [];
-    db.notifications.unshift({
-      id: 'notif-' + Date.now() + Math.random().toString(36).slice(2, 6),
-      user_id: userId,
-      team_id: teamId,
-      title,
-      message,
-      link,
-      is_read: false,
-      created_at: new Date().toISOString(),
-    });
-    saveDemoDb(db);
-    return true;
+      if (!error) return true;
+    } catch {}
   }
+
+  const db = getDemoDb();
+  if (!db.notifications) db.notifications = [];
+  db.notifications.unshift({
+    id: 'notif-' + Date.now() + Math.random().toString(36).slice(2, 6),
+    user_id: userId,
+    team_id: teamId,
+    title,
+    message,
+    link,
+    is_read: false,
+    created_at: new Date().toISOString(),
+  });
+  saveDemoDb(db);
+  return true;
 }
 
 export async function markNotificationAsRead(notificationId: string): Promise<boolean> {
