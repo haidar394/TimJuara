@@ -10,6 +10,7 @@ export default function AuthPage() {
   const router = useRouter();
   const [isRegister, setIsRegister] = useState(false);
   const [fullName, setFullName] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -29,7 +30,12 @@ export default function AuthPage() {
           setLoading(false);
           return;
         }
-        const { user, error, needsEmailConfirmation } = await signUpUser(fullName.trim(), email.trim(), password);
+        const { user, error, needsEmailConfirmation } = await signUpUser(
+          fullName.trim(),
+          email.trim(),
+          password,
+          phoneNumber.trim()
+        );
         if (error) {
           setErrorMsg(error);
           setLoading(false);
@@ -159,17 +165,36 @@ export default function AuthPage() {
           {/* Form */}
           <form onSubmit={handleSubmit}>
             {isRegister && (
-              <div className="form-group">
-                <label className="form-label">Nama Lengkap Anda</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="Contoh: Budi Santoso"
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  className="form-input"
-                />
-              </div>
+              <>
+                <div className="form-group">
+                  <label className="form-label">Nama Lengkap Anda</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Contoh: Budi Santoso"
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    className="form-input"
+                  />
+                </div>
+
+                <div className="form-group">
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <label className="form-label">Nomor WhatsApp</label>
+                    <span style={{ fontSize: '0.725rem', color: '#16a34a', fontWeight: 600 }}>Untuk Pengingat Deadline</span>
+                  </div>
+                  <input
+                    type="tel"
+                    placeholder="Contoh: 08123456789 atau 628..."
+                    value={phoneNumber}
+                    onChange={(e) => setPhoneNumber(e.target.value)}
+                    className="form-input"
+                  />
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 4, display: 'block' }}>
+                    💡 Notifikasi pengingat batas waktu tugas tim akan dikirim ke nomor ini.
+                  </span>
+                </div>
+              </>
             )}
 
             <div className="form-group">

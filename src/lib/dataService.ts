@@ -198,13 +198,23 @@ export async function getCurrentUser(): Promise<Profile | null> {
   }
 }
 
-export async function signUpUser(fullName: string, email: string, password: string): Promise<{ user: Profile | null; error: string | null; needsEmailConfirmation?: boolean }> {
+export async function signUpUser(
+  fullName: string,
+  email: string,
+  password: string,
+  phoneNumber?: string
+): Promise<{ user: Profile | null; error: string | null; needsEmailConfirmation?: boolean }> {
+  const cleanPhone = (phoneNumber || '').trim();
+
   if (isSupabaseConfigured && supabase) {
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        data: { full_name: fullName },
+        data: {
+          full_name: fullName,
+          phone_number: cleanPhone,
+        },
       },
     });
 
@@ -220,6 +230,18 @@ export async function signUpUser(fullName: string, email: string, password: stri
     }
     if (!data.user) return { user: null, error: 'Pendaftaran gagal.' };
 
+    // Pastikan nomor WhatsApp langsung tersimpan di tabel public.profiles
+    if (cleanPhone) {
+      try {
+        await supabase
+          .from('profiles')
+          .update({ phone_number: cleanPhone })
+          .eq('id', data.user.id);
+      } catch (e) {
+        console.error('Failed to update phone_number during sign-up:', e);
+      }
+    }
+
     const needsEmailConfirmation = !data.session;
 
     return {
@@ -227,6 +249,7 @@ export async function signUpUser(fullName: string, email: string, password: stri
         id: data.user.id,
         full_name: fullName,
         email,
+        phone_number: cleanPhone,
       },
       error: null,
       needsEmailConfirmation,
@@ -244,11 +267,17 @@ export async function signUpUser(fullName: string, email: string, password: stri
       email,
       full_name: fullName,
       password,
+      phone_number: cleanPhone,
     };
     db.users.push(newUser);
     saveDemoDb(db);
 
-    const profile: Profile = { id: newUser.id, full_name: newUser.full_name, email: newUser.email };
+    const profile: Profile = {
+      id: newUser.id,
+      full_name: newUser.full_name,
+      email: newUser.email,
+      phone_number: cleanPhone,
+    };
     if (typeof window !== 'undefined') {
       localStorage.setItem(DEMO_USER_KEY, JSON.stringify(profile));
     }
