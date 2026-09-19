@@ -403,4 +403,14 @@ BEGIN
 END $$;
 
 
+-- ==============================================================================
+-- 9. MIGRASI: NOTIFIKASI WHATSAPP & FONNTE GATEWAY
+-- ==============================================================================
+-- Jalankan bagian ini di SQL Editor Supabase untuk mengaktifkan kolom nomor WhatsApp:
 
+-- Kolom nomor telepon / WhatsApp pada profil anggota
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS phone_number TEXT DEFAULT '';
+
+-- Kolom konfigurasi bot WhatsApp Fonnte pada tim
+ALTER TABLE public.teams ADD COLUMN IF NOT EXISTS wa_gateway_token TEXT DEFAULT '';
+ALTER TABLE public.teams ADD COLUMN IF NOT EXISTS wa_notifications_enabled BOOLEAN DEFAULT true;

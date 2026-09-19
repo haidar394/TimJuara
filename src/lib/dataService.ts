@@ -20,7 +20,7 @@ const DEMO_USER_KEY = 'timku_demo_current_user';
 const DEMO_DATA_KEY = 'timku_demo_database';
 
 interface DemoDatabase {
-  users: Array<{ id: string; email: string; full_name: string; password?: string }>;
+  users: Array<{ id: string; email: string; full_name: string; password?: string; phone_number?: string }>;
   teams: Team[];
   members: TeamMember[];
   tasks: Task[];
@@ -187,6 +187,7 @@ export async function getCurrentUser(): Promise<Profile | null> {
       full_name: profile?.full_name || user.user_metadata?.full_name || user.email?.split('@')[0] || 'Pengguna',
       email: user.email || '',
       avatar_url: profile?.avatar_url || '',
+      phone_number: profile?.phone_number || '',
     };
   } else {
     // Mode Demo Lokal
@@ -511,6 +512,150 @@ export async function updateUserProfile(
   }
 }
 
+export async function updateUserPhoneNumber(
+  userId: string,
+  phoneNumber: string
+): Promise<{ success: boolean; error: string | null }> {
+  const cleanPhone = phoneNumber.trim();
+
+  if (isSupabaseConfigured && supabase) {
+    const { error } = await supabase
+      .from('profiles')
+      .update({ phone_number: cleanPhone })
+      .eq('id', userId);
+
+    if (error) return { success: false, error: error.message };
+    return { success: true, error: null };
+  } else {
+    const db = getDemoDb();
+    const user = db.users.find(u => u.id === userId);
+    if (user) {
+      user.phone_number = cleanPhone;
+      saveDemoDb(db);
+    }
+    if (typeof window !== 'undefined') {
+      const raw = localStorage.getItem(DEMO_USER_KEY);
+      if (raw) {
+        const p: Profile = JSON.parse(raw);
+        p.phone_number = cleanPhone;
+        localStorage.setItem(DEMO_USER_KEY, JSON.stringify(p));
+      }
+    }
+    return { success: true, error: null };
+  }
+}
+
+export async function updateTeamWhatsAppConfig(
+  teamId: string,
+  configOrToken: { wa_gateway_token?: string; wa_notifications_enabled?: boolean } | string,
+  maybeEnabled?: boolean
+): Promise<{ success: boolean; error: string | null }> {
+  let cleanToken = '';
+  let enabled = true;
+
+  if (typeof configOrToken === 'string') {
+    cleanToken = configOrToken.trim();
+    enabled = maybeEnabled !== undefined ? maybeEnabled : true;
+  } else {
+    cleanToken = (configOrToken.wa_gateway_token || '').trim();
+    enabled = configOrToken.wa_notifications_enabled !== false;
+  }
+
+  if (isSupabaseConfigured && supabase) {
+    const { error } = await supabase
+      .from('teams')
+      .update({
+        wa_gateway_token: cleanToken,
+        wa_notifications_enabled: enabled,
+      })
+      .eq('id', teamId);
+
+    if (error) return { success: false, error: error.message };
+    return { success: true, error: null };
+  } else {
+    const db = getDemoDb();
+    const t = db.teams.find(item => item.id === teamId);
+    if (t) {
+      t.wa_gateway_token = cleanToken;
+      t.wa_notifications_enabled = enabled;
+      saveDemoDb(db);
+    }
+    return { success: true, error: null };
+  }
+}
+
+export async function sendTestWhatsAppMessage(
+  targetPhone: string,
+  customMessageOrToken?: string,
+  token?: string
+): Promise<{ success: boolean; error: string | null; message?: string }> {
+  try {
+    const defaultMsg = '✅ *TES KONEKSI WHATSAPP TIMJUARA*\n\nSelamat! Nomor WhatsApp kamu berhasil terhubung dengan sistem notifikasi bot TimJuara. Nantinya pengingat deadline tugas akan dikirim otomatis ke nomor ini. 🚀';
+    
+    // If only 2 arguments are provided and second argument looks like a token (no newline) vs custom message
+    let finalMsg = defaultMsg;
+    let finalToken = token;
+
+    if (token) {
+      finalMsg = customMessageOrToken || defaultMsg;
+      finalToken = token;
+    } else if (customMessageOrToken) {
+      if (customMessageOrToken.includes('\n') || customMessageOrToken.includes('*')) {
+        finalMsg = customMessageOrToken;
+        finalToken = undefined;
+      } else {
+        // Likely passed as (targetPhone, token)
+        finalToken = customMessageOrToken;
+      }
+    }
+
+    const res = await fetch('/api/whatsapp/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        target: targetPhone,
+        token: finalToken,
+        message: finalMsg,
+      }),
+    });
+
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      return { success: false, error: data.error || 'Gagal mengirim pesan tes WhatsApp.' };
+    }
+    return { success: true, error: null, message: data.message };
+  } catch (err: any) {
+    return { success: false, error: err.message || 'Terjadi kesalahan jaringan saat tes WhatsApp.' };
+  }
+}
+
+export async function triggerDeadlineReminders(
+  teamId?: string,
+  force: boolean = false
+): Promise<{ success: boolean; error: string | null; sentCount?: number; skippedCount?: number; message?: string }> {
+  try {
+    const res = await fetch('/api/whatsapp/remind', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ teamId, force }),
+    });
+
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      return { success: false, error: data.error || 'Gagal memicu pengingat deadline.' };
+    }
+    return {
+      success: true,
+      error: null,
+      sentCount: data.sentCount,
+      skippedCount: data.skippedCount,
+      message: data.message,
+    };
+  } catch (err: any) {
+    return { success: false, error: err.message || 'Terjadi kesalahan jaringan saat memicu pengingat.' };
+  }
+}
+
 // -------------------------------------------------------------
 // TEAMS METHODS
 // -------------------------------------------------------------
@@ -606,7 +751,7 @@ export async function getTeamByUsername(username: string): Promise<{ team: Team 
       .from('team_members')
       .select(`
         id, team_id, user_id, role, joined_at,
-        profiles (id, full_name, avatar_url)
+        profiles (id, full_name, avatar_url, phone_number)
       `)
       .eq('team_id', team.id);
 
@@ -628,7 +773,7 @@ export async function getTeamByUsername(username: string): Promise<{ team: Team 
     if (members.length === 0 && team.created_by) {
       const { data: creatorProfile } = await supabase
         .from('profiles')
-        .select('id, full_name, avatar_url')
+        .select('id, full_name, avatar_url, phone_number')
         .eq('id', team.created_by)
         .single();
 
@@ -799,7 +944,7 @@ export async function getTeamTasks(teamId: string): Promise<Task[]> {
       .from('tasks')
       .select(`
         id, team_id, title, description, task_link, assigned_to, deadline, status, completed_by, review_notes, created_by, created_at,
-        profiles!tasks_assigned_to_fkey (id, full_name, avatar_url)
+        profiles!tasks_assigned_to_fkey (id, full_name, avatar_url, phone_number)
       `)
       .eq('team_id', teamId)
       .order('deadline', { ascending: true, nullsFirst: false });

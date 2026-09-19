@@ -93,8 +93,55 @@ Untuk mengaktifkannya, pilih salah satu cara termudah berikut:
 - 🏆 **Statistik & Leaderboard**: Otomatis menghitung siapa yang paling banyak menyelesaikan tugas untuk transparansi kerja kelompok.
 - 📁 **Materi & Hasil Riset (0 Kuota)**: Simpan dan buka tautan Google Drive, Google Docs, Slides, Sheets, dan Figma dengan 1 klik tanpa memakan kuota penyimpanan Supabase.
 - 👑 **Manajemen Peran**: Ketua dapat mengatur peran anggota dan membagikan kode tim.
+- 📱 **Notifikasi Pengingat WhatsApp Otomatis (100% Gratis via Fonnte & Vercel Cron)**:
+  - Mengirim pesan WhatsApp ke nomor HP anggota saat tugas mendekati deadline (H-1, Hari H, dan tugas yang terlewat).
+  - Terjadwal otomatis setiap hari jam **08:00 WIB** via Vercel Cron (`0 1 * * *` UTC).
+  - Tombol **"Rekap ke WA"** untuk membagikan daftar tugas & deadline langsung ke grup WhatsApp tim.
+  - Tombol **"Ingatkan WA"** pada setiap kartu tugas untuk menyapa PIC secara instan.
 - 🛡️ **Panel Master Admin (`/admin`)**:
   - **Email**: `admin@gmail.com`
   - **Password**: `masteradmin`
   - Otoritas khusus untuk memantau ringkasan statistik seluruh pengguna/tim, serta menghapus tim atau akun anggota yang menyalahi aturan langsung dari dashboard admin.
+
+---
+
+## Panduan Khusus: Mengaktifkan Bot WhatsApp Pengingat Deadline (100% Gratis)
+
+Fitur notifikasi WhatsApp TimJuara menggunakan **Fonnte Gateway** (Free Tier: 1.000 pesan per bulan tanpa biaya dan tanpa kartu kredit) yang diotomatisasi dengan **Vercel Cron**.
+
+### Langkah 1: Jalankan Migrasi SQL di Supabase
+Jika Anda sudah memiliki database Supabase yang berjalan sebelumnya:
+1. Buka Supabase -> **SQL Editor** -> **New Query**.
+2. Jalankan perintah SQL berikut:
+   ```sql
+   ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS phone_number TEXT DEFAULT '';
+   ALTER TABLE public.teams ADD COLUMN IF NOT EXISTS wa_gateway_token TEXT DEFAULT '';
+   ALTER TABLE public.teams ADD COLUMN IF NOT EXISTS wa_notifications_enabled BOOLEAN DEFAULT true;
+   ```
+3. Klik **Run**. Kolom nomor WhatsApp profil dan token tim kini aktif!
+
+### Langkah 2: Dapatkan Token Fonnte Gratis (1 Menit)
+1. Buka [https://fonnte.com](https://fonnte.com) dan buat akun baru.
+2. Di dashboard Fonnte, masuk ke menu **Device** -> klik **Tambah Device** / buka device yang ada.
+3. Klik **Scan QR Code** lalu buka aplikasi WhatsApp di ponsel Anda (menu *Perangkat Tertaut* / *Linked Devices*, persis seperti membuka WhatsApp Web).
+4. Salin **Device Token** yang tertera di Fonnte.
+
+### Langkah 3: Masukkan Token ke Workspace TimJuara
+1. Buka halaman workspace tim Anda di TimJuara sebagai **Ketua Tim**.
+2. Masuk ke **Tab Pengaturan & Profil**.
+3. Pada kartu **"Bot Pengingat WhatsApp Otomatis"**, tempelkan Device Token dari Fonnte.
+4. Pastikan centang *"Aktifkan pengingat deadline otomatis harian"* tercentang, lalu klik **Simpan Pengaturan Bot WA**.
+
+### Langkah 4: Anggota Menyimpan Nomor WhatsApp
+1. Setiap anggota tim (termasuk ketua) cukup membuka **Tab Pengaturan & Profil** -> pada bagian **Edit Profil Saya**, masukkan nomor WhatsApp di kolom **Nomor WhatsApp** (format: `08...` atau `628...`) lalu klik **Simpan Nomor WA**.
+2. Anda dapat mengklik tombol **"📲 Tes Kirim WA"** untuk memastikan pesan terkirim ke WhatsApp Anda.
+
+### Bagaimana Jadwal Otomatis Bekerja?
+- File [`vercel.json`](./vercel.json) telah dikonfigurasi dengan Vercel Cron yang berjalan setiap hari pukul **01:00 UTC (08:00 WIB)** memanggil endpoint `/api/whatsapp/remind`.
+- Bot akan memindai seluruh tugas yang berstatus belum selesai, dan secara otomatis mengirim pesan pengingat ke WhatsApp anggota yang memiliki tugas dengan deadline:
+  - ⏳ **H-1** (Besok batas waktu)
+  - 🚨 **Hari H** (Hari ini batas waktu)
+  - ⚠️ **Terlewat** (Melewati batas waktu dan perlu segera diselesaikan)
+- Ketua Tim juga bisa mengklik tombol **"📢 Kirim Pengingat Deadline Sekarang"** kapan saja untuk mengirim pengingat secara manual tanpa menunggu jam 8 pagi.
+
 

@@ -9,6 +9,7 @@ export interface Profile {
   full_name: string;
   email?: string;
   avatar_url?: string;
+  phone_number?: string; // Nomor WhatsApp (contoh: 08123456789 atau 628123456789)
   created_at?: string;
 }
 
@@ -19,6 +20,8 @@ export interface Team {
   description?: string;
   created_by?: string;
   created_at: string;
+  wa_gateway_token?: string; // Token API Fonnte tim
+  wa_notifications_enabled?: boolean; // Status aktif notifikasi bot WhatsApp
 }
 
 export interface TeamMember {
