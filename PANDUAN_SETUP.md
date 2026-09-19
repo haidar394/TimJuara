@@ -107,18 +107,19 @@ Untuk mengaktifkannya, pilih salah satu cara termudah berikut:
 
 ## Panduan Khusus: Mengaktifkan Bot WhatsApp Pengingat Deadline (100% Gratis)
 
-Fitur notifikasi WhatsApp TimJuara menggunakan **Fonnte Gateway** (Free Tier: 1.000 pesan per bulan tanpa biaya dan tanpa kartu kredit) yang diotomatisasi dengan **Vercel Cron**.
+Fitur notifikasi WhatsApp TimJuara menggunakan **Fonnte Gateway** (Free Tier: 1.000 pesan per bulan tanpa biaya dan tanpa kartu kredit) yang dikelola terpusat oleh **Master Admin** dan diotomatisasi dengan **Vercel Cron**. Ketua Tim dan anggota tidak perlu repot mendaftar bot sendiri!
 
 ### Langkah 1: Jalankan Migrasi SQL di Supabase
 Jika Anda sudah memiliki database Supabase yang berjalan sebelumnya:
 1. Buka Supabase -> **SQL Editor** -> **New Query**.
 2. Jalankan perintah SQL berikut:
    ```sql
+   -- 1. Kolom nomor WhatsApp profil & token tim
    ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS phone_number TEXT DEFAULT '';
    ALTER TABLE public.teams ADD COLUMN IF NOT EXISTS wa_gateway_token TEXT DEFAULT '';
    ALTER TABLE public.teams ADD COLUMN IF NOT EXISTS wa_notifications_enabled BOOLEAN DEFAULT true;
 
-   -- Update trigger agar otomatis menyimpan nomor WhatsApp saat pendaftaran akun baru
+   -- 2. Update trigger agar otomatis menyimpan nomor WhatsApp saat pendaftaran akun baru
    CREATE OR REPLACE FUNCTION public.handle_new_user()
    RETURNS trigger AS $$
    BEGIN
@@ -135,31 +136,50 @@ Jika Anda sudah memiliki database Supabase yang berjalan sebelumnya:
      RETURN new;
    END;
    $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+   -- 3. Tabel System Settings untuk Pengaturan Bot Terpusat oleh Master Admin
+   CREATE TABLE IF NOT EXISTS public.system_settings (
+       key TEXT PRIMARY KEY,
+       value TEXT NOT NULL,
+       updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+   );
+   ALTER TABLE public.system_settings ENABLE ROW LEVEL SECURITY;
+   DROP POLICY IF EXISTS "Public read system settings" ON public.system_settings;
+   CREATE POLICY "Public read system settings" ON public.system_settings FOR SELECT TO public USING (true);
+   DROP POLICY IF EXISTS "Master admin manage system settings" ON public.system_settings;
+   CREATE POLICY "Master admin manage system settings" ON public.system_settings FOR ALL TO authenticated
+   USING ((auth.jwt() ->> 'email') = 'admin@gmail.com')
+   WITH CHECK ((auth.jwt() ->> 'email') = 'admin@gmail.com');
    ```
-3. Klik **Run**. Kolom nomor WhatsApp profil, token tim, dan trigger pendaftaran kini aktif!
+3. Klik **Run**. Kolom nomor WhatsApp profil, tabel `system_settings`, dan trigger pendaftaran kini aktif!
 
 ### Langkah 2: Dapatkan Token Fonnte Gratis (1 Menit)
-1. Buka [https://fonnte.com](https://fonnte.com) dan buat akun baru.
+1. Buka [https://fonnte.com](https://fonnte.com) dan buat akun baru gratis.
 2. Di dashboard Fonnte, masuk ke menu **Device** -> klik **Tambah Device** / buka device yang ada.
 3. Klik **Scan QR Code** lalu buka aplikasi WhatsApp di ponsel Anda (menu *Perangkat Tertaut* / *Linked Devices*, persis seperti membuka WhatsApp Web).
 4. Salin **Device Token** yang tertera di Fonnte.
 
-### Langkah 3: Masukkan Token ke Workspace TimJuara
-1. Buka halaman workspace tim Anda di TimJuara sebagai **Ketua Tim**.
-2. Masuk ke **Tab Pengaturan & Profil**.
-3. Pada kartu **"Bot Pengingat WhatsApp Otomatis"**, tempelkan Device Token dari Fonnte.
-4. Pastikan centang *"Aktifkan pengingat deadline otomatis harian"* tercentang, lalu klik **Simpan Pengaturan Bot WA**.
+### Langkah 3: Masukkan Token di Panel Master Admin (`/admin`)
+1. Buka aplikasi TimJuara dan login ke panel **Master Admin** di `/admin` (menggunakan akun `admin@gmail.com`).
+2. Masuk ke tab **"🤖 Bot WhatsApp"**.
+3. Tempelkan Device Token dari Fonnte pada kolom **"Fonnte Device Token"**.
+4. Pastikan centang *"Aktifkan pengingat deadline otomatis harian"* tercentang, lalu klik **"Simpan Pengaturan Bot WA"**.
+5. *(Opsional)* Anda dapat melakukan uji coba pengiriman pesan langsung melalui form **"Uji Coba Kirim Pesan WA Langsung"** di tab tersebut.
 
-### Langkah 4: Anggota Menyimpan Nomor WhatsApp
-1. Setiap anggota tim (termasuk ketua) cukup membuka **Tab Pengaturan & Profil** -> pada bagian **Edit Profil Saya**, masukkan nomor WhatsApp di kolom **Nomor WhatsApp** (format: `08...` atau `628...`) lalu klik **Simpan Nomor WA**.
-2. Anda dapat mengklik tombol **"📲 Tes Kirim WA"** untuk memastikan pesan terkirim ke WhatsApp Anda.
+> **Catatan Keamanan**: Token bot disimpan terpusat dan hanya dapat dilihat maupun diubah oleh **Master Admin** (`admin@gmail.com`). Ketua tim biasa tidak memiliki akses mengubah token ini.
+
+### Langkah 4: Anggota & Ketua Memasukkan Nomor WhatsApp
+1. Setiap anggota tim (termasuk ketua) cukup membuka **Tab Pengaturan & Profil** di workspace tim masing-masing.
+2. Pada bagian **Edit Profil Saya**, masukkan nomor WhatsApp di kolom **Nomor WhatsApp** (format: `08...` atau `628...`) lalu klik **Simpan Nomor WA**.
+3. Anggota dapat mengklik tombol **"📲 Tes Kirim WA"** untuk memverifikasi bahwa nomor mereka sudah terhubung dengan bot platform.
 
 ### Bagaimana Jadwal Otomatis Bekerja?
 - File [`vercel.json`](./vercel.json) telah dikonfigurasi dengan Vercel Cron yang berjalan setiap hari pukul **01:00 UTC (08:00 WIB)** memanggil endpoint `/api/whatsapp/remind`.
-- Bot akan memindai seluruh tugas yang berstatus belum selesai, dan secara otomatis mengirim pesan pengingat ke WhatsApp anggota yang memiliki tugas dengan deadline:
+- Bot akan memindai seluruh tugas dari semua tim yang berstatus belum selesai, dan secara otomatis mengirim pesan pengingat ke WhatsApp anggota yang memiliki tugas dengan deadline:
   - ⏳ **H-1** (Besok batas waktu)
   - 🚨 **Hari H** (Hari ini batas waktu)
   - ⚠️ **Terlewat** (Melewati batas waktu dan perlu segera diselesaikan)
-- Ketua Tim juga bisa mengklik tombol **"📢 Kirim Pengingat Deadline Sekarang"** kapan saja untuk mengirim pengingat secara manual tanpa menunggu jam 8 pagi.
+- Master Admin juga dapat mengklik tombol **"📢 Picu Kirim Notifikasi Pengingat ke Semua Tim Sekarang"** dari panel `/admin` kapan saja untuk pengujian manual.
+
 
 

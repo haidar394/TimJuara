@@ -13,6 +13,10 @@ import {
   deleteMultipleTeamsByAdmin,
   deleteMultipleUsersByAdmin,
   signOutUser,
+  getGlobalWhatsAppConfig,
+  updateGlobalWhatsAppConfig,
+  sendTestWhatsAppMessage,
+  triggerDeadlineReminders,
 } from '@/lib/dataService';
 import {
   Profile,
@@ -40,6 +44,10 @@ import {
   Check,
   X,
   CheckSquare,
+  MessageSquare,
+  Smartphone,
+  BellRing,
+  Lock,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -53,8 +61,16 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
 
   // Tabs & Search
-  const [activeTab, setActiveTab] = useState<'teams' | 'users'>('teams');
+  const [activeTab, setActiveTab] = useState<'teams' | 'users' | 'whatsapp'>('teams');
   const [searchQuery, setSearchQuery] = useState('');
+
+  // WhatsApp Gateway Bot Configuration (Master Admin)
+  const [waToken, setWaToken] = useState('');
+  const [waEnabled, setWaEnabled] = useState(true);
+  const [savingWaConfig, setSavingWaConfig] = useState(false);
+  const [testingWa, setTestingWa] = useState(false);
+  const [testPhone, setTestPhone] = useState('');
+  const [triggeringReminders, setTriggeringReminders] = useState(false);
 
   // Bulk Selection States
   const [selectedTeamIds, setSelectedTeamIds] = useState<string[]>([]);
@@ -84,21 +100,83 @@ export default function AdminDashboard() {
     }
     setCurrentUser(user);
 
-    const [st, tm, us] = await Promise.all([
+    const [st, tm, us, waConfig] = await Promise.all([
       getAdminStats(),
       getAllTeamsForAdmin(),
       getAllUsersForAdmin(),
+      getGlobalWhatsAppConfig(),
     ]);
 
     setStats(st);
     setTeams(tm);
     setUsers(us);
+    setWaToken(waConfig.wa_gateway_token);
+    setWaEnabled(waConfig.wa_notifications_enabled);
     setLoading(false);
   };
 
   useEffect(() => {
     loadAdminData();
   }, []);
+
+  const handleSaveWaConfig = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSavingWaConfig(true);
+    const { success, error } = await updateGlobalWhatsAppConfig(waToken, waEnabled);
+    setSavingWaConfig(false);
+
+    if (error) {
+      showToast(`Gagal menyimpan pengaturan WhatsApp: ${error}`);
+      return;
+    }
+
+    if (success) {
+      showToast('Pengaturan Bot WhatsApp platform berhasil disimpan! 🤖');
+    }
+  };
+
+  const handleTestWhatsAppAdmin = async () => {
+    if (!testPhone.trim()) {
+      showToast('Masukkan nomor WhatsApp tujuan uji coba terlebih dahulu.');
+      return;
+    }
+    if (!waToken.trim()) {
+      showToast('Masukkan Device Token Fonnte terlebih dahulu lalu simpan.');
+      return;
+    }
+
+    setTestingWa(true);
+    const testMsg = `Halo! 👋\n\nIni adalah pesan uji coba dari Master Admin TimJuara.\nBot WhatsApp Gateway (Fonnte) telah berhasil terhubung dan siap mengirimkan pengingat deadline ke seluruh tim! 🚀`;
+    const res = await sendTestWhatsAppMessage(testPhone.trim(), testMsg, waToken.trim());
+    setTestingWa(false);
+
+    if (res.success) {
+      showToast(`Pesan uji coba berhasil dikirim ke WhatsApp ${testPhone}! 📲`);
+    } else {
+      showToast(`Gagal mengirim WA: ${res.error || 'Periksa token Fonnte dan nomor HP'}`);
+    }
+  };
+
+  const handleTriggerAllReminders = async () => {
+    if (!waToken.trim()) {
+      showToast('Token Fonnte belum diatur. Masukkan token Fonnte di bawah dan simpan terlebih dahulu.');
+      return;
+    }
+
+    setTriggeringReminders(true);
+    const res = await triggerDeadlineReminders(undefined, true);
+    setTriggeringReminders(false);
+
+    if (res.success) {
+      if (res.sentCount === 0) {
+        showToast(res.message || 'Tidak ada tugas yang mendekati batas deadline atau nomor WA anggota belum terisi.');
+      } else {
+        showToast(`Berhasil mengirim ${res.sentCount} notifikasi WhatsApp ke anggota tim! 📢`);
+      }
+    } else {
+      showToast(`Gagal mengirim notifikasi: ${res.error}`);
+    }
+  };
 
   // Handle Delete Team (Single)
   const confirmDeleteTeam = async () => {
@@ -350,7 +428,7 @@ export default function AdminDashboard() {
 
           {/* Tab Navigation & Search Bar */}
           <div className="card" style={{ padding: '16px 20px', marginBottom: 20, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 14 }}>
-            <div style={{ display: 'flex', gap: 8 }}>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               <button
                 onClick={() => { setActiveTab('teams'); setSearchQuery(''); setSelectedTeamIds([]); setSelectedUserIds([]); }}
                 className={`btn ${activeTab === 'teams' ? 'btn-primary' : 'btn-secondary'} btn-sm`}
@@ -367,22 +445,41 @@ export default function AdminDashboard() {
                 <Users size={15} />
                 <span>Kelola Semua Pengguna ({users.length})</span>
               </button>
+              <button
+                onClick={() => { setActiveTab('whatsapp'); setSearchQuery(''); setSelectedTeamIds([]); setSelectedUserIds([]); }}
+                className={`btn ${activeTab === 'whatsapp' ? 'btn-primary' : 'btn-secondary'} btn-sm`}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  color: activeTab === 'whatsapp' ? '#ffffff' : '#16a34a',
+                  borderColor: activeTab === 'whatsapp' ? 'var(--primary)' : '#86efac',
+                  background: activeTab === 'whatsapp' ? 'var(--primary)' : '#f0fdf4',
+                  fontWeight: 600,
+                }}
+              >
+                <MessageSquare size={15} />
+                <span>Bot WhatsApp Gateway</span>
+                <span className="badge badge-success" style={{ fontSize: '0.65rem', padding: '1px 6px' }}>100% Gratis</span>
+              </button>
             </div>
 
-            {/* Search Input */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 260, flex: 1, maxWidth: 400 }}>
-              <div style={{ position: 'relative', width: '100%' }}>
-                <Search size={16} color="var(--text-muted)" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }} />
-                <input
-                  type="text"
-                  placeholder={activeTab === 'teams' ? 'Cari nama tim atau @username...' : 'Cari nama atau email pengguna...'}
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="form-input"
-                  style={{ paddingLeft: 36, height: 38, fontSize: '0.85rem' }}
-                />
+            {/* Search Input (Hanya tampil di tab Teams & Users) */}
+            {activeTab !== 'whatsapp' && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 260, flex: 1, maxWidth: 400 }}>
+                <div style={{ position: 'relative', width: '100%' }}>
+                  <Search size={16} color="var(--text-muted)" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }} />
+                  <input
+                    type="text"
+                    placeholder={activeTab === 'teams' ? 'Cari nama tim atau @username...' : 'Cari nama atau email pengguna...'}
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="form-input"
+                    style={{ paddingLeft: 36, height: 38, fontSize: '0.85rem' }}
+                  />
+                </div>
               </div>
-            </div>
+            )}
           </div>
 
           {/* ========================================================================= */}
@@ -717,6 +814,7 @@ export default function AdminDashboard() {
                         </th>
                         <th style={{ padding: '12px 14px', fontWeight: 700 }}>Pengguna</th>
                         <th style={{ padding: '12px 14px', fontWeight: 700 }}>Alamat Email</th>
+                        <th style={{ padding: '12px 14px', fontWeight: 700 }}>Nomor WhatsApp</th>
                         <th style={{ padding: '12px 14px', fontWeight: 700 }}>Tim yang Diikuti</th>
                         <th style={{ padding: '12px 14px', fontWeight: 700 }}>Role Akun</th>
                         <th style={{ padding: '12px 14px', fontWeight: 700, textAlign: 'right' }}>Aksi</th>
@@ -774,6 +872,15 @@ export default function AdminDashboard() {
                               </div>
                             </td>
                             <td style={{ padding: '14px' }}>
+                              {u.phone_number ? (
+                                <span style={{ color: '#16a34a', fontWeight: 600, fontSize: '0.85rem', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                                  <Smartphone size={13} /> {u.phone_number}
+                                </span>
+                              ) : (
+                                <span style={{ color: '#94a3b8', fontSize: '0.75rem' }}>Belum diisi</span>
+                              )}
+                            </td>
+                            <td style={{ padding: '14px' }}>
                               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, maxWidth: 300 }}>
                                 {u.teams_joined && u.teams_joined.length > 0 ? (
                                   u.teams_joined.map((tName, i) => (
@@ -820,6 +927,137 @@ export default function AdminDashboard() {
                   </table>
                 </div>
               )}
+            </div>
+          )}
+
+          {/* ========================================================================= */}
+          {/* TAB 3: BOT WHATSAPP GATEWAY (MASTER ADMIN)                                */}
+          {/* ========================================================================= */}
+          {activeTab === 'whatsapp' && (
+            <div className="card" style={{ padding: 28, border: '1px solid #bbf7d0', background: 'linear-gradient(to bottom, #f0fdf4 0%, #ffffff 200px)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 14, marginBottom: 22 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                  <div style={{ width: 48, height: 48, borderRadius: 14, background: '#dcfce7', color: '#16a34a', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: '0 4px 12px rgba(22, 163, 74, 0.15)' }}>
+                    <MessageSquare size={26} />
+                  </div>
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                      <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0f172a' }}>Bot Pengingat WhatsApp Otomatis</h3>
+                      <span className="badge badge-success" style={{ fontSize: '0.75rem' }}>100% Gratis</span>
+                      <span className="badge badge-neutral" style={{ fontSize: '0.75rem' }}>Khusus Master Admin</span>
+                    </div>
+                    <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)', marginTop: 2 }}>
+                      Kirim notifikasi otomatis ke WhatsApp anggota saat mendekati batas waktu (deadline) tugas di seluruh tim!
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleTriggerAllReminders}
+                  disabled={triggeringReminders}
+                  className="btn btn-secondary btn-sm"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    color: '#16a34a',
+                    borderColor: '#86efac',
+                    background: '#ffffff',
+                    fontWeight: 700,
+                    padding: '8px 16px',
+                  }}
+                  title="Pindai seluruh tim dan kirim pengingat deadline ke WhatsApp anggota sekarang"
+                >
+                  <BellRing size={16} />
+                  {triggeringReminders ? 'Mengirim Pengingat...' : '📢 Kirim Pengingat Deadline Sekarang (Semua Tim)'}
+                </button>
+              </div>
+
+              {/* Panduan 3 Langkah Menghubungkan WhatsApp Gratis */}
+              <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: 'var(--radius-md)', padding: '18px 20px', marginBottom: 24, boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+                <h4 style={{ fontSize: '0.95rem', fontWeight: 700, color: '#1e293b', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span>Cara Menghubungkan WhatsApp Gratis (Fonnte):</span>
+                </h4>
+                <ol style={{ fontSize: '0.875rem', color: '#475569', paddingLeft: 18, lineHeight: 1.7, margin: 0 }}>
+                  <li>Buka situs resmi <a href="https://fonnte.com" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--primary)', fontWeight: 600, textDecoration: 'underline' }}>fonnte.com</a> dan daftar akun gratis (Free Tier: 1.000 pesan WA/bulan tanpa biaya).</li>
+                  <li>Di dashboard Fonnte, buka menu <b>Device</b>, lalu <b>Scan QR Code</b> menggunakan aplikasi WhatsApp Anda (seperti saat membuka WhatsApp Web).</li>
+                  <li>Salin <b>Device Token</b> yang muncul di Fonnte, lalu tempel pada kolom di bawah ini dan klik Simpan.</li>
+                </ol>
+              </div>
+
+              {/* Form Konfigurasi Token Master */}
+              <form onSubmit={handleSaveWaConfig} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700 }}>
+                    <Lock size={15} /> Fonnte Device Token (Master Platform)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Contoh: XmLdzRrxvz6nQXvrCtFE"
+                    value={waToken}
+                    onChange={(e) => setWaToken(e.target.value)}
+                    className="form-input"
+                    style={{ fontFamily: 'monospace', fontSize: '0.95rem', letterSpacing: 0.5 }}
+                  />
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 4, display: 'block' }}>
+                    Token ini hanya dapat dilihat dan diubah oleh Master Admin. Seluruh tim akan otomatis menggunakan bot ini.
+                  </span>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0' }}>
+                  <input
+                    type="checkbox"
+                    id="waEnabledMaster"
+                    checked={waEnabled}
+                    onChange={(e) => setWaEnabled(e.target.checked)}
+                    style={{ width: 18, height: 18, accentColor: '#16a34a', cursor: 'pointer' }}
+                  />
+                  <label htmlFor="waEnabledMaster" style={{ fontSize: '0.9rem', color: '#1e293b', cursor: 'pointer', fontWeight: 600 }}>
+                    Aktifkan pengingat deadline otomatis harian (setiap pukul 08:00 WIB untuk tugas H-1, Hari H, & Terlewat)
+                  </label>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'flex-start', gap: 10 }}>
+                  <button
+                    type="submit"
+                    disabled={savingWaConfig}
+                    className="btn btn-primary"
+                    style={{ background: '#16a34a', borderColor: '#16a34a', padding: '10px 22px', fontWeight: 700 }}
+                  >
+                    {savingWaConfig ? 'Menyimpan...' : 'Simpan Pengaturan Bot WA'}
+                  </button>
+                </div>
+              </form>
+
+              {/* Area Uji Coba Pengiriman Pesan */}
+              <div style={{ marginTop: 28, paddingTop: 22, borderTop: '1px solid #e2e8f0' }}>
+                <h4 style={{ fontSize: '0.95rem', fontWeight: 700, color: '#1e293b', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <Smartphone size={16} color="#16a34a" /> Uji Coba Pengiriman WhatsApp
+                </h4>
+                <p style={{ fontSize: '0.825rem', color: 'var(--text-muted)', marginBottom: 14 }}>
+                  Kirim pesan percobaan ke nomor HP Anda untuk memastikan Fonnte Device Token sudah aktif dan dapat terkirim.
+                </p>
+                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', maxWidth: 540 }}>
+                  <input
+                    type="text"
+                    placeholder="Masukkan no HP: 08123456789..."
+                    value={testPhone}
+                    onChange={(e) => setTestPhone(e.target.value)}
+                    className="form-input"
+                    style={{ flex: 1, minWidth: 240 }}
+                  />
+                  <button
+                    type="button"
+                    onClick={handleTestWhatsAppAdmin}
+                    disabled={testingWa}
+                    className="btn btn-secondary"
+                    style={{ whiteSpace: 'nowrap', color: '#16a34a', borderColor: '#86efac', fontWeight: 600 }}
+                  >
+                    {testingWa ? 'Mengirim...' : '📲 Kirim Pesan Tes'}
+                  </button>
+                </div>
+              </div>
             </div>
           )}
         </div>

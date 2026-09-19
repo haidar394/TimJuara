@@ -23,14 +23,36 @@ export async function POST(request: Request) {
       );
     }
 
-    // Gunakan token yang dikirim dari tim atau fallback ke environment variable FONNTE_TOKEN
-    const fonnteToken = token || process.env.FONNTE_TOKEN;
+    // Gunakan token yang dikirim, atau dari system_settings (Master Admin), atau fallback ke env
+    let fonnteToken = token;
+
+    if (!fonnteToken) {
+      try {
+        const { supabase, isSupabaseConfigured } = await import('@/lib/supabase');
+        if (isSupabaseConfigured && supabase) {
+          const { data } = await supabase
+            .from('system_settings')
+            .select('value')
+            .eq('key', 'fonnte_token')
+            .maybeSingle();
+          if (data?.value) {
+            fonnteToken = data.value;
+          }
+        }
+      } catch (e) {
+        console.error('Error fetching global token from system_settings:', e);
+      }
+    }
+
+    if (!fonnteToken) {
+      fonnteToken = process.env.FONNTE_TOKEN;
+    }
 
     if (!fonnteToken) {
       return NextResponse.json(
         {
           success: false,
-          error: 'Token API Fonnte belum dikonfigurasi. Masukkan token di Pengaturan Tim atau set FONNTE_TOKEN di .env.local.',
+          error: 'Token API Fonnte belum dikonfigurasi. Masukkan token di Panel Master Admin (/admin).',
         },
         { status: 400 }
       );

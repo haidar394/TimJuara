@@ -574,6 +574,95 @@ export async function updateUserPhoneNumber(
   }
 }
 
+export async function getGlobalWhatsAppConfig(): Promise<{ wa_gateway_token: string; wa_notifications_enabled: boolean }> {
+  if (isSupabaseConfigured && supabase) {
+    try {
+      const { data } = await supabase
+        .from('system_settings')
+        .select('key, value')
+        .in('key', ['fonnte_token', 'wa_notifications_enabled']);
+
+      let wa_gateway_token = '';
+      let wa_notifications_enabled = true;
+
+      if (data) {
+        for (const item of data) {
+          if (item.key === 'fonnte_token') wa_gateway_token = item.value || '';
+          if (item.key === 'wa_notifications_enabled') wa_notifications_enabled = item.value !== 'false';
+        }
+      }
+
+      // Fallback: cek jika ada di tabel teams
+      if (!wa_gateway_token) {
+        const { data: teamWithToken } = await supabase
+          .from('teams')
+          .select('wa_gateway_token, wa_notifications_enabled')
+          .not('wa_gateway_token', 'eq', '')
+          .limit(1)
+          .maybeSingle();
+        if (teamWithToken?.wa_gateway_token) {
+          wa_gateway_token = teamWithToken.wa_gateway_token;
+          wa_notifications_enabled = teamWithToken.wa_notifications_enabled !== false;
+        }
+      }
+
+      return { wa_gateway_token, wa_notifications_enabled };
+    } catch (e) {
+      console.error('Error getting global WhatsApp config:', e);
+      return { wa_gateway_token: '', wa_notifications_enabled: true };
+    }
+  } else {
+    if (typeof window !== 'undefined') {
+      const savedToken = localStorage.getItem('master_wa_token') || '';
+      const savedEnabled = localStorage.getItem('master_wa_enabled') !== 'false';
+      return { wa_gateway_token: savedToken, wa_notifications_enabled: savedEnabled };
+    }
+    return { wa_gateway_token: '', wa_notifications_enabled: true };
+  }
+}
+
+export async function updateGlobalWhatsAppConfig(
+  waToken: string,
+  enabled: boolean
+): Promise<{ success: boolean; error: string | null }> {
+  const cleanToken = waToken.trim();
+
+  if (isSupabaseConfigured && supabase) {
+    try {
+      // Simpan ke system_settings
+      await supabase.from('system_settings').upsert([
+        { key: 'fonnte_token', value: cleanToken, updated_at: new Date().toISOString() },
+        { key: 'wa_notifications_enabled', value: String(enabled), updated_at: new Date().toISOString() },
+      ]);
+
+      // Sinkronkan ke seluruh baris tim di database
+      await supabase
+        .from('teams')
+        .update({
+          wa_gateway_token: cleanToken,
+          wa_notifications_enabled: enabled,
+        })
+        .neq('id', '00000000-0000-0000-0000-000000000000');
+
+      return { success: true, error: null };
+    } catch (e: any) {
+      return { success: false, error: e.message || 'Gagal menyimpan pengaturan WhatsApp master admin.' };
+    }
+  } else {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('master_wa_token', cleanToken);
+      localStorage.setItem('master_wa_enabled', String(enabled));
+    }
+    const db = getDemoDb();
+    db.teams.forEach(t => {
+      t.wa_gateway_token = cleanToken;
+      t.wa_notifications_enabled = enabled;
+    });
+    saveDemoDb(db);
+    return { success: true, error: null };
+  }
+}
+
 export async function updateTeamWhatsAppConfig(
   teamId: string,
   configOrToken: { wa_gateway_token?: string; wa_notifications_enabled?: boolean } | string,
@@ -1531,6 +1620,7 @@ export async function getAllUsersForAdmin(): Promise<AdminUserItem[]> {
       full_name: p.full_name,
       email: p.email || '',
       avatar_url: p.avatar_url,
+      phone_number: p.phone_number || '',
       created_at: p.created_at,
       teams_joined: userTeamsMap[p.id] || [],
     }));
@@ -1546,6 +1636,7 @@ export async function getAllUsersForAdmin(): Promise<AdminUserItem[]> {
         id: u.id,
         full_name: u.full_name,
         email: u.email,
+        phone_number: u.phone_number || '',
         teams_joined: teamsJoined,
       };
     });

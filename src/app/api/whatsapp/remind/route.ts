@@ -85,25 +85,40 @@ async function handleReminders(request: Request) {
     let skippedCount = 0;
     let failedCount = 0;
 
+    // Ambil token dan status global dari system_settings (Master Admin)
+    let globalFonnteToken = process.env.FONNTE_TOKEN || '';
+    let globalWaEnabled = true;
+
+    try {
+      const { data: settings } = await supabase
+        .from('system_settings')
+        .select('key, value')
+        .in('key', ['fonnte_token', 'wa_notifications_enabled']);
+
+      if (settings) {
+        for (const s of settings) {
+          if (s.key === 'fonnte_token' && s.value) globalFonnteToken = s.value;
+          if (s.key === 'wa_notifications_enabled') globalWaEnabled = s.value !== 'false';
+        }
+      }
+    } catch (e) {
+      console.error('Error fetching global settings in remind route:', e);
+    }
+
+    if (!globalWaEnabled) {
+      return NextResponse.json({
+        success: false,
+        message: 'Pengingat WhatsApp otomatis sedang dinonaktifkan oleh Master Admin.',
+        sentCount: 0,
+        skippedCount: 0,
+      });
+    }
+
     for (const t of tasks) {
       const teamInfo: any = t.teams;
       const profileInfo: any = t.profiles;
 
-      // Cek apakah notifikasi di tim ini diaktifkan
-      if (teamInfo && teamInfo.wa_notifications_enabled === false) {
-        skippedCount++;
-        results.push({
-          taskId: t.id,
-          title: t.title,
-          assignee: profileInfo?.full_name || 'Tidak diketahui',
-          phone: profileInfo?.phone_number || '',
-          status: 'skipped',
-          reason: 'Notifikasi WA dinonaktifkan oleh pengaturan tim',
-        });
-        continue;
-      }
-
-      const token = teamInfo?.wa_gateway_token || process.env.FONNTE_TOKEN;
+      const token = globalFonnteToken || teamInfo?.wa_gateway_token;
       if (!token) {
         skippedCount++;
         results.push({
@@ -112,7 +127,7 @@ async function handleReminders(request: Request) {
           assignee: profileInfo?.full_name || 'Tidak diketahui',
           phone: profileInfo?.phone_number || '',
           status: 'skipped',
-          reason: 'Token API Fonnte belum dipasang di tim ini',
+          reason: 'Token API Fonnte belum dikonfigurasi di Panel Master Admin',
         });
         continue;
       }

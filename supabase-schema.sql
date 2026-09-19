@@ -436,3 +436,28 @@ BEGIN
   RETURN new;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+
+-- ==============================================================================
+-- 10. TABEL SYSTEM_SETTINGS (PENGATURAN GLOBAL MASTER ADMIN)
+-- ==============================================================================
+CREATE TABLE IF NOT EXISTS public.system_settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+ALTER TABLE public.system_settings ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Public read system settings" ON public.system_settings;
+CREATE POLICY "Public read system settings"
+ON public.system_settings FOR SELECT
+TO public
+USING (true);
+
+DROP POLICY IF EXISTS "Master admin manage system settings" ON public.system_settings;
+CREATE POLICY "Master admin manage system settings"
+ON public.system_settings FOR ALL
+TO authenticated
+USING ((auth.jwt() ->> 'email') = 'admin@gmail.com')
+WITH CHECK ((auth.jwt() ->> 'email') = 'admin@gmail.com');

@@ -142,12 +142,8 @@ export default function TeamWorkspace() {
   const [savingEmail, setSavingEmail] = useState(false);
   const [savingPassword, setSavingPassword] = useState(false);
 
-  // WhatsApp Gateway Bot Configuration (Khusus Ketua Tim)
-  const [waToken, setWaToken] = useState('');
-  const [waEnabled, setWaEnabled] = useState(true);
-  const [savingWaConfig, setSavingWaConfig] = useState(false);
+  // WhatsApp Test State
   const [testingWa, setTestingWa] = useState(false);
-  const [triggeringReminders, setTriggeringReminders] = useState(false);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -173,8 +169,6 @@ export default function TeamWorkspace() {
     }
 
     setTeam(teamData);
-    setWaToken(teamData.wa_gateway_token || '');
-    setWaEnabled(teamData.wa_notifications_enabled !== false);
     setMembers(membersData);
 
     const taskList = await getTeamTasks(teamData.id);
@@ -674,69 +668,16 @@ export default function TeamWorkspace() {
       showToast('Masukkan nomor WhatsApp Anda terlebih dahulu.');
       return;
     }
-    const token = waToken.trim();
-    if (!token) {
-      showToast('Token Fonnte belum dimasukkan di Pengaturan Tim oleh Ketua.');
-      return;
-    }
 
     setTestingWa(true);
-    const testMsg = `Halo *${currentUser?.full_name || 'Rekan Tim'}*! 👋\n\nIni adalah pesan uji coba dari Bot TimJuara untuk tim *${team?.name}*.\nIntegrasi WhatsApp Gateway (Fonnte) telah berhasil terhubung! 🚀`;
-    const res = await sendTestWhatsAppMessage(profilePhone.trim(), testMsg, token);
+    const testMsg = `Halo *${currentUser?.full_name || 'Rekan Tim'}*! 👋\n\nIni adalah pesan uji coba dari Bot TimJuara untuk tim *${team?.name || 'Anda'}*.\nIntegrasi WhatsApp Gateway telah berhasil terhubung! 🚀`;
+    const res = await sendTestWhatsAppMessage(profilePhone.trim(), testMsg);
     setTestingWa(false);
 
     if (res.success) {
       showToast('Pesan uji coba berhasil dikirim ke WhatsApp Anda! 📲');
     } else {
-      showToast(`Gagal mengirim WA: ${res.error || 'Periksa token Fonnte dan nomor WhatsApp Anda'}`);
-    }
-  };
-
-  const handleSaveWaConfig = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!team || !isKetua) return;
-
-    setSavingWaConfig(true);
-    const { success, error } = await updateTeamWhatsAppConfig(team.id, {
-      wa_gateway_token: waToken.trim(),
-      wa_notifications_enabled: waEnabled,
-    });
-    setSavingWaConfig(false);
-
-    if (error) {
-      showToast(`Gagal menyimpan konfigurasi WhatsApp: ${error}`);
-      return;
-    }
-
-    if (success) {
-      setTeam({
-        ...team,
-        wa_gateway_token: waToken.trim(),
-        wa_notifications_enabled: waEnabled,
-      });
-      showToast('Pengaturan Bot WhatsApp berhasil disimpan! 🤖');
-    }
-  };
-
-  const handleTriggerReminders = async () => {
-    if (!team) return;
-    if (!waToken.trim()) {
-      showToast('Token Fonnte belum diatur. Masukkan token Fonnte di bawah terlebih dahulu.');
-      return;
-    }
-
-    setTriggeringReminders(true);
-    const res = await triggerDeadlineReminders(team.id);
-    setTriggeringReminders(false);
-
-    if (res.success) {
-      if (res.sentCount === 0) {
-        showToast(res.message || 'Tidak ada tugas yang mendekati deadline dengan nomor WA anggota.');
-      } else {
-        showToast(`Berhasil mengirim ${res.sentCount} pengingat WA ke anggota! 📢`);
-      }
-    } else {
-      showToast(`Gagal mengirim pengingat: ${res.error}`);
+      showToast(`Gagal mengirim WA: ${res.error || 'Periksa nomor WhatsApp Anda'}`);
     }
   };
 
@@ -795,13 +736,11 @@ export default function TeamWorkspace() {
 
     const message = `Halo *${task.assignee_profile.full_name}*! 👋\n\nPengingat tugas dari Tim *${team?.name}*:\n📌 *${task.title}*\n📅 Deadline: *${deadlineStr}*\nStatus: *${task.status === 'review' ? 'Menunggu Dicek' : task.status === 'in_progress' ? 'Sedang Dikerjakan' : 'Belum Selesai'}*\n\nYuk segera diselesaikan atau dicek! 💪\nBuka TimJuara: ${window.location.origin}/workspace/${team?.username}`;
 
-    if (team?.wa_gateway_token) {
-      showToast(`Mengirim pesan pengingat WA ke ${task.assignee_profile.full_name}...`);
-      const res = await sendTestWhatsAppMessage(phone, message, team.wa_gateway_token);
-      if (res.success) {
-        showToast(`Pengingat berhasil dikirim ke WA ${task.assignee_profile.full_name}! 📲`);
-        return;
-      }
+    showToast(`Mengirim pesan pengingat WA ke ${task.assignee_profile.full_name}...`);
+    const res = await sendTestWhatsAppMessage(phone, message);
+    if (res.success) {
+      showToast(`Pengingat berhasil dikirim ke WA ${task.assignee_profile.full_name}! 📲`);
+      return;
     }
 
     // Fallback: buka wa.me langsung
@@ -1841,103 +1780,6 @@ export default function TeamWorkspace() {
                 )}
               </div>
 
-              {/* WhatsApp Bot Gateway Integration (Khusus Ketua Tim) */}
-              {isKetua && (
-                <div className="card" style={{ padding: 26, marginTop: 24, border: '1px solid #bbf7d0', background: 'linear-gradient(to bottom, #f0fdf4, #ffffff)' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 18 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                      <div style={{ width: 44, height: 44, borderRadius: 12, background: '#dcfce7', color: '#16a34a', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                        <MessageSquare size={24} />
-                      </div>
-                      <div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                          <h3 style={{ fontSize: '1.2rem', fontWeight: 800 }}>Bot Pengingat WhatsApp Otomatis</h3>
-                          <span className="badge badge-success" style={{ fontSize: '0.7rem' }}>100% Gratis</span>
-                        </div>
-                        <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>
-                          Kirim notifikasi otomatis ke WhatsApp anggota saat mendekati batas waktu (deadline) tugas!
-                        </p>
-                      </div>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={handleTriggerReminders}
-                      disabled={triggeringReminders}
-                      className="btn btn-secondary btn-sm"
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: 8,
-                        color: '#16a34a',
-                        borderColor: '#86efac',
-                        background: '#ffffff',
-                        fontWeight: 600,
-                      }}
-                      title="Jalankan pengecekan deadline dan kirim pengingat ke WA anggota sekarang"
-                    >
-                      <BellRing size={16} />
-                      {triggeringReminders ? 'Mengirim Pengingat...' : '📢 Kirim Pengingat Deadline Sekarang'}
-                    </button>
-                  </div>
-
-                  {/* Panduan 3 Langkah */}
-                  <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: 'var(--radius-md)', padding: '16px 18px', marginBottom: 20 }}>
-                    <h4 style={{ fontSize: '0.9rem', fontWeight: 700, color: '#1e293b', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <span>Cara Menghubungkan WhatsApp Gratis (Fonnte):</span>
-                    </h4>
-                    <ol style={{ fontSize: '0.85rem', color: '#475569', paddingLeft: 18, lineHeight: 1.6, margin: 0 }}>
-                      <li>Buka situs resmi <a href="https://fonnte.com" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--primary)', fontWeight: 600, textDecoration: 'underline' }}>fonnte.com</a> dan daftar akun gratis (Free Tier: 1.000 pesan WA/bulan tanpa biaya).</li>
-                      <li>Di dashboard Fonnte, buka menu <b>Device</b>, lalu <b>Scan QR Code</b> menggunakan aplikasi WhatsApp Anda (seperti saat membuka WhatsApp Web).</li>
-                      <li>Salin <b>Device Token</b> yang muncul di Fonnte, lalu tempel pada kolom di bawah ini dan klik Simpan.</li>
-                    </ol>
-                  </div>
-
-                  <form onSubmit={handleSaveWaConfig} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                    <div className="form-group" style={{ marginBottom: 0 }}>
-                      <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <Lock size={14} /> Fonnte Device Token
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="Contoh: a1b2c3d4e5f6g7h8..."
-                        value={waToken}
-                        onChange={(e) => setWaToken(e.target.value)}
-                        className="form-input"
-                        style={{ fontFamily: 'monospace', fontSize: '0.9rem' }}
-                      />
-                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 4, display: 'block' }}>
-                        Token ini tersimpan aman di tim Anda dan hanya digunakan untuk mengirim pengingat tugas.
-                      </span>
-                    </div>
-
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0' }}>
-                      <input
-                        type="checkbox"
-                        id="waEnabled"
-                        checked={waEnabled}
-                        onChange={(e) => setWaEnabled(e.target.checked)}
-                        style={{ width: 18, height: 18, accentColor: '#16a34a', cursor: 'pointer' }}
-                      />
-                      <label htmlFor="waEnabled" style={{ fontSize: '0.875rem', color: '#1e293b', cursor: 'pointer', fontWeight: 500 }}>
-                        Aktifkan pengingat deadline otomatis harian (setiap pukul 08:00 WIB untuk tugas H-1, Hari H, & Terlewat)
-                      </label>
-                    </div>
-
-                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
-                      <button
-                        type="submit"
-                        disabled={savingWaConfig}
-                        className="btn btn-primary"
-                        style={{ background: '#16a34a', borderColor: '#16a34a' }}
-                      >
-                        {savingWaConfig ? 'Menyimpan...' : 'Simpan Pengaturan Bot WA'}
-                      </button>
-                    </div>
-                  </form>
-                </div>
-              )}
-
               {/* Edit Profile Card (Terpisah: Nama, Email, Password) */}
               <div className="card" style={{ padding: 26, marginTop: 24 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 22 }}>
@@ -2012,14 +1854,14 @@ export default function TeamWorkspace() {
                         >
                           {savingPhone ? 'Menyimpan...' : 'Simpan Nomor WA'}
                         </button>
-                        {waToken && profilePhone && (
+                        {profilePhone && (
                           <button
                             type="button"
                             onClick={handleTestWhatsApp}
                             disabled={testingWa}
                             className="btn btn-secondary"
                             style={{ whiteSpace: 'nowrap', color: '#16a34a', borderColor: '#86efac' }}
-                            title="Kirim pesan tes ke nomor ini menggunakan token tim"
+                            title="Kirim pesan uji coba ke nomor ini"
                           >
                             {testingWa ? 'Mengirim Tes...' : '📲 Tes Kirim WA'}
                           </button>
