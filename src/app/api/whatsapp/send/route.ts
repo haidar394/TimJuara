@@ -37,10 +37,22 @@ export async function POST(request: Request) {
             .maybeSingle();
           if (data?.value) {
             fonnteToken = data.value;
+          } else {
+            // Fallback: cek jika tersimpan di salah satu record teams
+            const { data: teamWithToken } = await supabase
+              .from('teams')
+              .select('wa_gateway_token')
+              .not('wa_gateway_token', 'is', null)
+              .neq('wa_gateway_token', '')
+              .limit(1)
+              .maybeSingle();
+            if (teamWithToken?.wa_gateway_token) {
+              fonnteToken = teamWithToken.wa_gateway_token;
+            }
           }
         }
       } catch (e) {
-        console.error('Error fetching global token from system_settings:', e);
+        console.error('Error fetching global token from system_settings/teams:', e);
       }
     }
 
@@ -77,10 +89,35 @@ export async function POST(request: Request) {
     const result = await response.json();
 
     if (!response.ok || result.status === false) {
+      const rawReason = (result.reason || result.message || '').toLowerCase();
+      let friendlyError = result.reason || result.message || 'Gagal mengirim pesan melalui Fonnte.';
+
+      if (
+        rawReason.includes('device disconnected') ||
+        rawReason.includes('device not connected') ||
+        rawReason.includes('not ready') ||
+        rawReason.includes('disconnected')
+      ) {
+        friendlyError = 'WhatsApp di Fonnte terputus (Device Disconnected). Silakan buka fonnte.com -> Menu Device -> Connect/Scan QR ulang.';
+      } else if (
+        rawReason.includes('invalid token') ||
+        rawReason.includes('token not found') ||
+        rawReason.includes('unauthorized')
+      ) {
+        friendlyError = 'Token Fonnte tidak valid. Periksa kembali Device Token di Panel Master Admin (/admin) atau di fonnte.com.';
+      } else if (
+        rawReason.includes('quota') ||
+        rawReason.includes('limit') ||
+        rawReason.includes('expired') ||
+        rawReason.includes('package')
+      ) {
+        friendlyError = 'Kuota pesan atau masa aktif paket Fonnte telah habis. Cek status paket/device di fonnte.com.';
+      }
+
       return NextResponse.json(
         {
           success: false,
-          error: result.reason || result.message || 'Gagal mengirim pesan melalui Fonnte.',
+          error: friendlyError,
           raw: result,
         },
         { status: 500 }

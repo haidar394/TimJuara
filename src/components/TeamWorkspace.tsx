@@ -3280,6 +3280,19 @@ export default function TeamWorkspace() {
                         >
                           {savingPhone ? 'Menyimpan...' : 'Simpan Nomor WA'}
                         </button>
+                        {profilePhone.trim() && (
+                          <button
+                            type="button"
+                            onClick={handleTestWhatsApp}
+                            disabled={testingWa}
+                            className="btn btn-outline"
+                            style={{ whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 6 }}
+                            title="Uji coba pengiriman pesan bot ke nomor WhatsApp Anda"
+                          >
+                            <Send size={14} />
+                            {testingWa ? 'Mengirim...' : 'Tes Kirim WA'}
+                          </button>
+                        )}
                       </div>
                       <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                         💡 Masukkan nomor dengan awalan 08... atau 628... Sistem otomatis memformat nomor menjadi standar internasional.
