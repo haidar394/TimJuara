@@ -25,6 +25,9 @@ import {
   updateUserEmail,
   updateUserPassword,
   updateUserPhoneNumber,
+  updateUserAvatar,
+  updateTeamAvatar,
+  getUserTeamsWithDetails,
   updateTeamWhatsAppConfig,
   sendTestWhatsAppMessage,
   triggerDeadlineReminders,
@@ -47,6 +50,7 @@ import {
   ResourceType,
   TaskComment,
   AppNotification,
+  UserTeamItem,
 } from '@/lib/types';
 import {
   Users,
@@ -58,6 +62,9 @@ import {
   Settings,
   Plus,
   Copy,
+  LayoutDashboard,
+  Camera,
+  Upload,
   Check,
   ExternalLink,
   Trash2,
@@ -104,9 +111,22 @@ export default function TeamWorkspace() {
   const [research, setResearch] = useState<ResearchMaterial[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Active Tab & Filters
-  const [activeTab, setActiveTab] = useState<'tasks' | 'stats' | 'research' | 'members'>('tasks');
+  // Active Tab & Filters (4 Menu: overview, tasks, research, settings)
+  const [activeTab, setActiveTab] = useState<'overview' | 'tasks' | 'research' | 'settings'>('overview');
   const [taskFilter, setTaskFilter] = useState<'all' | 'todo' | 'in_progress' | 'review' | 'done'>('all');
+
+  // User Teams List for Dropdown Switcher
+  const [userTeams, setUserTeams] = useState<UserTeamItem[]>([]);
+
+  // Avatar Editing State
+  const [showTeamAvatarModal, setShowTeamAvatarModal] = useState(false);
+  const [teamAvatarUrl, setTeamAvatarUrl] = useState('');
+  const [savingTeamAvatar, setSavingTeamAvatar] = useState(false);
+  const [userAvatarUrl, setUserAvatarUrl] = useState('');
+  const [savingUserAvatar, setSavingUserAvatar] = useState(false);
+
+  // Unread Comments Tracking (task_id -> last_known_count)
+  const [readCommentsMap, setReadCommentsMap] = useState<Record<string, number>>({});
 
   // Toasts
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -224,6 +244,24 @@ export default function TeamWorkspace() {
     setSelectedTaskForComments(task);
     setShowCommentsModal(true);
     setLoadingComments(true);
+
+    // Tandai seluruh komentar pada tugas ini sudah dibaca oleh user saat ini
+    if (currentUser) {
+      const currentCommentsCount = task.comments_count || 0;
+      const updated = {
+        ...readCommentsMap,
+        [task.id]: Math.max(currentCommentsCount, (readCommentsMap[task.id] || 0) + 1),
+      };
+      setReadCommentsMap(updated);
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.setItem(`timjuara_read_comments_${currentUser.id}`, JSON.stringify(updated));
+        } catch (err) {
+          console.error(err);
+        }
+      }
+    }
+
     const data = await getTaskComments(task.id);
     setTaskComments(data);
     setLoadingComments(false);
@@ -245,13 +283,25 @@ export default function TeamWorkspace() {
       setTaskComments((prev) => [...prev, comment]);
       setCommentInput('');
 
+      const newCommentsCount = (selectedTaskForComments.comments_count || 0) + 1;
       setTasks((prev) =>
         prev.map((t) =>
           t.id === selectedTaskForComments.id
-            ? { ...t, comments_count: (t.comments_count || 0) + 1 }
+            ? { ...t, comments_count: newCommentsCount }
             : t
         )
       );
+
+      // Tandai komentar sendiri sebagai telah dibaca
+      const updatedRead = { ...readCommentsMap, [selectedTaskForComments.id]: newCommentsCount };
+      setReadCommentsMap(updatedRead);
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.setItem(`timjuara_read_comments_${currentUser.id}`, JSON.stringify(updatedRead));
+        } catch (err) {
+          console.error(err);
+        }
+      }
 
       const recipientIds = new Set<string>();
       (selectedTaskForComments.assigned_to_ids || []).forEach((id) => recipientIds.add(id));
@@ -273,6 +323,36 @@ export default function TeamWorkspace() {
     }
   };
 
+  // Avatar Actions
+  const handleSaveTeamAvatar = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!team) return;
+    setSavingTeamAvatar(true);
+    const { success, error } = await updateTeamAvatar(team.id, teamAvatarUrl);
+    setSavingTeamAvatar(false);
+    if (success) {
+      setTeam((prev) => prev ? { ...prev, avatar_url: teamAvatarUrl.trim() } : null);
+      setShowTeamAvatarModal(false);
+      showToast('Foto profil tim berhasil diperbarui!');
+    } else {
+      showToast(`Gagal memperbarui foto tim: ${error}`);
+    }
+  };
+
+  const handleUpdateUserAvatar = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentUser) return;
+    setSavingUserAvatar(true);
+    const { success, error } = await updateUserAvatar(currentUser.id, userAvatarUrl);
+    setSavingUserAvatar(false);
+    if (success) {
+      setCurrentUser((prev) => prev ? { ...prev, avatar_url: userAvatarUrl.trim() } : null);
+      showToast('Foto profil Anda berhasil disimpan!');
+    } else {
+      showToast(`Gagal menyimpan foto profil: ${error}`);
+    }
+  };
+
   // Load Data
   const loadWorkspaceData = async () => {
     const user = await getCurrentUser();
@@ -284,7 +364,20 @@ export default function TeamWorkspace() {
     setProfileName(user.full_name);
     setProfilePhone(user.phone_number || '');
     setProfileEmail(user.email || '');
+    setUserAvatarUrl(user.avatar_url || '');
     loadNotifications(user.id);
+
+    // Ambil rekam jejak komentar yang sudah dibaca user dari localStorage
+    if (typeof window !== 'undefined') {
+      try {
+        const storedRead = localStorage.getItem(`timjuara_read_comments_${user.id}`);
+        if (storedRead) {
+          setReadCommentsMap(JSON.parse(storedRead));
+        }
+      } catch (e) {
+        console.error('Error loading read comments map:', e);
+      }
+    }
 
     const { team: teamData, members: membersData } = await getTeamByUsername(teamUsername);
     if (!teamData) {
@@ -293,6 +386,7 @@ export default function TeamWorkspace() {
     }
 
     setTeam(teamData);
+    setTeamAvatarUrl(teamData.avatar_url || '');
     setMembers(membersData);
 
     const taskList = await getTeamTasks(teamData.id);
@@ -300,6 +394,10 @@ export default function TeamWorkspace() {
 
     const researchList = await getTeamResearch(teamData.id);
     setResearch(researchList);
+
+    // Load All Teams of User for Dropdown Switcher
+    const myTeams = await getUserTeamsWithDetails(user.id);
+    setUserTeams(myTeams);
 
     setLoading(false);
   };
@@ -1080,7 +1178,7 @@ export default function TeamWorkspace() {
         ? t.assignee_profiles.map((p) => p.full_name).join(', ')
         : (t.assignee_profile?.full_name || 'Belum ditugaskan');
       text += `${idx + 1}. *${t.title}*\n`;
-      text += `   • PIC: ${picNames}\n`;
+      text += `   • Member Tugas: ${picNames}\n`;
       text += `   • Status: ${statusText}\n`;
       text += `   • Deadline: ${deadlineNote}\n`;
       if (t.task_link) text += `   • Link: ${t.task_link}\n`;
@@ -1101,7 +1199,7 @@ export default function TeamWorkspace() {
     const validTargets = targets.filter((p) => Boolean(p.phone_number && p.phone_number.trim()));
 
     if (validTargets.length === 0) {
-      showToast(`Nomor WA penanggung jawab tugas belum terdaftar di profil.`);
+      showToast(`Nomor WA member tugas belum terdaftar di profil.`);
       return;
     }
 
@@ -1207,7 +1305,7 @@ export default function TeamWorkspace() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: 'var(--bg-page)' }}>
+    <div className="workspace-shell" style={{ minHeight: '100vh', background: 'var(--bg-page)' }}>
       {/* Toast Notification */}
       {toastMessage && (
         <div className="toast-notice">
@@ -1216,32 +1314,268 @@ export default function TeamWorkspace() {
         </div>
       )}
 
-      {/* Top Navbar */}
-      <header className="workspace-header">
-        <div className="container">
-          {/* Mobile Top Nav: Ganti Tim on Left, User Profile & Logout on Right */}
-          <div className="workspace-mobile-nav">
-            <Link
-              href="/onboarding"
-              className="btn btn-secondary btn-sm"
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 6,
-                padding: '6px 14px',
-                fontSize: '0.825rem',
-                fontWeight: 700,
-                borderRadius: 'var(--radius-full)',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
-              }}
-              title="Ganti ke tim lain"
-            >
-              <Users size={15} color="var(--primary)" />
-              <span>Ganti Tim</span>
+      {/* ========================================================================= */}
+      {/* DESKTOP SIDEBAR NAVIGATION (Kiri)                                         */}
+      {/* ========================================================================= */}
+      <aside className="workspace-sidebar">
+        {/* App & Team Header */}
+        <div style={{ padding: '20px 16px 16px', borderBottom: '1px solid var(--surface-border)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+            <Link href="/onboarding" style={{ display: 'flex', alignItems: 'center', gap: 8, textDecoration: 'none' }}>
+              <div style={{ width: 32, height: 32, borderRadius: 10, background: 'var(--primary)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800 }}>
+                TJ
+              </div>
+              <span style={{ fontWeight: 800, fontSize: '1.1rem', color: 'var(--text-main)' }}>TimJuara</span>
             </Link>
 
+            {currentUser?.email?.toLowerCase() === 'admin@gmail.com' && (
+              <Link href="/admin" className="badge" style={{ background: '#ef4444', color: '#fff', fontSize: '0.65rem', padding: '3px 6px', display: 'flex', alignItems: 'center', gap: 4 }}>
+                <Crown size={10} /> Admin
+              </Link>
+            )}
+          </div>
+
+          {/* Active Team Pill */}
+          <div
+            style={{
+              padding: '10px 12px',
+              borderRadius: 'var(--radius-md)',
+              background: 'var(--surface-secondary)',
+              border: '1px solid var(--surface-border)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 10,
+            }}
+          >
+            {team?.avatar_url ? (
+              <img
+                src={team.avatar_url}
+                alt={team.name}
+                className="avatar-photo"
+                style={{ width: 36, height: 36, objectFit: 'cover' }}
+              />
+            ) : (
+              <div className="team-avatar-header" style={{ width: 36, height: 36, fontSize: '0.85rem' }}>
+                {team?.name.slice(0, 2).toUpperCase()}
+              </div>
+            )}
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <div style={{ fontWeight: 700, fontSize: '0.875rem', color: 'var(--text-main)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {team?.name}
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
+                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>@{team?.username}</span>
+                {isKetua ? (
+                  <span className="badge badge-warning" style={{ fontSize: '0.6rem', padding: '1px 5px' }}>
+                    <Crown size={9} /> Ketua
+                  </span>
+                ) : (
+                  <span className="badge badge-neutral" style={{ fontSize: '0.6rem', padding: '1px 5px' }}>
+                    Anggota
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Sidebar Nav List (4 Main Menus) */}
+        <div className="sidebar-nav-list" style={{ padding: '0 12px' }}>
+          <button
+            onClick={() => setActiveTab('overview')}
+            className={`sidebar-nav-btn ${activeTab === 'overview' ? 'active' : ''}`}
+          >
+            <LayoutDashboard size={18} />
+            <span style={{ flex: 1 }}>Overview</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('tasks')}
+            className={`sidebar-nav-btn ${activeTab === 'tasks' ? 'active' : ''}`}
+          >
+            <CheckCircle2 size={18} />
+            <span style={{ flex: 1 }}>Tim Saya</span>
+            <span className="badge badge-primary" style={{ fontSize: '0.7rem', padding: '2px 6px' }}>
+              {tasks.length}
+            </span>
+            {inReviewTasks > 0 && (
+              <span className="badge" style={{ background: '#f3e8ff', color: '#7e22ce', fontSize: '0.65rem', padding: '2px 5px' }}>
+                {inReviewTasks}
+              </span>
+            )}
+          </button>
+
+          <button
+            onClick={() => setActiveTab('research')}
+            className={`sidebar-nav-btn ${activeTab === 'research' ? 'active' : ''}`}
+          >
+            <FolderGit2 size={18} />
+            <span style={{ flex: 1 }}>Materi & Riset</span>
+            <span className="badge badge-neutral" style={{ fontSize: '0.7rem', padding: '2px 6px' }}>
+              {research.length}
+            </span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('settings')}
+            className={`sidebar-nav-btn ${activeTab === 'settings' ? 'active' : ''}`}
+          >
+            <Settings size={18} />
+            <span style={{ flex: 1 }}>Pengaturan</span>
+          </button>
+        </div>
+
+        {/* Sidebar Footer */}
+        <div style={{ padding: '16px 14px', borderTop: '1px solid var(--surface-border)', display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            {/* Dark Mode Toggle */}
+            <button
+              onClick={toggleDarkMode}
+              className="theme-toggle-btn"
+              style={{ width: 34, height: 34 }}
+              title={isDarkMode ? 'Mode Terang' : 'Mode Gelap'}
+            >
+              {isDarkMode ? <Sun size={16} color="#f59e0b" /> : <Moon size={16} color="#6366f1" />}
+            </button>
+
+            {/* In-App Notifications */}
+            <div style={{ position: 'relative' }}>
+              <button
+                onClick={() => setShowNotifPopover((prev) => !prev)}
+                className="notif-btn"
+                style={{ width: 34, height: 34 }}
+                title="Notifikasi"
+              >
+                <Bell size={16} />
+                {notifications.filter((n) => !n.is_read).length > 0 && (
+                  <span className="notif-badge">
+                    {notifications.filter((n) => !n.is_read).length}
+                  </span>
+                )}
+              </button>
+
+              {showNotifPopover && (
+                <div className="notif-popover" style={{ bottom: 44, top: 'auto', left: 0, width: 280 }}>
+                  <div className="notif-header">
+                    <span>🔔 Notifikasi</span>
+                    {notifications.some((n) => !n.is_read) && (
+                      <button
+                        onClick={handleMarkAllRead}
+                        style={{ background: 'none', border: 'none', color: 'var(--primary)', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}
+                      >
+                        Semua dibaca
+                      </button>
+                    )}
+                  </div>
+                  <div className="notif-list" style={{ maxHeight: 240 }}>
+                    {notifications.length === 0 ? (
+                      <div style={{ padding: '20px 12px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.8rem' }}>
+                        Tidak ada notifikasi baru
+                      </div>
+                    ) : (
+                      notifications.map((n) => (
+                        <div
+                          key={n.id}
+                          onClick={async () => {
+                            if (!n.is_read) {
+                              await markNotificationAsRead(n.id);
+                              setNotifications((prev) =>
+                                prev.map((item) => (item.id === n.id ? { ...item, is_read: true } : item))
+                              );
+                            }
+                            setShowNotifPopover(false);
+                          }}
+                          className={`notif-item ${!n.is_read ? 'unread' : ''}`}
+                        >
+                          <div style={{ flex: 1 }}>
+                            <div className="notif-item-title">{n.title}</div>
+                            <div className="notif-item-msg">{n.message}</div>
+                            <div className="notif-item-time">
+                              {new Date(n.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })}
+                            </div>
+                          </div>
+                          {!n.is_read && (
+                            <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--primary)', alignSelf: 'center', flexShrink: 0 }} />
+                          )}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <Link href="/onboarding" className="btn btn-secondary btn-sm" title="Overview Seluruh Akun / Ganti Tim">
+              <Users size={14} />
+            </Link>
+          </div>
+
+          {/* User Mini Profile */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, paddingTop: 10, borderTop: '1px solid var(--surface-border)' }}>
+            {currentUser?.avatar_url ? (
+              <img
+                src={currentUser.avatar_url}
+                alt={currentUser.full_name}
+                className="avatar-photo"
+                style={{ width: 34, height: 34 }}
+              />
+            ) : (
+              <div className="avatar-badge" style={{ width: 34, height: 34, fontSize: '0.75rem' }}>
+                {currentUser?.full_name?.slice(0, 2).toUpperCase() || 'AG'}
+              </div>
+            )}
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <div style={{ fontSize: '0.825rem', fontWeight: 700, color: 'var(--text-main)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {currentUser?.full_name}
+              </div>
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {currentUser?.email}
+              </div>
+            </div>
+            <button
+              onClick={async () => {
+                await signOutUser();
+                router.push('/auth');
+              }}
+              className="btn btn-secondary btn-sm"
+              style={{ padding: '6px 8px', flexShrink: 0 }}
+              title="Keluar akun"
+            >
+              <LogOut size={13} />
+            </button>
+          </div>
+        </div>
+      </aside>
+
+      {/* ========================================================================= */}
+      {/* WORKSPACE CONTENT PANE (Kanan)                                            */}
+      {/* ========================================================================= */}
+      <div className="workspace-content-pane">
+        {/* Mobile Top Header */}
+        <header className="workspace-header" style={{ borderBottom: '1px solid var(--surface-border)', padding: '12px 16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+              {team?.avatar_url ? (
+                <img
+                  src={team.avatar_url}
+                  alt={team.name}
+                  className="avatar-photo"
+                  style={{ width: 34, height: 34 }}
+                />
+              ) : (
+                <div className="team-avatar-header" style={{ width: 34, height: 34, fontSize: '0.8rem' }}>
+                  {team?.name.slice(0, 2).toUpperCase()}
+                </div>
+              )}
+              <div style={{ minWidth: 0 }}>
+                <h1 style={{ fontSize: '1rem', fontWeight: 800, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {team?.name}
+                </h1>
+                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>@{team?.username}</span>
+              </div>
+            </div>
+
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              {/* Theme Toggle Mobile */}
               <button
                 onClick={toggleDarkMode}
                 className="theme-toggle-btn"
@@ -1251,950 +1585,941 @@ export default function TeamWorkspace() {
                 {isDarkMode ? <Sun size={15} color="#f59e0b" /> : <Moon size={15} color="#6366f1" />}
               </button>
 
-              {/* In-App Notifications Bell Mobile */}
-              <div style={{ position: 'relative' }}>
-                <button
-                  onClick={() => setShowNotifPopover((prev) => !prev)}
-                  className="notif-btn"
-                  style={{ width: 32, height: 32 }}
-                  title="Notifikasi"
-                >
-                  <Bell size={15} />
-                  {notifications.filter((n) => !n.is_read).length > 0 && (
-                    <span className="notif-badge">
-                      {notifications.filter((n) => !n.is_read).length}
-                    </span>
-                  )}
-                </button>
+              <Link href="/onboarding" className="btn btn-secondary btn-sm" style={{ padding: '6px 10px', fontSize: '0.75rem' }} title="Overview Akun">
+                <Users size={14} />
+              </Link>
+            </div>
+          </div>
+        </header>
 
-                {showNotifPopover && (
-                  <div className="notif-popover" style={{ position: 'fixed', top: 60, right: 16, left: 16, width: 'auto' }}>
-                    <div className="notif-header">
-                      <span>🔔 Notifikasi</span>
-                      {notifications.some((n) => !n.is_read) && (
-                        <button
-                          onClick={handleMarkAllRead}
-                          style={{ background: 'none', border: 'none', color: 'var(--primary)', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}
-                        >
-                          Tandai semua dibaca
-                        </button>
-                      )}
-                    </div>
-
-                    <div className="notif-list">
-                      {notifications.length === 0 ? (
-                        <div style={{ padding: '24px 16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.825rem' }}>
-                          Tidak ada notifikasi baru
-                        </div>
-                      ) : (
-                        notifications.map((n) => (
-                          <div
-                            key={n.id}
-                            onClick={async () => {
-                              if (!n.is_read) {
-                                await markNotificationAsRead(n.id);
-                                setNotifications((prev) =>
-                                  prev.map((item) => (item.id === n.id ? { ...item, is_read: true } : item))
-                                );
-                              }
-                              setShowNotifPopover(false);
-                            }}
-                            className={`notif-item ${!n.is_read ? 'unread' : ''}`}
-                          >
-                            <div style={{ flex: 1 }}>
-                              <div className="notif-item-title">{n.title}</div>
-                              <div className="notif-item-msg">{n.message}</div>
-                              <div className="notif-item-time">
-                                {new Date(n.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })} • {new Date(n.created_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
-                              </div>
-                            </div>
-                            {!n.is_read && (
-                              <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--primary)', alignSelf: 'center', flexShrink: 0 }} />
-                            )}
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {currentUser?.email?.toLowerCase() === 'admin@gmail.com' && (
+        {/* Main Content Body */}
+        <main className="workspace-main" style={{ flex: 1, padding: '24px 16px 80px' }}>
+          <div className="container" style={{ maxWidth: 1100 }}>
+            {/* Master Admin Management Notice Banner */}
+            {isMasterAdminUser && (
+              <div
+                style={{
+                  background: isDarkMode
+                    ? 'linear-gradient(135deg, rgba(245, 158, 11, 0.15) 0%, rgba(217, 119, 6, 0.08) 100%)'
+                    : 'linear-gradient(135deg, #fef3c7 0%, #fffbeb 100%)',
+                  border: isDarkMode ? '1px solid rgba(245, 158, 11, 0.35)' : '1px solid #fde68a',
+                  color: isDarkMode ? '#fde68a' : '#92400e',
+                  borderRadius: 'var(--radius-md)',
+                  padding: '12px 18px',
+                  marginBottom: 20,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  flexWrap: 'wrap',
+                  gap: 12,
+                  boxShadow: isDarkMode ? '0 2px 12px rgba(0, 0, 0, 0.4)' : '0 2px 8px rgba(217, 119, 6, 0.08)',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: '0.875rem', fontWeight: 700 }}>
+                  <ShieldAlert size={20} color={isDarkMode ? '#fbbf24' : '#d97706'} />
+                  <span>
+                    🛡️ <strong>Mode Master Admin</strong>: Anda memiliki hak akses penuh untuk mengelola anggota, peran, dan tugas di tim ini.
+                  </span>
+                </div>
                 <Link
                   href="/admin"
-                  className="btn btn-sm"
-                  style={{ background: '#ef4444', color: '#fff', border: 'none', padding: '5px 8px', fontSize: '0.725rem', fontWeight: 700 }}
+                  className="btn btn-secondary btn-sm"
+                  style={{
+                    background: isDarkMode ? '#1e293b' : '#ffffff',
+                    borderColor: isDarkMode ? 'rgba(245, 158, 11, 0.4)' : '#fcd34d',
+                    color: isDarkMode ? '#fbbf24' : '#b45309',
+                    fontWeight: 700,
+                    fontSize: '0.8rem',
+                    padding: '6px 14px',
+                  }}
                 >
-                  <Crown size={12} /> Admin
+                  ← Kembali ke Panel Admin
                 </Link>
-              )}
-              <div className="avatar-badge" style={{ width: 32, height: 32, fontSize: '0.75rem' }} title={currentUser?.full_name}>
-                {currentUser?.full_name?.slice(0, 2).toUpperCase()}
               </div>
-              <button
-                onClick={async () => {
-                  await signOutUser();
-                  router.push('/auth');
-                }}
-                className="btn btn-secondary btn-sm"
-                style={{ padding: '6px 9px' }}
-                title="Keluar akun"
-              >
-                <LogOut size={14} />
-              </button>
-            </div>
-          </div>
+            )}
 
-          {/* Main Header Inner (Team Info + Desktop Actions) */}
-          <div className="workspace-header-inner">
-            {/* Team Brand Info */}
-            <div className="team-brand-box">
-              <Link href="/onboarding" style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }} title="Pilih Tim Lain">
-                <div className="team-avatar-header">
-                  {team.name.slice(0, 2).toUpperCase()}
-                </div>
-              </Link>
-              <div style={{ minWidth: 0, flex: 1 }}>
-                <div className="team-title-row">
-                  <h1 className="team-name-heading">
-                    {team.name}
-                  </h1>
-                </div>
-
-                <div className="team-badges-row">
-                  {/* Role Badge */}
-                  {isKetua ? (
-                    <span className="badge badge-warning" style={{ fontSize: '0.68rem', padding: '2px 8px' }}>
-                      <Crown size={11} /> Ketua Tim
-                    </span>
-                  ) : (
-                    <span className="badge badge-neutral" style={{ fontSize: '0.68rem', padding: '2px 8px' }}>
-                      <User size={11} /> Anggota
-                    </span>
-                  )}
-
-                  {/* Quick Copy Username Tag */}
-                  <button
-                    onClick={handleCopyCode}
-                    className="team-code-btn"
-                    title="Klik untuk salin kode tim"
-                  >
-                    {copiedCode ? <Check size={12} color="#10b981" /> : <Copy size={12} />}
-                    <span className="team-code-username">@{team.username}</span>
-                    <span className="team-code-copy-label">(Salin Kode)</span>
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Desktop Actions (Hidden on Mobile) */}
-            <div className="workspace-desktop-actions">
-              {/* Theme Toggle Desktop */}
-              <button
-                onClick={toggleDarkMode}
-                className="theme-toggle-btn"
-                title={isDarkMode ? 'Mode Terang' : 'Mode Gelap'}
-              >
-                {isDarkMode ? <Sun size={17} color="#f59e0b" /> : <Moon size={17} color="#6366f1" />}
-              </button>
-
-              {/* In-App Notifications Bell Desktop */}
-              <div style={{ position: 'relative' }}>
-                <button
-                  onClick={() => setShowNotifPopover((prev) => !prev)}
-                  className="notif-btn"
-                  title="Notifikasi"
-                >
-                  <Bell size={17} />
-                  {notifications.filter((n) => !n.is_read).length > 0 && (
-                    <span className="notif-badge">
-                      {notifications.filter((n) => !n.is_read).length}
-                    </span>
-                  )}
-                </button>
-
-                {showNotifPopover && (
-                  <div className="notif-popover">
-                    <div className="notif-header">
-                      <span>🔔 Notifikasi</span>
-                      {notifications.some((n) => !n.is_read) && (
-                        <button
-                          onClick={handleMarkAllRead}
-                          style={{ background: 'none', border: 'none', color: 'var(--primary)', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}
-                        >
-                          Tandai semua dibaca
-                        </button>
-                      )}
+            {/* ========================================================================= */}
+            {/* TAB 1: OVERVIEW (PROGRESS TIM BAR SOLID, STATISTIK & DEADLINE MENDESAK)    */}
+            {/* ========================================================================= */}
+            {activeTab === 'overview' && (
+              <div className="animate-fade-in">
+                {/* Progress Tim Card (Solid Bar, Satu Warna Saja!) */}
+                <div className="card stats-progress-card" style={{ padding: 26, marginBottom: 24, background: 'var(--surface)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16, marginBottom: 16 }}>
+                    <div>
+                      <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-main)', marginBottom: 4 }}>
+                        Kemajuan Keseluruhan Tim 🚀
+                      </h3>
+                      <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>
+                        {completedTasks} dari {totalTasks} tugas telah selesai & disetujui ({overallProgress}% selesai)
+                        {inReviewTasks > 0 && ` • ${inReviewTasks} sedang menunggu review Ketua`}
+                      </p>
                     </div>
-
-                    <div className="notif-list">
-                      {notifications.length === 0 ? (
-                        <div style={{ padding: '24px 16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.825rem' }}>
-                          Tidak ada notifikasi baru
-                        </div>
-                      ) : (
-                        notifications.map((n) => (
-                          <div
-                            key={n.id}
-                            onClick={async () => {
-                              if (!n.is_read) {
-                                await markNotificationAsRead(n.id);
-                                setNotifications((prev) =>
-                                  prev.map((item) => (item.id === n.id ? { ...item, is_read: true } : item))
-                                );
-                              }
-                              setShowNotifPopover(false);
-                            }}
-                            className={`notif-item ${!n.is_read ? 'unread' : ''}`}
-                          >
-                            <div style={{ flex: 1 }}>
-                              <div className="notif-item-title">{n.title}</div>
-                              <div className="notif-item-msg">{n.message}</div>
-                              <div className="notif-item-time">
-                                {new Date(n.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })} • {new Date(n.created_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
-                              </div>
-                            </div>
-                            {!n.is_read && (
-                              <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--primary)', alignSelf: 'center', flexShrink: 0 }} />
-                            )}
-                          </div>
-                        ))
-                      )}
+                    <div style={{ fontSize: '2.2rem', fontWeight: 800, color: 'var(--primary)' }}>
+                      {overallProgress}%
                     </div>
                   </div>
-                )}
-              </div>
 
-              {currentUser?.email?.toLowerCase() === 'admin@gmail.com' && (
-                <Link href="/admin" className="btn btn-sm" style={{ background: '#ef4444', color: '#fff', border: 'none', display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700 }}>
-                  <Crown size={14} /> Panel Admin
-                </Link>
-              )}
-              <Link href="/onboarding" className="btn btn-secondary btn-sm" title="Buka tim lain">
-                <Users size={15} /> Ganti Tim
-              </Link>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <div className="avatar-badge" style={{ width: 34, height: 34, fontSize: '0.8rem' }} title={currentUser?.full_name}>
-                  {currentUser?.full_name?.slice(0, 2).toUpperCase()}
+                  {/* Progress Bar (Satu Warna Solid, Tanpa Gradasi) */}
+                  <div style={{ width: '100%', height: 14, background: 'var(--surface-border)', borderRadius: 9999, overflow: 'hidden' }}>
+                    <div
+                      style={{
+                        width: `${overallProgress}%`,
+                        height: '100%',
+                        background: 'var(--primary)',
+                        borderRadius: 9999,
+                        transition: 'width 0.8s cubic-bezier(0.16, 1, 0.3, 1)',
+                      }}
+                    />
+                  </div>
                 </div>
-                <button
-                  onClick={async () => {
-                    await signOutUser();
-                    router.push('/auth');
-                  }}
-                  className="btn btn-secondary btn-sm"
-                  style={{ padding: '7px 10px' }}
-                  title="Keluar akun"
-                >
-                  <LogOut size={14} />
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </header>
 
-      {/* Main Workspace Area */}
-      <main className="workspace-main" style={{ flex: 1, padding: '24px 0 60px' }}>
-        <div className="container">
-          {/* Navigation Tabs */}
-          <div className="tab-container">
-            <button
-              onClick={() => setActiveTab('tasks')}
-              className={`tab-btn ${activeTab === 'tasks' ? 'active' : ''}`}
-            >
-              <CheckCircle2 size={18} />
-              Tugas & Deadline
-              <span className="badge badge-primary" style={{ padding: '2px 6px', fontSize: '0.7rem' }}>
-                {tasks.length}
-              </span>
-              {inReviewTasks > 0 && (
-                <span className="badge" style={{ background: '#f3e8ff', color: '#7e22ce', padding: '2px 6px', fontSize: '0.7rem' }}>
-                  {inReviewTasks} dicek
-                </span>
-              )}
-            </button>
+                {/* Tugas Mendesak & Deadline Terdekat */}
+                <div className="card" style={{ padding: 24, marginBottom: 24, background: 'var(--surface)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <Clock size={20} color="var(--primary)" />
+                      <div>
+                        <h3 style={{ fontSize: '1.1rem', fontWeight: 800, margin: 0 }}>Tugas Mendesak & Deadline Terdekat</h3>
+                        <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '2px 0 0' }}>
+                          Prioritas tugas yang harus segera diselesaikan rekan tim.
+                        </p>
+                      </div>
+                    </div>
+                    <button onClick={() => setActiveTab('tasks')} className="btn btn-secondary btn-sm">
+                      Lihat Seluruh Tugas ({tasks.length}) →
+                    </button>
+                  </div>
 
-            <button
-              onClick={() => setActiveTab('stats')}
-              className={`tab-btn ${activeTab === 'stats' ? 'active' : ''}`}
-            >
-              <Trophy size={18} />
-              Statistik Kontribusi
-              {contributions.length > 0 && contributions[0].completed_count > 0 && (
-                <span className="badge badge-warning" style={{ padding: '2px 6px', fontSize: '0.7rem' }}>
-                  Juara: {contributions[0].full_name.split(' ')[0]} 🥇
-                </span>
-              )}
-            </button>
+                  {tasks.filter((t) => t.status !== 'done').length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: '24px 12px', color: 'var(--text-muted)', fontSize: '0.875rem' }}>
+                      🎉 Luar biasa! Seluruh tugas tim telah diselesaikan.
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                      {tasks
+                        .filter((t) => t.status !== 'done')
+                        .slice(0, 4)
+                        .map((task) => (
+                          <div
+                            key={task.id}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              padding: '12px 16px',
+                              borderRadius: 'var(--radius-md)',
+                              background: 'var(--surface-secondary)',
+                              border: '1px solid var(--surface-border)',
+                              gap: 12,
+                              flexWrap: 'wrap',
+                            }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, flex: 1 }}>
+                              <span
+                                style={{
+                                  width: 8,
+                                  height: 8,
+                                  borderRadius: '50%',
+                                  background: task.status === 'review' ? '#a855f7' : task.status === 'in_progress' ? 'var(--primary)' : '#94a3b8',
+                                  flexShrink: 0,
+                                }}
+                              />
+                              <div style={{ minWidth: 0 }}>
+                                <div style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-main)', wordBreak: 'break-word' }}>
+                                  {task.title}
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 2, fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                                  <span>
+                                    Member: {task.assignee_profiles?.map((p) => p.full_name).join(', ') || task.assignee_profile?.full_name || 'Belum ditugaskan'}
+                                  </span>
+                                  {task.deadline && (
+                                    <>
+                                      <span>•</span>
+                                      <span>Deadline: {new Date(task.deadline).toLocaleDateString('id-ID')}</span>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
 
-            <button
-              onClick={() => setActiveTab('research')}
-              className={`tab-btn ${activeTab === 'research' ? 'active' : ''}`}
-            >
-              <FolderGit2 size={18} />
-              Materi & Hasil Riset
-              <span className="badge badge-neutral" style={{ padding: '2px 6px', fontSize: '0.7rem' }}>
-                {research.length}
-              </span>
-            </button>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                              {getDeadlineBadge(task.deadline, task.status)}
+                              <button
+                                onClick={() => setActiveTab('tasks')}
+                                className="btn btn-secondary btn-sm"
+                                style={{ fontSize: '0.75rem', padding: '4px 8px' }}
+                              >
+                                Buka
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                    </div>
+                  )}
+                </div>
 
-            <button
-              onClick={() => setActiveTab('members')}
-              className={`tab-btn ${activeTab === 'members' ? 'active' : ''}`}
-            >
-              <Settings size={18} />
-              Pengaturan & Anggota
-              <span className="badge badge-neutral" style={{ padding: '2px 6px', fontSize: '0.7rem' }}>
-                {members.length}
-              </span>
-            </button>
-          </div>
-
-          {/* Master Admin Management Notice Banner */}
-          {isMasterAdminUser && (
-            <div
-              style={{
-                background: isDarkMode
-                  ? 'linear-gradient(135deg, rgba(245, 158, 11, 0.15) 0%, rgba(217, 119, 6, 0.08) 100%)'
-                  : 'linear-gradient(135deg, #fef3c7 0%, #fffbeb 100%)',
-                border: isDarkMode ? '1px solid rgba(245, 158, 11, 0.35)' : '1px solid #fde68a',
-                color: isDarkMode ? '#fde68a' : '#92400e',
-                borderRadius: 'var(--radius-md)',
-                padding: '12px 18px',
-                marginBottom: 20,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                flexWrap: 'wrap',
-                gap: 12,
-                boxShadow: isDarkMode ? '0 2px 12px rgba(0, 0, 0, 0.4)' : '0 2px 8px rgba(217, 119, 6, 0.08)',
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: '0.875rem', fontWeight: 700 }}>
-                <ShieldAlert size={20} color={isDarkMode ? '#fbbf24' : '#d97706'} />
-                <span>
-                  🛡️ <strong>Mode Master Admin</strong>: Anda memiliki hak akses penuh untuk mengelola anggota, peran, dan tugas di tim ini.
-                </span>
-              </div>
-              <Link
-                href="/admin"
-                className="btn btn-secondary btn-sm"
-                style={{
-                  background: isDarkMode ? '#1e293b' : '#ffffff',
-                  borderColor: isDarkMode ? 'rgba(245, 158, 11, 0.4)' : '#fcd34d',
-                  color: isDarkMode ? '#fbbf24' : '#b45309',
-                  fontWeight: 700,
-                  fontSize: '0.8rem',
-                  padding: '6px 14px',
-                }}
-              >
-                ← Kembali ke Panel Admin
-              </Link>
-            </div>
-          )}
-
-          {/* ========================================================================= */}
-          {/* TAB 1: TUGAS & DEADLINE                                                   */}
-          {/* ========================================================================= */}
-          {activeTab === 'tasks' && (
-            <div className="animate-fade-in">
-              {/* Leader review prompt banner if any tasks are in review */}
-              {isKetua && inReviewTasks > 0 && (
-                <div
-                  style={{
-                    background: isDarkMode ? 'rgba(168, 85, 247, 0.12)' : '#fdf4ff',
-                    border: isDarkMode ? '1px solid rgba(168, 85, 247, 0.3)' : '1px solid #f0abfc',
-                    borderRadius: 'var(--radius-md)',
-                    padding: '14px 20px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    gap: 12,
-                    marginBottom: 20,
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <ShieldAlert size={20} color={isDarkMode ? '#c084fc' : '#a21caf'} />
+                {/* Leaderboard & Statistik Kontribusi Anggota */}
+                <div style={{ marginBottom: 24 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+                    <Trophy size={24} color="#f59e0b" />
                     <div>
-                      <h4 style={{ fontSize: '0.9rem', fontWeight: 700, color: isDarkMode ? '#f5d0fe' : '#86198f' }}>
-                        Ada {inReviewTasks} tugas yang sudah diselesaikan anggota dan menunggu pengecekan Anda!
-                      </h4>
-                      <p style={{ fontSize: '0.8rem', color: isDarkMode ? '#d8b4fe' : '#a21caf' }}>
-                        Periksa link hasil kerja anggota di bawah, lalu klik &quot;Setujui Selesai&quot; atau &quot;Minta Revisi&quot;.
+                      <h3 style={{ fontSize: '1.2rem', fontWeight: 800 }}>Peringkat Kontribusi Tim</h3>
+                      <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                        Dihitung secara realtime dari tugas yang telah diselesaikan anggota dan disetujui Ketua.
                       </p>
                     </div>
                   </div>
-                  <button
-                    onClick={() => setTaskFilter('review')}
-                    className="btn btn-sm"
-                    style={{ background: '#c026d3', color: 'white', whiteSpace: 'nowrap' }}
-                  >
-                    Lihat Tugas Dicek ({inReviewTasks})
-                  </button>
-                </div>
-              )}
 
-              {/* Toolbar & Filter */}
-              <div className="task-toolbar">
-                <div className="task-filters-scroll">
-                  <button
-                    onClick={() => setTaskFilter('all')}
-                    className={`btn btn-sm task-filter-chip ${taskFilter === 'all' ? 'btn-primary' : 'btn-secondary'}`}
-                  >
-                    Semua ({tasks.length})
-                  </button>
-                  <button
-                    onClick={() => setTaskFilter('todo')}
-                    className={`btn btn-sm task-filter-chip ${taskFilter === 'todo' ? 'btn-primary' : 'btn-secondary'}`}
-                  >
-                    Belum Dikerjakan ({tasks.filter((t) => t.status === 'todo').length})
-                  </button>
-                  <button
-                    onClick={() => setTaskFilter('in_progress')}
-                    className={`btn btn-sm task-filter-chip ${taskFilter === 'in_progress' ? 'btn-primary' : 'btn-secondary'}`}
-                  >
-                    Sedang Dikerjakan ({tasks.filter((t) => t.status === 'in_progress').length})
-                  </button>
-                  <button
-                    onClick={() => setTaskFilter('review')}
-                    className={`btn btn-sm task-filter-chip ${taskFilter === 'review' ? 'btn-primary' : 'btn-secondary'}`}
-                  >
-                    🔍 Menunggu Review ({inReviewTasks})
-                  </button>
-                  <button
-                    onClick={() => setTaskFilter('done')}
-                    className={`btn btn-sm task-filter-chip ${taskFilter === 'done' ? 'btn-primary' : 'btn-secondary'}`}
-                  >
-                    Selesai ({tasks.filter((t) => t.status === 'done').length})
-                  </button>
-                </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    {contributions.map((item, idx) => {
+                      const isChampion = idx === 0 && item.completed_count > 0;
+                      let rankBadge = `${idx + 1}`;
+                      let rankBg = isDarkMode ? 'rgba(148, 163, 184, 0.15)' : '#f1f5f9';
+                      let rankColor = isDarkMode ? '#cbd5e1' : '#475569';
 
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                  <button
-                    onClick={handleShareGroupRecap}
-                    className="btn btn-secondary btn-sm btn-rekap-wa"
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: 6,
-                      fontWeight: 600,
-                    }}
-                    title="Kirim ringkasan semua tugas & deadline ke WhatsApp / Grup WA"
-                  >
-                    <Share2 size={15} /> Rekap ke WA
-                  </button>
-                  <button onClick={openAddTaskModal} className="btn btn-primary btn-add-task">
-                    <Plus size={16} /> Tambah Tugas Baru
-                  </button>
-                </div>
-              </div>
+                      if (isChampion) {
+                        rankBadge = '🥇 Juara 1';
+                        rankBg = isDarkMode ? 'rgba(245, 158, 11, 0.25)' : '#fef3c7';
+                        rankColor = isDarkMode ? '#fbbf24' : '#b45309';
+                      } else if (idx === 1 && item.completed_count > 0) {
+                        rankBadge = '🥈 Juara 2';
+                        rankBg = isDarkMode ? 'rgba(148, 163, 184, 0.2)' : '#f1f5f9';
+                        rankColor = isDarkMode ? '#e2e8f0' : '#334155';
+                      } else if (idx === 2 && item.completed_count > 0) {
+                        rankBadge = '🥉 Juara 3';
+                        rankBg = isDarkMode ? 'rgba(234, 88, 12, 0.22)' : '#ffedd5';
+                        rankColor = isDarkMode ? '#fdba74' : '#9a3412';
+                      }
 
-              {/* Task List */}
-              {filteredTasks.length === 0 ? (
-                <div className="card" style={{ textAlign: 'center', padding: '50px 20px', background: 'var(--surface)' }}>
-                  <div style={{ width: 54, height: 54, borderRadius: 16, background: 'var(--primary-light)', color: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
-                    <CheckCircle2 size={28} />
-                  </div>
-                  <h3 style={{ fontSize: '1.15rem', fontWeight: 700, marginBottom: 6 }}>
-                    {taskFilter === 'all' ? 'Belum ada tugas di tim ini' : 'Tidak ada tugas dalam kategori ini'}
-                  </h3>
-                  <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginBottom: 20 }}>
-                    Mulai bagi tugas kelompok dan sertakan link pengerjaan agar tercapai target tepat waktu.
-                  </p>
-                  <button onClick={openAddTaskModal} className="btn btn-primary">
-                    <Plus size={16} /> Buat Tugas Pertama
-                  </button>
-                </div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                  {filteredTasks.map((task) => {
-                    const isDone = task.status === 'done';
-                    const isInProgress = task.status === 'in_progress';
-                    const isReview = task.status === 'review';
+                      return (
+                        <div
+                          key={item.user_id}
+                          className={`card contributor-card-responsive ${isChampion ? 'contributor-card-champion' : ''}`}
+                          style={{
+                            border: isChampion
+                              ? isDarkMode
+                                ? '1px solid rgba(245, 158, 11, 0.45)'
+                                : '2px solid #fde68a'
+                              : '1px solid var(--surface-border)',
+                            background: isChampion
+                              ? isDarkMode
+                                ? 'linear-gradient(135deg, rgba(245, 158, 11, 0.12) 0%, rgba(217, 119, 6, 0.05) 100%)'
+                                : '#fffdf7'
+                              : 'var(--surface)',
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0, flex: 1 }}>
+                            <span
+                              style={{
+                                background: rankBg,
+                                color: rankColor,
+                                fontWeight: 800,
+                                fontSize: '0.85rem',
+                                padding: '6px 10px',
+                                borderRadius: 8,
+                                flexShrink: 0,
+                              }}
+                            >
+                              {rankBadge}
+                            </span>
 
-                    let borderLeftColor = '#cbd5e1';
-                    if (isDone) borderLeftColor = 'var(--success)';
-                    else if (isReview) borderLeftColor = '#a855f7';
-                    else if (isInProgress) borderLeftColor = 'var(--primary)';
-
-                    return (
-                      <div
-                        key={task.id}
-                        className="card task-card-responsive"
-                        style={{
-                          borderLeft: `5px solid ${borderLeftColor}`,
-                          background: isReview
-                            ? isDarkMode
-                              ? 'rgba(168, 85, 247, 0.08)'
-                              : '#fdfaff'
-                            : 'var(--surface)',
-                          opacity: isDone ? 0.88 : 1,
-                        }}
-                      >
-                        <div className="task-card-content">
-                          {/* Status Icon */}
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (isDone) handleReopenTask(task);
-                              else if (task.status === 'todo') handleStartTask(task);
-                            }}
-                            style={{
-                              marginTop: 2,
-                              width: 28,
-                              height: 28,
-                              borderRadius: 8,
-                              background: isDone
-                                ? 'var(--success)'
-                                : isReview
-                                ? isDarkMode ? 'rgba(168, 85, 247, 0.22)' : '#f3e8ff'
-                                : isInProgress
-                                ? 'var(--primary-light)'
-                                : isDarkMode ? '#1e293b' : '#f1f5f9',
-                              color: isDone
-                                ? 'white'
-                                : isReview
-                                ? isDarkMode ? '#c084fc' : '#7e22ce'
-                                : isInProgress
-                                ? 'var(--primary)'
-                                : 'var(--text-muted)',
-                              border: 'none',
-                              cursor: isDone || task.status === 'todo' ? 'pointer' : 'default',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              flexShrink: 0,
-                              transition: 'all 0.15s ease',
-                            }}
-                            title={isDone ? 'Klik untuk membuka kembali tugas' : task.status === 'todo' ? 'Klik untuk mulai pengerjaan' : undefined}
-                          >
-                            {isDone && <Check size={16} strokeWidth={3} />}
-                            {isReview && <Clock size={16} />}
-                            {isInProgress && <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--primary)' }} />}
-                            {task.status === 'todo' && <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#94a3b8' }} />}
-                          </button>
-
-                          <div className="task-card-body">
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 6 }}>
-                              <h4
-                                style={{
-                                  fontSize: '1.05rem',
-                                  fontWeight: 700,
-                                  textDecoration: isDone ? 'line-through' : 'none',
-                                  color: isDone ? 'var(--text-muted)' : 'var(--text-main)',
-                                  wordBreak: 'break-word',
-                                }}
-                              >
-                                {task.title}
-                              </h4>
-                              {getDeadlineBadge(task.deadline, task.status)}
-                              {task.status === 'review' ? (
-                                <span
-                                  className="badge badge-purple"
-                                  style={{
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    gap: 4,
-                                    fontSize: '0.75rem',
-                                    fontWeight: 700,
-                                    background: isDarkMode ? 'rgba(168, 85, 247, 0.2)' : '#f3e8ff',
-                                    color: isDarkMode ? '#c084fc' : '#7e22ce',
-                                    border: `1px solid ${isDarkMode ? 'rgba(168, 85, 247, 0.4)' : '#ddd6fe'}`,
-                                    padding: '2px 8px',
-                                    borderRadius: 6,
-                                  }}
-                                >
-                                  🔍 Menunggu Review Ketua
-                                </span>
-                              ) : isInProgress && task.review_notes?.toLowerCase().includes('revisi') ? (
-                                <span
-                                  className="badge badge-warning"
-                                  style={{
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    gap: 4,
-                                    fontSize: '0.75rem',
-                                    fontWeight: 700,
-                                    background: isDarkMode ? 'rgba(245, 158, 11, 0.2)' : '#fef3c7',
-                                    color: isDarkMode ? '#fbbf24' : '#b45309',
-                                    border: `1px solid ${isDarkMode ? 'rgba(245, 158, 11, 0.4)' : '#fde68a'}`,
-                                    padding: '2px 8px',
-                                    borderRadius: 6,
-                                  }}
-                                >
-                                  ⚠️ Perlu Revisi
-                                </span>
-                              ) : null}
+                            <div className="avatar-badge" style={{ width: 40, height: 40, flexShrink: 0 }}>
+                              {item.full_name.slice(0, 2).toUpperCase()}
                             </div>
 
-                            {task.description && (
-                              <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)', marginBottom: 12, lineHeight: 1.5, wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
-                                {task.description}
-                              </p>
-                            )}
-
-                            {/* Review Notes from Member / Revision Notes from Leader */}
-                            {task.review_notes && (
-                              <div
-                                style={{
-                                  background: task.review_notes.toLowerCase().includes('revisi')
-                                    ? isDarkMode ? 'rgba(239, 68, 68, 0.12)' : '#fef2f2'
-                                    : isReview
-                                    ? isDarkMode ? 'rgba(168, 85, 247, 0.12)' : '#f5f3ff'
-                                    : isDarkMode ? 'rgba(245, 158, 11, 0.12)' : '#fffbeb',
-                                  border: `1px solid ${
-                                    task.review_notes.toLowerCase().includes('revisi')
-                                      ? isDarkMode ? 'rgba(239, 68, 68, 0.35)' : '#fecaca'
-                                      : isReview
-                                      ? isDarkMode ? 'rgba(168, 85, 247, 0.3)' : '#ddd6fe'
-                                      : isDarkMode ? 'rgba(245, 158, 11, 0.3)' : '#fde68a'
-                                  }`,
-                                  borderRadius: 8,
-                                  padding: '8px 12px',
-                                  marginBottom: 12,
-                                  fontSize: '0.825rem',
-                                  color: task.review_notes.toLowerCase().includes('revisi')
-                                    ? isDarkMode ? '#fca5a5' : '#b91c1c'
-                                    : isReview
-                                    ? isDarkMode ? '#d8b4fe' : '#5b21b6'
-                                    : isDarkMode ? '#fcd34d' : '#92400e',
-                                  wordBreak: 'break-word',
-                                  overflowWrap: 'anywhere',
-                                }}
-                              >
-                                {task.review_notes.toLowerCase().includes('revisi') ? '⚠️ ' : '💬 '}
-                                <b>{task.review_notes.toLowerCase().includes('revisi') ? 'Catatan Revisi dari Ketua:' : 'Catatan:'}</b>{' '}
-                                {task.review_notes.replace(/^Catatan Revisi dari Ketua:\s*/i, '')}
-                              </div>
-                            )}
-
-                            {/* Task Link (Tautan Hasil Tugas) */}
-                            {task.task_link && (
-                              <div style={{ marginBottom: 12 }}>
-                                <a
-                                  href={task.task_link.startsWith('http') ? task.task_link : `https://${task.task_link}`}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="btn btn-secondary btn-sm btn-task-link"
-                                  style={{
-                                    display: 'inline-flex',
-                                    fontSize: '0.8rem',
-                                    padding: '5px 12px',
-                                    maxWidth: '100%',
-                                    overflow: 'hidden',
-                                    textOverflow: 'ellipsis',
-                                    whiteSpace: 'nowrap',
-                                  }}
-                                >
-                                  <ExternalLink size={13} /> Buka Link Tugas ↗
-                                </a>
-                              </div>
-                            )}
-
-                            {/* Assignee & Meta */}
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                <span style={{ color: 'var(--text-subtle)' }}>Penanggung Jawab:</span>
-                                {task.assignee_profiles && task.assignee_profiles.length > 0 ? (
-                                  <span style={{ fontWeight: 600, color: 'var(--text-main)' }}>
-                                    {task.assignee_profiles.map((p) => p.full_name).join(', ')}
+                            <div style={{ minWidth: 0 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                                <h4 style={{ fontSize: '1rem', fontWeight: 700, wordBreak: 'break-word' }}>{item.full_name}</h4>
+                                {item.role === 'ketua' && (
+                                  <span className="badge badge-warning" style={{ fontSize: '0.65rem' }}>
+                                    <Crown size={10} /> Ketua
                                   </span>
-                                ) : task.assignee_profile ? (
-                                  <span style={{ fontWeight: 600, color: 'var(--text-main)' }}>
-                                    {task.assignee_profile.full_name}
-                                  </span>
-                                ) : (
-                                  <span style={{ fontStyle: 'italic', color: 'var(--text-subtle)' }}>Belum ditugaskan</span>
                                 )}
                               </div>
+                              <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: 2, wordBreak: 'break-word' }}>
+                                Total {item.total_assigned} tugas dipegang • {item.in_progress_count} dikerjakan • {item.in_review_count} dicek
+                              </p>
+                            </div>
+                          </div>
 
-                              {task.deadline && (
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                                  <Calendar size={13} />
-                                  <span>Deadline: {new Date(task.deadline).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
-                                </div>
-                              )}
+                          {/* Stats Counts */}
+                          <div className="contributor-stats-group">
+                            <div style={{ textAlign: 'right' }}>
+                              <div style={{ fontSize: '1.25rem', fontWeight: 800, color: item.completed_count > 0 ? 'var(--success)' : 'var(--text-muted)' }}>
+                                {item.completed_count} Tugas
+                              </div>
+                              <div style={{ fontSize: '0.725rem', color: 'var(--text-muted)' }}>
+                                Telah Selesai
+                              </div>
+                            </div>
+
+                            <div style={{ minWidth: 80, textAlign: 'right' }}>
+                              <div style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--primary)' }}>
+                                {item.contribution_percentage}%
+                              </div>
+                              <div style={{ fontSize: '0.725rem', color: 'var(--text-muted)' }}>
+                                Porsi Kontribusi
+                              </div>
                             </div>
                           </div>
                         </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            )}
 
-                        {/* Actions Area */}
-                        <div className="task-card-actions">
-                          {/* Primary Workflow Buttons based on Role & Status */}
-                          <div className="task-actions-main">
-                            {task.status === 'todo' && (
-                              <button
-                                onClick={() => handleStartTask(task)}
-                                className="btn btn-secondary btn-sm"
-                              >
-                                ▶ Mulai Kerjakan
-                              </button>
-                            )}
+            {/* ========================================================================= */}
+            {/* TAB 2: TIM SAYA (DROPDOWN TIM, INFO TIM, DAN SELURUH TUGAS DARI TIM INI)   */}
+            {/* ========================================================================= */}
+            {activeTab === 'tasks' && (
+              <div className="animate-fade-in">
+                {/* Dropdown Pemilih Tim Aktif & Quick Actions */}
+                <div className="card" style={{ padding: '16px 20px', marginBottom: 20, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 14, background: 'var(--surface)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1, minWidth: 260 }}>
+                    <label style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+                      Pilih Tim Aktif:
+                    </label>
+                    <select
+                      value={team?.username}
+                      onChange={(e) => {
+                        if (e.target.value && e.target.value !== team?.username) {
+                          router.push(`/team/${e.target.value}`);
+                        }
+                      }}
+                      className="form-select"
+                      style={{ fontWeight: 700, minWidth: 200, maxWidth: 340 }}
+                    >
+                      {userTeams.length > 0 ? (
+                        userTeams.map((ut) => (
+                          <option key={ut.id} value={ut.username}>
+                            {ut.name} (@{ut.username})
+                          </option>
+                        ))
+                      ) : (
+                        <option value={team?.username}>{team?.name} (@{team?.username})</option>
+                      )}
+                    </select>
+                  </div>
 
-                            {task.status === 'in_progress' && (
-                              <>
-                                {isKetua ? (
-                                  <button
-                                    onClick={() => openKetuaReviewModal(task)}
-                                    className="btn btn-success btn-sm"
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                    <button
+                      onClick={() => setShowTeamAvatarModal(true)}
+                      className="btn btn-secondary btn-sm"
+                      title="Ganti Foto Profil Tim (Dapat diedit oleh seluruh anggota)"
+                    >
+                      <Camera size={14} /> Ganti Foto Tim
+                    </button>
+                    <button onClick={handleCopyCode} className="btn btn-secondary btn-sm" title="Salin kode username tim">
+                      <Copy size={14} /> Salin Kode
+                    </button>
+                    <button onClick={handleCopyInviteLink} className="btn btn-secondary btn-sm" title="Salin tautan bergabung">
+                      <ExternalLink size={14} /> Undangan
+                    </button>
+                  </div>
+                </div>
+
+                {/* Team Info Banner */}
+                <div className="card" style={{ padding: '20px 24px', marginBottom: 20, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16, background: 'var(--surface)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 16, minWidth: 0, flex: 1 }}>
+                    <div
+                      style={{ position: 'relative', cursor: 'pointer', flexShrink: 0 }}
+                      onClick={() => setShowTeamAvatarModal(true)}
+                      title="Klik untuk ganti foto profil tim"
+                    >
+                      {team?.avatar_url ? (
+                        <img
+                          src={team.avatar_url}
+                          alt={team.name}
+                          className="avatar-photo"
+                          style={{ width: 56, height: 56, border: '2px solid var(--primary)', objectFit: 'cover' }}
+                        />
+                      ) : (
+                        <div className="team-avatar-header" style={{ width: 56, height: 56, fontSize: '1.3rem' }}>
+                          {team?.name.slice(0, 2).toUpperCase()}
+                        </div>
+                      )}
+                      <div
+                        style={{
+                          position: 'absolute',
+                          bottom: -2,
+                          right: -2,
+                          width: 20,
+                          height: 20,
+                          borderRadius: '50%',
+                          background: 'var(--primary)',
+                          color: 'white',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          border: '2px solid var(--surface)',
+                          boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+                        }}
+                      >
+                        <Camera size={10} />
+                      </div>
+                    </div>
+
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                        <h2 style={{ fontSize: '1.25rem', fontWeight: 800, margin: 0, wordBreak: 'break-word' }}>
+                          {team?.name}
+                        </h2>
+                        {isKetua ? (
+                          <span className="badge badge-warning" style={{ fontSize: '0.68rem', padding: '2px 8px' }}>
+                            <Crown size={11} /> Ketua Tim
+                          </span>
+                        ) : (
+                          <span className="badge badge-neutral" style={{ fontSize: '0.68rem', padding: '2px 8px' }}>
+                            <User size={11} /> Anggota
+                          </span>
+                        )}
+                      </div>
+                      {team?.description && (
+                        <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: '4px 0 0', lineHeight: 1.4 }}>
+                          {team.description}
+                        </p>
+                      )}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 6, flexWrap: 'wrap', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                        <span>@{team?.username}</span>
+                        <span>•</span>
+                        <span>{members.length} Anggota</span>
+                        <span>•</span>
+                        <span>{tasks.length} Seluruh Tugas</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Leader review prompt banner if any tasks are in review */}
+                {isKetua && inReviewTasks > 0 && (
+                  <div
+                    style={{
+                      background: isDarkMode ? 'rgba(168, 85, 247, 0.12)' : '#fdf4ff',
+                      border: isDarkMode ? '1px solid rgba(168, 85, 247, 0.3)' : '1px solid #f0abfc',
+                      borderRadius: 'var(--radius-md)',
+                      padding: '14px 20px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: 12,
+                      marginBottom: 20,
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <ShieldAlert size={20} color={isDarkMode ? '#c084fc' : '#a21caf'} />
+                      <div>
+                        <h4 style={{ fontSize: '0.9rem', fontWeight: 700, color: isDarkMode ? '#f5d0fe' : '#86198f' }}>
+                          Ada {inReviewTasks} tugas yang sudah diselesaikan anggota dan menunggu pengecekan Anda!
+                        </h4>
+                        <p style={{ fontSize: '0.8rem', color: isDarkMode ? '#d8b4fe' : '#a21caf' }}>
+                          Periksa link hasil kerja anggota di bawah, lalu klik &quot;Setujui Selesai&quot; atau &quot;Minta Revisi&quot;.
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setTaskFilter('review')}
+                      className="btn btn-sm"
+                      style={{ background: '#c026d3', color: 'white', whiteSpace: 'nowrap' }}
+                    >
+                      Lihat Tugas Dicek ({inReviewTasks})
+                    </button>
+                  </div>
+                )}
+
+                {/* Toolbar & Filter */}
+                <div className="task-toolbar">
+                  <div className="task-filters-scroll">
+                    <button
+                      onClick={() => setTaskFilter('all')}
+                      className={`btn btn-sm task-filter-chip ${taskFilter === 'all' ? 'btn-primary' : 'btn-secondary'}`}
+                    >
+                      Semua ({tasks.length})
+                    </button>
+                    <button
+                      onClick={() => setTaskFilter('todo')}
+                      className={`btn btn-sm task-filter-chip ${taskFilter === 'todo' ? 'btn-primary' : 'btn-secondary'}`}
+                    >
+                      Belum Dikerjakan ({tasks.filter((t) => t.status === 'todo').length})
+                    </button>
+                    <button
+                      onClick={() => setTaskFilter('in_progress')}
+                      className={`btn btn-sm task-filter-chip ${taskFilter === 'in_progress' ? 'btn-primary' : 'btn-secondary'}`}
+                    >
+                      Sedang Dikerjakan ({tasks.filter((t) => t.status === 'in_progress').length})
+                    </button>
+                    <button
+                      onClick={() => setTaskFilter('review')}
+                      className={`btn btn-sm task-filter-chip ${taskFilter === 'review' ? 'btn-primary' : 'btn-secondary'}`}
+                    >
+                      🔍 Menunggu Review ({inReviewTasks})
+                    </button>
+                    <button
+                      onClick={() => setTaskFilter('done')}
+                      className={`btn btn-sm task-filter-chip ${taskFilter === 'done' ? 'btn-primary' : 'btn-secondary'}`}
+                    >
+                      Selesai ({tasks.filter((t) => t.status === 'done').length})
+                    </button>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    <button
+                      onClick={handleShareGroupRecap}
+                      className="btn btn-secondary btn-sm btn-rekap-wa"
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 6,
+                        fontWeight: 600,
+                      }}
+                      title="Kirim ringkasan semua tugas & deadline ke WhatsApp / Grup WA"
+                    >
+                      <Share2 size={15} /> Rekap ke WA
+                    </button>
+                    <button onClick={openAddTaskModal} className="btn btn-primary btn-add-task">
+                      <Plus size={16} /> Tambah Tugas Baru
+                    </button>
+                  </div>
+                </div>
+
+                {/* Task List */}
+                {filteredTasks.length === 0 ? (
+                  <div className="card" style={{ textAlign: 'center', padding: '50px 20px', background: 'var(--surface)' }}>
+                    <div style={{ width: 54, height: 54, borderRadius: 16, background: 'var(--primary-light)', color: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+                      <CheckCircle2 size={28} />
+                    </div>
+                    <h3 style={{ fontSize: '1.15rem', fontWeight: 700, marginBottom: 6 }}>
+                      {taskFilter === 'all' ? 'Belum ada tugas di tim ini' : 'Tidak ada tugas dalam kategori ini'}
+                    </h3>
+                    <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginBottom: 20 }}>
+                      Mulai bagi tugas kelompok dan sertakan link pengerjaan agar tercapai target tepat waktu.
+                    </p>
+                    <button onClick={openAddTaskModal} className="btn btn-primary">
+                      <Plus size={16} /> Buat Tugas Pertama
+                    </button>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                    {filteredTasks.map((task) => {
+                      const isDone = task.status === 'done';
+                      const isInProgress = task.status === 'in_progress';
+                      const isReview = task.status === 'review';
+                      const isUnreadComment = (task.comments_count || 0) > (readCommentsMap[task.id] || 0);
+
+                      let borderLeftColor = '#cbd5e1';
+                      if (isDone) borderLeftColor = 'var(--success)';
+                      else if (isReview) borderLeftColor = '#a855f7';
+                      else if (isInProgress) borderLeftColor = 'var(--primary)';
+
+                      return (
+                        <div
+                          key={task.id}
+                          className="card task-card-responsive"
+                          style={{
+                            borderLeft: `5px solid ${borderLeftColor}`,
+                            background: isReview
+                              ? isDarkMode
+                                ? 'rgba(168, 85, 247, 0.08)'
+                                : '#fdfaff'
+                              : 'var(--surface)',
+                            opacity: isDone ? 0.88 : 1,
+                          }}
+                        >
+                          <div className="task-card-content">
+                            {/* Status Icon */}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (isDone) handleReopenTask(task);
+                                else if (task.status === 'todo') handleStartTask(task);
+                              }}
+                              style={{
+                                marginTop: 2,
+                                width: 28,
+                                height: 28,
+                                borderRadius: 8,
+                                background: isDone
+                                  ? 'var(--success)'
+                                  : isReview
+                                  ? isDarkMode ? 'rgba(168, 85, 247, 0.22)' : '#f3e8ff'
+                                  : isInProgress
+                                  ? 'var(--primary-light)'
+                                  : isDarkMode ? '#1e293b' : '#f1f5f9',
+                                color: isDone
+                                  ? 'white'
+                                  : isReview
+                                  ? isDarkMode ? '#c084fc' : '#7e22ce'
+                                  : isInProgress
+                                  ? 'var(--primary)'
+                                  : 'var(--text-muted)',
+                                border: 'none',
+                                cursor: isDone || task.status === 'todo' ? 'pointer' : 'default',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                flexShrink: 0,
+                                transition: 'all 0.15s ease',
+                              }}
+                              title={isDone ? 'Klik untuk membuka kembali tugas' : task.status === 'todo' ? 'Klik untuk mulai pengerjaan' : undefined}
+                            >
+                              {isDone && <Check size={16} strokeWidth={3} />}
+                              {isReview && <Clock size={16} />}
+                              {isInProgress && <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--primary)' }} />}
+                              {task.status === 'todo' && <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#94a3b8' }} />}
+                            </button>
+
+                            <div className="task-card-body">
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 6 }}>
+                                <h4
+                                  style={{
+                                    fontSize: '1.05rem',
+                                    fontWeight: 700,
+                                    textDecoration: isDone ? 'line-through' : 'none',
+                                    color: isDone ? 'var(--text-muted)' : 'var(--text-main)',
+                                    wordBreak: 'break-word',
+                                  }}
+                                >
+                                  {task.title}
+                                </h4>
+                                {getDeadlineBadge(task.deadline, task.status)}
+
+                                {/* Indikator Komentar Belum Dibaca */}
+                                {isUnreadComment && (
+                                  <span
+                                    className="badge unread-comment-indicator"
+                                    style={{
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: 4,
+                                      fontSize: '0.72rem',
+                                      fontWeight: 800,
+                                      background: '#ef4444',
+                                      color: '#ffffff',
+                                      padding: '2px 8px',
+                                      borderRadius: 9999,
+                                    }}
+                                    title="Ada diskusi/komentar baru yang belum Anda baca!"
                                   >
-                                    <Check size={14} /> Tandai Selesai (Ketua)
-                                  </button>
-                                ) : (
-                                  <button
-                                    onClick={() => openSubmitReview(task)}
-                                    className="btn btn-primary btn-sm"
-                                    style={{ background: 'linear-gradient(135deg, #7c3aed, #4f46e5)' }}
-                                  >
-                                    <Send size={13} /> {task.review_notes?.toLowerCase().includes('revisi') ? 'Ajukan Ulang Hasil Revisi' : 'Ajukan Dicek Ketua'}
-                                  </button>
+                                    💬 Komentar Baru
+                                  </span>
                                 )}
-                              </>
-                            )}
 
-                            {task.status === 'review' && (
-                              <>
-                                {isKetua ? (
-                                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', width: '100%' }}>
+                                {task.status === 'review' ? (
+                                  <span
+                                    className="badge badge-purple"
+                                    style={{
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: 4,
+                                      fontSize: '0.75rem',
+                                      fontWeight: 700,
+                                      background: isDarkMode ? 'rgba(168, 85, 247, 0.2)' : '#f3e8ff',
+                                      color: isDarkMode ? '#c084fc' : '#7e22ce',
+                                      border: `1px solid ${isDarkMode ? 'rgba(168, 85, 247, 0.4)' : '#ddd6fe'}`,
+                                      padding: '2px 8px',
+                                      borderRadius: 6,
+                                    }}
+                                  >
+                                    🔍 Menunggu Review Ketua
+                                  </span>
+                                ) : isInProgress && task.review_notes?.toLowerCase().includes('revisi') ? (
+                                  <span
+                                    className="badge badge-warning"
+                                    style={{
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: 4,
+                                      fontSize: '0.75rem',
+                                      fontWeight: 700,
+                                      background: isDarkMode ? 'rgba(245, 158, 11, 0.2)' : '#fef3c7',
+                                      color: isDarkMode ? '#fbbf24' : '#b45309',
+                                      border: `1px solid ${isDarkMode ? 'rgba(245, 158, 11, 0.4)' : '#fde68a'}`,
+                                      padding: '2px 8px',
+                                      borderRadius: 6,
+                                    }}
+                                  >
+                                    ⚠️ Perlu Revisi
+                                  </span>
+                                ) : null}
+                              </div>
+
+                              {task.description && (
+                                <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)', marginBottom: 12, lineHeight: 1.5, wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
+                                  {task.description}
+                                </p>
+                              )}
+
+                              {/* Review Notes from Member / Revision Notes from Leader */}
+                              {task.review_notes && (
+                                <div
+                                  style={{
+                                    background: task.review_notes.toLowerCase().includes('revisi')
+                                      ? isDarkMode ? 'rgba(239, 68, 68, 0.12)' : '#fef2f2'
+                                      : isReview
+                                      ? isDarkMode ? 'rgba(168, 85, 247, 0.12)' : '#f5f3ff'
+                                      : isDarkMode ? 'rgba(245, 158, 11, 0.12)' : '#fffbeb',
+                                    border: `1px solid ${
+                                      task.review_notes.toLowerCase().includes('revisi')
+                                        ? isDarkMode ? 'rgba(239, 68, 68, 0.35)' : '#fecaca'
+                                        : isReview
+                                        ? isDarkMode ? 'rgba(168, 85, 247, 0.3)' : '#ddd6fe'
+                                        : isDarkMode ? 'rgba(245, 158, 11, 0.3)' : '#fde68a'
+                                    }`,
+                                    borderRadius: 8,
+                                    padding: '8px 12px',
+                                    marginBottom: 12,
+                                    fontSize: '0.825rem',
+                                    color: task.review_notes.toLowerCase().includes('revisi')
+                                      ? isDarkMode ? '#fca5a5' : '#b91c1c'
+                                      : isReview
+                                      ? isDarkMode ? '#d8b4fe' : '#5b21b6'
+                                      : isDarkMode ? '#fcd34d' : '#92400e',
+                                    wordBreak: 'break-word',
+                                    overflowWrap: 'anywhere',
+                                  }}
+                                >
+                                  {task.review_notes.toLowerCase().includes('revisi') ? '⚠️ ' : '💬 '}
+                                  <b>{task.review_notes.toLowerCase().includes('revisi') ? 'Catatan Revisi dari Ketua:' : 'Catatan:'}</b>{' '}
+                                  {task.review_notes.replace(/^Catatan Revisi dari Ketua:\s*/i, '')}
+                                </div>
+                              )}
+
+                              {/* Task Link (Tautan Hasil Tugas) */}
+                              {task.task_link && (
+                                <div style={{ marginBottom: 12 }}>
+                                  <a
+                                    href={task.task_link.startsWith('http') ? task.task_link : `https://${task.task_link}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="btn btn-secondary btn-sm btn-task-link"
+                                    style={{
+                                      display: 'inline-flex',
+                                      fontSize: '0.8rem',
+                                      padding: '5px 12px',
+                                      maxWidth: '100%',
+                                      overflow: 'hidden',
+                                      textOverflow: 'ellipsis',
+                                      whiteSpace: 'nowrap',
+                                    }}
+                                  >
+                                    <ExternalLink size={13} /> Buka Link Tugas ↗
+                                  </a>
+                                </div>
+                              )}
+
+                              {/* Assignee & Meta (Member Tugas dengan Foto Profil) */}
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                  <span style={{ color: 'var(--text-subtle)' }}>Member Tugas:</span>
+                                  {task.assignee_profiles && task.assignee_profiles.length > 0 ? (
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                                      <div className="pic-avatar-stack">
+                                        {task.assignee_profiles.map((p) => (
+                                          p.avatar_url ? (
+                                            <img
+                                              key={p.id}
+                                              src={p.avatar_url}
+                                              alt={p.full_name}
+                                              className="avatar-photo pic-stack-item"
+                                              style={{ width: 24, height: 24 }}
+                                              title={p.full_name}
+                                            />
+                                          ) : (
+                                            <div
+                                              key={p.id}
+                                              className="pic-stack-item"
+                                              style={{ width: 24, height: 24, fontSize: '0.65rem' }}
+                                              title={p.full_name}
+                                            >
+                                              {p.full_name.slice(0, 1).toUpperCase()}
+                                            </div>
+                                          )
+                                        ))}
+                                      </div>
+                                      <span style={{ fontWeight: 600, color: 'var(--text-main)' }}>
+                                        {task.assignee_profiles.map((p) => p.full_name).join(', ')}
+                                      </span>
+                                    </div>
+                                  ) : task.assignee_profile ? (
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                      {task.assignee_profile.avatar_url ? (
+                                        <img
+                                          src={task.assignee_profile.avatar_url}
+                                          alt={task.assignee_profile.full_name}
+                                          className="avatar-photo"
+                                          style={{ width: 22, height: 22 }}
+                                        />
+                                      ) : (
+                                        <div className="avatar-badge" style={{ width: 22, height: 22, fontSize: '0.65rem' }}>
+                                          {task.assignee_profile.full_name.slice(0, 1).toUpperCase()}
+                                        </div>
+                                      )}
+                                      <span style={{ fontWeight: 600, color: 'var(--text-main)' }}>
+                                        {task.assignee_profile.full_name}
+                                      </span>
+                                    </div>
+                                  ) : (
+                                    <span style={{ fontStyle: 'italic', color: 'var(--text-subtle)' }}>Belum ditugaskan</span>
+                                  )}
+                                </div>
+
+                                {task.deadline && (
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                    <Calendar size={13} />
+                                    <span>Deadline: {new Date(task.deadline).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Actions Area */}
+                          <div className="task-card-actions">
+                            {/* Primary Workflow Buttons based on Role & Status */}
+                            <div className="task-actions-main">
+                              {task.status === 'todo' && (
+                                <button
+                                  onClick={() => handleStartTask(task)}
+                                  className="btn btn-secondary btn-sm"
+                                >
+                                  ▶ Mulai Kerjakan
+                                </button>
+                              )}
+
+                              {task.status === 'in_progress' && (
+                                <>
+                                  {isKetua ? (
                                     <button
                                       onClick={() => openKetuaReviewModal(task)}
                                       className="btn btn-success btn-sm"
-                                      style={{ flex: 1 }}
                                     >
-                                      <Check size={14} /> Review & Selesaikan
+                                      <Check size={14} /> Tandai Selesai (Ketua)
                                     </button>
+                                  ) : (
                                     <button
-                                      onClick={() => openKetuaReviewModal(task)}
-                                      className="btn btn-danger btn-sm"
-                                      style={{ flex: 1 }}
+                                      onClick={() => openSubmitReview(task)}
+                                      className="btn btn-primary btn-sm"
+                                      style={{ background: 'linear-gradient(135deg, #7c3aed, #4f46e5)' }}
                                     >
-                                      <RotateCcw size={14} /> Minta Revisi
+                                      <Send size={13} /> {task.review_notes?.toLowerCase().includes('revisi') ? 'Ajukan Ulang Hasil Revisi' : 'Ajukan Dicek Ketua'}
                                     </button>
-                                  </div>
-                                ) : (
-                                  <span className="badge badge-purple">
-                                    Sedang Dicek Ketua
-                                  </span>
-                                )}
-                              </>
-                            )}
+                                  )}
+                                </>
+                              )}
 
-                            {task.status === 'done' && (
-                              <button
-                                onClick={() => handleReopenTask(task)}
-                                className="btn btn-secondary btn-sm"
-                                title="Buka kembali tugas untuk dikerjakan"
-                              >
-                                <RotateCcw size={13} /> Buka Kembali
-                              </button>
-                            )}
-                          </div>
+                              {task.status === 'review' && (
+                                <>
+                                  {isKetua ? (
+                                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', width: '100%' }}>
+                                      <button
+                                        onClick={() => openKetuaReviewModal(task)}
+                                        className="btn btn-success btn-sm"
+                                        style={{ flex: 1 }}
+                                      >
+                                        <Check size={14} /> Review & Selesaikan
+                                      </button>
+                                      <button
+                                        onClick={() => openKetuaReviewModal(task)}
+                                        className="btn btn-danger btn-sm"
+                                        style={{ flex: 1 }}
+                                      >
+                                        <RotateCcw size={14} /> Minta Revisi
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <span className="badge badge-purple">
+                                      Sedang Dicek Ketua
+                                    </span>
+                                  )}
+                                </>
+                              )}
 
-                          {/* Secondary Buttons (WhatsApp, Comment, Edit & Delete) */}
-                          <div className="task-actions-secondary">
-                            {/* Tombol Diskusi / Komentar */}
-                            <button
-                              onClick={() => openTaskComments(task)}
-                              className="btn btn-secondary btn-sm"
-                              style={{
-                                padding: '6px 10px',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: 5,
-                                color: (task.comments_count || 0) > 0 ? 'var(--primary)' : 'inherit',
-                                borderColor: (task.comments_count || 0) > 0 ? 'var(--primary-light)' : undefined,
-                              }}
-                              title="Diskusi & Komentar Tugas"
-                            >
-                              <MessageSquare size={14} />
-                              <span style={{ fontSize: '0.75rem', fontWeight: 700 }}>{task.comments_count || 0}</span>
-                            </button>
-
-                            {task.status !== 'done' && (
-                              <button
-                                onClick={() => handleSendTaskWAReminder(task)}
-                                className="btn btn-secondary btn-sm btn-task-wa"
-                                style={{ padding: '6px 9px' }}
-                                title={`Kirim pengingat WhatsApp ke ${task.assignee_profile?.full_name || 'anggota'}`}
-                              >
-                                <Smartphone size={14} />
-                              </button>
-                            )}
-
-                            <button
-                              onClick={() => openEditTask(task)}
-                              className="btn btn-secondary btn-sm"
-                              style={{ padding: '6px 9px' }}
-                              title="Edit tugas"
-                            >
-                              <Edit size={14} />
-                            </button>
-
-                            <button
-                              onClick={() => handleDeleteTask(task.id)}
-                              style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: 6, borderRadius: 6 }}
-                              title="Hapus tugas"
-                            >
-                              <Trash2 size={16} />
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* ========================================================================= */}
-          {/* TAB 2: STATISTIK & LEADERBOARD KONTRIBUSI                                 */}
-          {/* ========================================================================= */}
-          {activeTab === 'stats' && (
-            <div className="animate-fade-in">
-              {/* Progress Tim Card */}
-              <div className="card stats-progress-card" style={{ padding: 28, marginBottom: 24, background: 'var(--surface)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16, marginBottom: 16 }}>
-                  <div>
-                    <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-main)', marginBottom: 4 }}>
-                      Kemajuan Keseluruhan Tim 🚀
-                    </h3>
-                    <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>
-                      {completedTasks} dari {totalTasks} tugas telah selesai & disetujui ({overallProgress}% selesai)
-                      {inReviewTasks > 0 && ` • ${inReviewTasks} sedang menunggu review Ketua`}
-                    </p>
-                  </div>
-                  <div style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--primary)' }}>
-                    {overallProgress}%
-                  </div>
-                </div>
-
-                {/* Progress Bar */}
-                <div style={{ width: '100%', height: 14, background: 'var(--surface-border)', borderRadius: 9999, overflow: 'hidden' }}>
-                  <div
-                    style={{
-                      width: `${overallProgress}%`,
-                      height: '100%',
-                      background: 'linear-gradient(90deg, #4f46e5, #10b981)',
-                      borderRadius: 9999,
-                      transition: 'width 0.8s cubic-bezier(0.16, 1, 0.3, 1)',
-                    }}
-                  />
-                </div>
-              </div>
-
-              {/* Leaderboard Section */}
-              <div style={{ marginBottom: 24 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
-                  <Trophy size={24} color="#f59e0b" />
-                  <div>
-                    <h3 style={{ fontSize: '1.2rem', fontWeight: 800 }}>Peringkat Kontribusi Tim</h3>
-                    <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                      Dihitung secara realtime dari tugas yang telah diselesaikan anggota dan disetujui Ketua.
-                    </p>
-                  </div>
-                </div>
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                  {contributions.map((item, idx) => {
-                    const isChampion = idx === 0 && item.completed_count > 0;
-                    let rankBadge = `${idx + 1}`;
-                    let rankBg = isDarkMode ? 'rgba(148, 163, 184, 0.15)' : '#f1f5f9';
-                    let rankColor = isDarkMode ? '#cbd5e1' : '#475569';
-
-                    if (isChampion) {
-                      rankBadge = '🥇 Juara 1';
-                      rankBg = isDarkMode ? 'rgba(245, 158, 11, 0.25)' : '#fef3c7';
-                      rankColor = isDarkMode ? '#fbbf24' : '#b45309';
-                    } else if (idx === 1 && item.completed_count > 0) {
-                      rankBadge = '🥈 Juara 2';
-                      rankBg = isDarkMode ? 'rgba(148, 163, 184, 0.2)' : '#f1f5f9';
-                      rankColor = isDarkMode ? '#e2e8f0' : '#334155';
-                    } else if (idx === 2 && item.completed_count > 0) {
-                      rankBadge = '🥉 Juara 3';
-                      rankBg = isDarkMode ? 'rgba(234, 88, 12, 0.22)' : '#ffedd5';
-                      rankColor = isDarkMode ? '#fdba74' : '#9a3412';
-                    }
-
-                    return (
-                      <div
-                        key={item.user_id}
-                        className={`card contributor-card-responsive ${isChampion ? 'contributor-card-champion' : ''}`}
-                        style={{
-                          border: isChampion
-                            ? isDarkMode
-                              ? '1px solid rgba(245, 158, 11, 0.45)'
-                              : '2px solid #fde68a'
-                            : '1px solid var(--surface-border)',
-                          background: isChampion
-                            ? isDarkMode
-                              ? 'linear-gradient(135deg, rgba(245, 158, 11, 0.12) 0%, rgba(217, 119, 6, 0.05) 100%)'
-                              : '#fffdf7'
-                            : 'var(--surface)',
-                        }}
-                      >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0, flex: 1 }}>
-                          <span
-                            style={{
-                              background: rankBg,
-                              color: rankColor,
-                              fontWeight: 800,
-                              fontSize: '0.85rem',
-                              padding: '6px 10px',
-                              borderRadius: 8,
-                              flexShrink: 0,
-                            }}
-                          >
-                            {rankBadge}
-                          </span>
-
-                          <div className="avatar-badge" style={{ width: 40, height: 40, flexShrink: 0 }}>
-                            {item.full_name.slice(0, 2).toUpperCase()}
-                          </div>
-
-                          <div style={{ minWidth: 0 }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                              <h4 style={{ fontSize: '1rem', fontWeight: 700, wordBreak: 'break-word' }}>{item.full_name}</h4>
-                              {item.role === 'ketua' && (
-                                <span className="badge badge-warning" style={{ fontSize: '0.65rem' }}>
-                                  <Crown size={10} /> Ketua
-                                </span>
+                              {task.status === 'done' && (
+                                <button
+                                  onClick={() => handleReopenTask(task)}
+                                  className="btn btn-secondary btn-sm"
+                                  title="Buka kembali tugas untuk dikerjakan"
+                                >
+                                  <RotateCcw size={13} /> Buka Kembali
+                                </button>
                               )}
                             </div>
-                            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: 2, wordBreak: 'break-word' }}>
-                              Total {item.total_assigned} tugas dipegang • {item.in_progress_count} dikerjakan • {item.in_review_count} dicek
-                            </p>
+
+                            {/* Secondary Buttons (WhatsApp, Comment, Edit & Delete) */}
+                            <div className="task-actions-secondary">
+                              {/* Tombol Diskusi / Komentar dengan Indikator Belum Dibaca */}
+                              <button
+                                onClick={() => openTaskComments(task)}
+                                className="btn btn-secondary btn-sm"
+                                style={{
+                                  padding: '6px 10px',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: 5,
+                                  position: 'relative',
+                                  color: isUnreadComment ? '#ef4444' : (task.comments_count || 0) > 0 ? 'var(--primary)' : 'inherit',
+                                  borderColor: isUnreadComment ? '#ef4444' : (task.comments_count || 0) > 0 ? 'var(--primary-light)' : undefined,
+                                }}
+                                title={isUnreadComment ? 'Ada komentar baru yang belum Anda baca!' : 'Diskusi & Komentar Tugas'}
+                              >
+                                <MessageSquare size={14} />
+                                <span style={{ fontSize: '0.75rem', fontWeight: 700 }}>{task.comments_count || 0}</span>
+                                {isUnreadComment && (
+                                  <span
+                                    className="unread-comment-indicator"
+                                    style={{
+                                      position: 'absolute',
+                                      top: -4,
+                                      right: -4,
+                                      width: 8,
+                                      height: 8,
+                                      borderRadius: '50%',
+                                      background: '#ef4444',
+                                    }}
+                                  />
+                                )}
+                              </button>
+
+                              {task.status !== 'done' && (
+                                <button
+                                  onClick={() => handleSendTaskWAReminder(task)}
+                                  className="btn btn-secondary btn-sm btn-task-wa"
+                                  style={{ padding: '6px 9px' }}
+                                  title={`Kirim pengingat WhatsApp ke ${task.assignee_profile?.full_name || 'anggota'}`}
+                                >
+                                  <Smartphone size={14} />
+                                </button>
+                              )}
+
+                              <button
+                                onClick={() => openEditTask(task)}
+                                className="btn btn-secondary btn-sm"
+                                style={{ padding: '6px 9px' }}
+                                title="Edit tugas"
+                              >
+                                <Edit size={14} />
+                              </button>
+
+                              <button
+                                onClick={() => handleDeleteTask(task.id)}
+                                style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: 6, borderRadius: 6 }}
+                                title="Hapus tugas"
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            </div>
                           </div>
                         </div>
-
-                        {/* Stats Counts */}
-                        <div className="contributor-stats-group">
-                          <div style={{ textAlign: 'right' }}>
-                            <div style={{ fontSize: '1.25rem', fontWeight: 800, color: item.completed_count > 0 ? 'var(--success)' : 'var(--text-muted)' }}>
-                              {item.completed_count} Tugas
-                            </div>
-                            <div style={{ fontSize: '0.725rem', color: 'var(--text-muted)' }}>
-                              Telah Selesai
-                            </div>
-                          </div>
-
-                          <div style={{ minWidth: 80, textAlign: 'right' }}>
-                            <div style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--primary)' }}>
-                              {item.contribution_percentage}%
-                            </div>
-                            <div style={{ fontSize: '0.725rem', color: 'var(--text-muted)' }}>
-                              Porsi Kontribusi
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
-            </div>
-          )}
+            )}
+
+
 
           {/* ========================================================================= */}
           {/* TAB 3: MATERI & HASIL RISET (Hemat Kuota Google Drive)                     */}
@@ -2298,10 +2623,71 @@ export default function TeamWorkspace() {
           )}
 
           {/* ========================================================================= */}
-          {/* TAB 4: PENGATURAN TIM & MANAJEMEN ANGGOTA                                */}
+          {/* TAB 4: PENGATURAN TIM & AKUN PRIBADI                                      */}
           {/* ========================================================================= */}
-          {activeTab === 'members' && (
+          {activeTab === 'settings' && (
             <div className="animate-fade-in">
+              {/* Card Foto Profil Tim (Dapat diedit seluruh anggota tim) */}
+              <div className="card" style={{ padding: '20px 24px', marginBottom: 24, background: 'var(--surface)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 16, minWidth: 260, flex: 1 }}>
+                    <div
+                      style={{ position: 'relative', cursor: 'pointer' }}
+                      onClick={() => setShowTeamAvatarModal(true)}
+                      title="Klik untuk ganti foto profil tim"
+                    >
+                      {team?.avatar_url ? (
+                        <img
+                          src={team.avatar_url}
+                          alt={team.name}
+                          className="avatar-photo"
+                          style={{ width: 64, height: 64, border: '2px solid var(--primary)', objectFit: 'cover' }}
+                        />
+                      ) : (
+                        <div className="team-avatar-header" style={{ width: 64, height: 64, fontSize: '1.5rem' }}>
+                          {team?.name.slice(0, 2).toUpperCase()}
+                        </div>
+                      )}
+                      <div
+                        style={{
+                          position: 'absolute',
+                          bottom: -2,
+                          right: -2,
+                          width: 22,
+                          height: 22,
+                          borderRadius: '50%',
+                          background: 'var(--primary)',
+                          color: 'white',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+                        }}
+                      >
+                        <Camera size={12} />
+                      </div>
+                    </div>
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 4 }}>
+                        <h3 style={{ fontSize: '1.2rem', fontWeight: 800, margin: 0 }}>{team?.name}</h3>
+                        <span className="badge badge-primary">@{team?.username}</span>
+                      </div>
+                      <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: 0 }}>
+                        Foto profil tim dapat diubah oleh seluruh anggota tim agar identitas tim lebih menarik.
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowTeamAvatarModal(true)}
+                    className="btn btn-primary"
+                    style={{ whiteSpace: 'nowrap' }}
+                  >
+                    <Camera size={16} /> Ganti Foto Tim
+                  </button>
+                </div>
+              </div>
+
               {/* Share Box */}
               <div className="card" style={{ padding: 26, marginBottom: 24 }}>
                 <h3 style={{ fontSize: '1.15rem', fontWeight: 800, marginBottom: 6 }}>
@@ -2452,6 +2838,80 @@ export default function TeamWorkspace() {
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+                  {/* Bagian 0: Foto Profil Saya (Default inisial) */}
+                  <div className="profile-edit-box">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                      <Camera size={16} color="var(--primary)" />
+                      <h4 style={{ fontSize: '0.95rem', fontWeight: 700 }}>Foto Profil</h4>
+                    </div>
+                    <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: 14 }}>
+                      Foto profil Anda akan ditampilkan pada kartu tugas dan menu. Bila belum diatur, sistem otomatis menampilkan inisial nama Anda.
+                    </p>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 16, flexWrap: 'wrap' }}>
+                      {userAvatarUrl ? (
+                        <img
+                          src={userAvatarUrl}
+                          alt="Preview Profil"
+                          className="avatar-photo"
+                          style={{ width: 56, height: 56, border: '2px solid var(--primary)', objectFit: 'cover' }}
+                          onError={(e) => {
+                            (e.target as HTMLElement).style.display = 'none';
+                          }}
+                        />
+                      ) : (
+                        <div className="avatar-badge" style={{ width: 56, height: 56, fontSize: '1.3rem' }}>
+                          {profileName?.slice(0, 2).toUpperCase() || 'AG'}
+                        </div>
+                      )}
+                      <div>
+                        <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-main)', display: 'block' }}>
+                          {userAvatarUrl ? 'Foto profil kustom aktif' : 'Menggunakan avatar inisial (bawaan)'}
+                        </span>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                          Tempel link URL gambar langsung (contoh: dari Unsplash, GitHub, dsb.)
+                        </span>
+                      </div>
+                    </div>
+                    <form onSubmit={handleUpdateUserAvatar} style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+                      <div style={{ flex: 1, minWidth: 260 }}>
+                        <input
+                          type="url"
+                          placeholder="https://images.unsplash.com/... atau tautan gambar online"
+                          value={userAvatarUrl}
+                          onChange={(e) => setUserAvatarUrl(e.target.value)}
+                          className="form-input"
+                        />
+                      </div>
+                      <button
+                        type="submit"
+                        disabled={savingUserAvatar}
+                        className="btn btn-primary"
+                        style={{ whiteSpace: 'nowrap' }}
+                      >
+                        {savingUserAvatar ? 'Menyimpan...' : 'Simpan Foto'}
+                      </button>
+                      {userAvatarUrl && (
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            setUserAvatarUrl('');
+                            if (currentUser) {
+                              setSavingUserAvatar(true);
+                              await updateUserAvatar(currentUser.id, '');
+                              setSavingUserAvatar(false);
+                              setCurrentUser((prev) => prev ? { ...prev, avatar_url: '' } : null);
+                              showToast('Foto profil direset ke inisial nama.');
+                            }
+                          }}
+                          className="btn btn-secondary"
+                          style={{ whiteSpace: 'nowrap' }}
+                        >
+                          Reset ke Inisial
+                        </button>
+                      )}
+                    </form>
+                  </div>
+
                   {/* Bagian 1: Ganti Nama Lengkap */}
                   <div className="profile-edit-box">
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
@@ -2610,6 +3070,53 @@ export default function TeamWorkspace() {
       </main>
 
       {/* ========================================================================= */}
+      {/* MOBILE BOTTOM NAVIGATION (Bawah)                                          */}
+      {/* ========================================================================= */}
+      <nav className="mobile-bottom-nav">
+        <button
+          type="button"
+          onClick={() => setActiveTab('overview')}
+          className={`mobile-nav-btn ${activeTab === 'overview' ? 'active' : ''}`}
+        >
+          <LayoutDashboard size={20} />
+          <span>Overview</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('tasks')}
+          className={`mobile-nav-btn ${activeTab === 'tasks' ? 'active' : ''}`}
+        >
+          <CheckCircle2 size={20} />
+          <span>Tim Saya</span>
+          {tasks.length > 0 && (
+            <span className="badge badge-primary" style={{ fontSize: '0.65rem', padding: '1px 5px' }}>
+              {tasks.length}
+            </span>
+          )}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('research')}
+          className={`mobile-nav-btn ${activeTab === 'research' ? 'active' : ''}`}
+        >
+          <FolderGit2 size={20} />
+          <span>Materi</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('settings')}
+          className={`mobile-nav-btn ${activeTab === 'settings' ? 'active' : ''}`}
+        >
+          <Settings size={20} />
+          <span>Pengaturan</span>
+        </button>
+      </nav>
+    </div>
+
+      {/* ========================================================================= */}
       {/* MODAL: TAMBAH TUGAS BARU                                                  */}
       {/* ========================================================================= */}
       {showAddTaskModal && (
@@ -2660,7 +3167,7 @@ export default function TeamWorkspace() {
 
                 <div className="form-group">
                   <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span>Ditugaskan Kepada (Bisa Lebih dari 1 PIC)</span>
+                    <span>Member Tugas (Bisa Lebih dari 1 Orang)</span>
                     <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                       {taskAssigneeIds.length} dipilih
                     </span>
@@ -2675,23 +3182,32 @@ export default function TeamWorkspace() {
                           onClick={() => toggleAssignee(m.user_id)}
                           className={`pic-chip ${isSelected ? 'selected' : ''}`}
                         >
-                          <span
-                            style={{
-                              width: 24,
-                              height: 24,
-                              borderRadius: '50%',
-                              background: isSelected ? 'var(--primary)' : '#cbd5e1',
-                              color: isSelected ? 'white' : '#334155',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              fontSize: '0.7rem',
-                              fontWeight: 700,
-                              flexShrink: 0,
-                            }}
-                          >
-                            {m.profile?.full_name?.slice(0, 1).toUpperCase() || 'A'}
-                          </span>
+                          {m.profile?.avatar_url ? (
+                            <img
+                              src={m.profile.avatar_url}
+                              alt={m.profile.full_name || ''}
+                              className="avatar-photo"
+                              style={{ width: 24, height: 24, flexShrink: 0 }}
+                            />
+                          ) : (
+                            <span
+                              style={{
+                                width: 24,
+                                height: 24,
+                                borderRadius: '50%',
+                                background: isSelected ? 'var(--primary)' : '#cbd5e1',
+                                color: isSelected ? 'white' : '#334155',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontSize: '0.7rem',
+                                fontWeight: 700,
+                                flexShrink: 0,
+                              }}
+                            >
+                              {m.profile?.full_name?.slice(0, 1).toUpperCase() || 'A'}
+                            </span>
+                          )}
                           <span style={{ flex: 1, textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             {m.profile?.full_name || 'Anggota'}
                           </span>
@@ -2787,7 +3303,7 @@ export default function TeamWorkspace() {
 
                 <div className="form-group">
                   <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span>Ditugaskan Kepada (Bisa Lebih dari 1 PIC)</span>
+                    <span>Member Tugas (Bisa Lebih dari 1 Orang)</span>
                     <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                       {taskAssigneeIds.length} dipilih
                     </span>
@@ -2802,23 +3318,32 @@ export default function TeamWorkspace() {
                           onClick={() => toggleAssignee(m.user_id)}
                           className={`pic-chip ${isSelected ? 'selected' : ''}`}
                         >
-                          <span
-                            style={{
-                              width: 24,
-                              height: 24,
-                              borderRadius: '50%',
-                              background: isSelected ? 'var(--primary)' : '#cbd5e1',
-                              color: isSelected ? 'white' : '#334155',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              fontSize: '0.7rem',
-                              fontWeight: 700,
-                              flexShrink: 0,
-                            }}
-                          >
-                            {m.profile?.full_name?.slice(0, 1).toUpperCase() || 'A'}
-                          </span>
+                          {m.profile?.avatar_url ? (
+                            <img
+                              src={m.profile.avatar_url}
+                              alt={m.profile.full_name || ''}
+                              className="avatar-photo"
+                              style={{ width: 24, height: 24, flexShrink: 0 }}
+                            />
+                          ) : (
+                            <span
+                              style={{
+                                width: 24,
+                                height: 24,
+                                borderRadius: '50%',
+                                background: isSelected ? 'var(--primary)' : '#cbd5e1',
+                                color: isSelected ? 'white' : '#334155',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontSize: '0.7rem',
+                                fontWeight: 700,
+                                flexShrink: 0,
+                              }}
+                            >
+                              {m.profile?.full_name?.slice(0, 1).toUpperCase() || 'A'}
+                            </span>
+                          )}
                           <span style={{ flex: 1, textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             {m.profile?.full_name || 'Anggota'}
                           </span>
@@ -3013,7 +3538,7 @@ export default function TeamWorkspace() {
                 {/* PIC Info & Deadline */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span style={{ color: 'var(--text-subtle)' }}>Penanggung Jawab:</span>
+                    <span style={{ color: 'var(--text-subtle)' }}>Member Tugas:</span>
                     <span style={{ fontWeight: 600, color: 'var(--text-main)' }}>
                       {ketuaReviewTask.assignee_profiles && ketuaReviewTask.assignee_profiles.length > 0
                         ? ketuaReviewTask.assignee_profiles.map((p) => p.full_name).join(', ')
@@ -3454,6 +3979,84 @@ export default function TeamWorkspace() {
                 </button>
                 <button type="submit" className="btn btn-primary">
                   Simpan Perubahan
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL: GANTI FOTO PROFIL TIM                                              */}
+      {/* ========================================================================= */}
+      {showTeamAvatarModal && (
+        <div className="modal-overlay" onClick={() => setShowTeamAvatarModal(false)}>
+          <div className="modal-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 440 }}>
+            <div className="modal-header">
+              <h3 style={{ fontSize: '1.15rem', fontWeight: 800 }}>Ganti Foto Profil Tim</h3>
+              <button
+                onClick={() => setShowTeamAvatarModal(false)}
+                style={{ background: 'none', border: 'none', fontSize: '1.2rem', cursor: 'pointer', color: 'var(--text-muted)' }}
+              >
+                ✕
+              </button>
+            </div>
+            <form onSubmit={handleSaveTeamAvatar}>
+              <div className="modal-body">
+                <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: 16 }}>
+                  Foto profil tim dapat diubah oleh seluruh anggota tim. Masukkan link URL gambar (contoh: Unsplash, Imgur, Cloudinary, dsb).
+                </p>
+
+                <div style={{ textAlign: 'center', marginBottom: 18 }}>
+                  {teamAvatarUrl ? (
+                    <img
+                      src={teamAvatarUrl}
+                      alt="Preview Foto Tim"
+                      className="avatar-photo"
+                      style={{ width: 80, height: 80, border: '3px solid var(--primary)', margin: '0 auto', objectFit: 'cover' }}
+                      onError={(e) => {
+                        (e.target as HTMLElement).style.display = 'none';
+                      }}
+                    />
+                  ) : (
+                    <div
+                      className="team-avatar-header"
+                      style={{ width: 80, height: 80, fontSize: '1.8rem', margin: '0 auto' }}
+                    >
+                      {team?.name.slice(0, 2).toUpperCase()}
+                    </div>
+                  )}
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">URL Foto Tim</label>
+                  <input
+                    type="url"
+                    required
+                    placeholder="https://images.unsplash.com/... atau link foto lainnya"
+                    value={teamAvatarUrl}
+                    onChange={(e) => setTeamAvatarUrl(e.target.value)}
+                    className="form-input"
+                  />
+                  <span className="form-hint">
+                    Gunakan tautan gambar langsung yang diawali http:// atau https://
+                  </span>
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button
+                  type="button"
+                  onClick={() => setShowTeamAvatarModal(false)}
+                  className="btn btn-secondary"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingTeamAvatar}
+                  className="btn btn-primary"
+                >
+                  {savingTeamAvatar ? 'Menyimpan...' : 'Simpan Foto Tim'}
                 </button>
               </div>
             </form>

@@ -18,6 +18,7 @@ export interface Team {
   name: string;
   username: string; // unik, contoh: tim-garuda-2026
   description?: string;
+  avatar_url?: string; // Foto profil / logo tim
   created_by?: string;
   created_at: string;
   wa_gateway_token?: string; // Token API Fonnte tim

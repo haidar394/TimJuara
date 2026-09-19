@@ -22,7 +22,7 @@ const DEMO_USER_KEY = 'timku_demo_current_user';
 const DEMO_DATA_KEY = 'timku_demo_database';
 
 interface DemoDatabase {
-  users: Array<{ id: string; email: string; full_name: string; password?: string; phone_number?: string }>;
+  users: Array<{ id: string; email: string; full_name: string; password?: string; phone_number?: string; avatar_url?: string }>;
   teams: Team[];
   members: TeamMember[];
   tasks: Task[];
@@ -379,12 +379,66 @@ export async function loginAsDemo(role: 'ketua' | 'anggota' = 'ketua'): Promise<
   return profile;
 }
 
+export async function signInWithGoogle(): Promise<{ error: string | null }> {
+  if (isSupabaseConfigured && supabase) {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: typeof window !== 'undefined' ? `${window.location.origin}/onboarding` : undefined,
+      },
+    });
+    if (error) return { error: error.message };
+    return { error: null };
+  } else {
+    // Demo Mode Google Login Fallback
+    await loginAsDemo('ketua');
+    return { error: null };
+  }
+}
+
 export async function signOutUser(): Promise<void> {
   if (isSupabaseConfigured && supabase) {
     await supabase.auth.signOut();
   }
   if (typeof window !== 'undefined') {
     localStorage.removeItem(DEMO_USER_KEY);
+  }
+}
+
+export async function updateUserAvatar(
+  userId: string,
+  avatarUrl: string
+): Promise<{ success: boolean; error: string | null }> {
+  const cleanUrl = avatarUrl.trim();
+  if (isSupabaseConfigured && supabase) {
+    const { error: profileError } = await supabase
+      .from('profiles')
+      .update({ avatar_url: cleanUrl })
+      .eq('id', userId);
+
+    if (profileError) return { success: false, error: profileError.message };
+
+    await supabase.auth.updateUser({
+      data: { avatar_url: cleanUrl },
+    });
+
+    return { success: true, error: null };
+  } else {
+    const db = getDemoDb();
+    const user = db.users.find(u => u.id === userId);
+    if (user) {
+      user.avatar_url = cleanUrl;
+      saveDemoDb(db);
+    }
+    if (typeof window !== 'undefined') {
+      const raw = localStorage.getItem(DEMO_USER_KEY);
+      if (raw) {
+        const p: Profile = JSON.parse(raw);
+        p.avatar_url = cleanUrl;
+        localStorage.setItem(DEMO_USER_KEY, JSON.stringify(p));
+      }
+    }
+    return { success: true, error: null };
   }
 }
 
@@ -709,6 +763,30 @@ export async function updateTeamWhatsAppConfig(
   }
 }
 
+export async function updateTeamAvatar(
+  teamId: string,
+  avatarUrl: string
+): Promise<{ success: boolean; error: string | null }> {
+  const cleanUrl = avatarUrl.trim();
+  if (isSupabaseConfigured && supabase) {
+    const { error } = await supabase
+      .from('teams')
+      .update({ avatar_url: cleanUrl })
+      .eq('id', teamId);
+
+    if (error) return { success: false, error: error.message };
+    return { success: true, error: null };
+  } else {
+    const db = getDemoDb();
+    const t = db.teams.find(item => item.id === teamId);
+    if (t) {
+      t.avatar_url = cleanUrl;
+      saveDemoDb(db);
+    }
+    return { success: true, error: null };
+  }
+}
+
 export async function sendTestWhatsAppMessage(
   targetPhone: string,
   customMessageOrToken?: string,
@@ -866,7 +944,79 @@ export async function getUserTeamsWithDetails(userId: string): Promise<UserTeamI
           task_count: taskCount,
         };
       })
-      .filter(Boolean) as UserTeamItem[];
+      .filter((t): t is UserTeamItem => t !== null);
+  }
+}
+
+export interface UserPersonalTask extends Task {
+  team_name?: string;
+  team_username?: string;
+}
+
+export async function getUserAllActiveTasks(userId: string): Promise<UserPersonalTask[]> {
+  if (isSupabaseConfigured && supabase) {
+    try {
+      const { data: memberTeams, error: tmError } = await supabase
+        .from('team_members')
+        .select('team_id, teams (id, name, username)')
+        .eq('user_id', userId);
+
+      if (tmError || !memberTeams || memberTeams.length === 0) return [];
+      const teamMap = new Map<string, { name: string; username: string }>();
+      memberTeams.forEach((m: any) => {
+        if (m.teams) teamMap.set(m.team_id, { name: m.teams.name, username: m.teams.username });
+      });
+
+      const teamIds = Array.from(teamMap.keys());
+      if (teamIds.length === 0) return [];
+
+      const { data: tasksData, error: taskError } = await supabase
+        .from('tasks')
+        .select(`
+          id, team_id, title, description, deadline, status, review_notes,
+          assigned_to, assigned_to_ids
+        `)
+        .in('team_id', teamIds)
+        .order('deadline', { ascending: true });
+
+      if (taskError || !tasksData) return [];
+
+      const myTasks = tasksData.filter((t: any) => {
+        return t.assigned_to === userId || (t.assigned_to_ids && t.assigned_to_ids.includes(userId));
+      });
+
+      return myTasks.map((t: any) => {
+        const tm = teamMap.get(t.team_id);
+        return {
+          ...t,
+          team_name: tm?.name,
+          team_username: tm?.username,
+        };
+      });
+    } catch {
+      return [];
+    }
+  } else {
+    const db = getDemoDb();
+    const myTeams = db.members.filter(m => m.user_id === userId);
+    const teamMap = new Map<string, { name: string; username: string }>();
+    myTeams.forEach(m => {
+      const tm = db.teams.find(t => t.id === m.team_id);
+      if (tm) teamMap.set(tm.id, { name: tm.name, username: tm.username });
+    });
+
+    const myTasks = (db.tasks || []).filter(t => {
+      return t.assigned_to === userId || (t.assigned_to_ids && t.assigned_to_ids.includes(userId));
+    });
+
+    return myTasks.map(t => {
+      const tm = teamMap.get(t.team_id);
+      return {
+        ...t,
+        team_name: tm?.name,
+        team_username: tm?.username,
+      };
+    });
   }
 }
 

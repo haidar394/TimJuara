@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { signInUser, signUpUser, getUserTeams } from '@/lib/dataService';
+import { signInUser, signUpUser, getUserTeams, signInWithGoogle } from '@/lib/dataService';
 import { LogIn, UserPlus, ArrowRight, Shield, AlertCircle, CheckCircle, Sun, Moon } from 'lucide-react';
 import Link from 'next/link';
 
@@ -14,6 +14,7 @@ export default function AuthPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [loadingGoogle, setLoadingGoogle] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [isDarkMode, setIsDarkMode] = useState(false);
@@ -33,6 +34,24 @@ export default function AuthPage() {
     }
     localStorage.setItem('timjuara_theme', newTheme);
     setIsDarkMode(!isDarkMode);
+  };
+
+  const handleGoogleSignIn = async () => {
+    setErrorMsg(null);
+    setSuccessMsg(null);
+    setLoadingGoogle(true);
+    try {
+      const { error } = await signInWithGoogle();
+      if (error) {
+        setErrorMsg(`Gagal login dengan Google: ${error}`);
+      } else {
+        router.push('/onboarding');
+      }
+    } catch (err: any) {
+      setErrorMsg(err?.message || 'Terjadi kesalahan login Google.');
+    } finally {
+      setLoadingGoogle(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -80,7 +99,7 @@ export default function AuthPage() {
             router.push('/admin');
             return;
           }
-          // Setelah login, arahkan pengguna ke halaman pemilihan tim
+          // Setelah login, arahkan pengguna ke halaman overview akun
           router.push('/onboarding');
         }
       }
@@ -90,7 +109,6 @@ export default function AuthPage() {
       setLoading(false);
     }
   };
-
 
   return (
     <div suppressHydrationWarning className="auth-page-bg" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: 'radial-gradient(ellipse at 50% 20%, #e0e7ff 0%, #f8fafc 80%)' }}>
@@ -129,6 +147,49 @@ export default function AuthPage() {
                 ? 'Daftar untuk mulai mengelola atau bergabung ke tim' 
                 : 'Masuk ke dashboard tim kelompok / lomba Anda'}
             </p>
+          </div>
+
+          {/* Google Sign-in Button */}
+          <button
+            type="button"
+            onClick={handleGoogleSignIn}
+            disabled={loadingGoogle || loading}
+            className="btn btn-secondary"
+            style={{
+              width: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 10,
+              padding: '11px 16px',
+              fontSize: '0.9rem',
+              fontWeight: 600,
+              marginBottom: 20,
+              border: '1px solid var(--surface-border)',
+              background: isDarkMode ? 'rgba(255, 255, 255, 0.05)' : '#ffffff',
+              color: 'var(--text-main)',
+              borderRadius: 'var(--radius-md)',
+              boxShadow: 'var(--shadow-sm)',
+              cursor: 'pointer',
+              transition: 'all 0.15s ease',
+            }}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24">
+              <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17z"/>
+              <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.34 24 12 24z"/>
+              <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.99 0 12s.45 3.82 1.25 5.42l4.03-3.15z"/>
+              <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.34 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/>
+            </svg>
+            {loadingGoogle ? 'Menghubungkan...' : isRegister ? 'Daftar dengan Google' : 'Masuk dengan Google'}
+          </button>
+
+          {/* Divider */}
+          <div style={{ display: 'flex', alignItems: 'center', margin: '0 0 20px 0', gap: 12 }}>
+            <div style={{ flex: 1, height: 1, background: 'var(--surface-border)' }} />
+            <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>
+              atau dengan email
+            </span>
+            <div style={{ flex: 1, height: 1, background: 'var(--surface-border)' }} />
           </div>
 
           {/* Tab Switcher */}

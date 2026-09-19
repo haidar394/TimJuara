@@ -8,6 +8,8 @@ import {
   createTeam,
   joinTeam,
   signOutUser,
+  getUserAllActiveTasks,
+  UserPersonalTask,
 } from '@/lib/dataService';
 import { Profile, UserTeamItem } from '@/lib/types';
 import {
@@ -26,6 +28,10 @@ import {
   Calendar,
   Sun,
   Moon,
+  Clock,
+  Check,
+  RotateCcw,
+  Layers,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -35,9 +41,10 @@ function OnboardingContent() {
 
   const [currentUser, setCurrentUser] = useState<Profile | null>(null);
   const [userTeams, setUserTeams] = useState<UserTeamItem[]>([]);
+  const [userTasks, setUserTasks] = useState<UserPersonalTask[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // View state: 'select' (pilih tim), 'create' (buat tim baru), 'join' (gabung tim)
+  // View state: 'select' (overview akun & tim), 'create' (buat tim baru), 'join' (gabung tim)
   const [viewMode, setViewMode] = useState<'select' | 'create' | 'join'>('select');
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -80,8 +87,12 @@ function OnboardingContent() {
       }
       setCurrentUser(user);
 
-      const teams = await getUserTeamsWithDetails(user.id);
+      const [teams, tasks] = await Promise.all([
+        getUserTeamsWithDetails(user.id),
+        getUserAllActiveTasks(user.id),
+      ]);
       setUserTeams(teams);
+      setUserTasks(tasks);
 
       // Check query params
       const joinParam = searchParams.get('join');
@@ -91,8 +102,6 @@ function OnboardingContent() {
         setJoinUsername(joinParam);
         setViewMode('join');
       } else if (tabParam === 'create') {
-        setViewMode('create');
-      } else if (teams.length === 0) {
         setViewMode('create');
       } else {
         setViewMode('select');
@@ -253,50 +262,24 @@ function OnboardingContent() {
         <div className="container" style={{ maxWidth: viewMode === 'select' ? 1040 : 760 }}>
           
           {/* ========================================================================= */}
-          {/* VIEW 1: PILIH TIM (TEAM SELECTOR - FRONT & CENTER)                        */}
+          {/* VIEW 1: OVERVIEW AKUN & TIM SAYA (ACCOUNT OVERVIEW)                       */}
           {/* ========================================================================= */}
           {viewMode === 'select' && (
             <div>
-              {/* Hero Banner */}
-              <div style={{ textAlign: 'center', marginBottom: 32 }}>
-                <div className="onboarding-hero-badge" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#e0e7ff', color: '#4338ca', padding: '4px 14px', borderRadius: 99, fontSize: '0.8rem', fontWeight: 700, marginBottom: 12 }}>
-                  <Sparkles size={14} /> Workspace Kolaborasi
-                </div>
-                <h2 style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--text-main)', letterSpacing: '-0.02em', marginBottom: 8 }}>
-                  Pilih Tim yang Ingin Anda Akses
-                </h2>
-                <p style={{ fontSize: '0.95rem', color: 'var(--text-muted)', maxWidth: 580, margin: '0 auto' }}>
-                  Selamat datang kembali, <strong>{currentUser?.full_name?.split(' ')[0]}</strong>! Pilih salah satu ruang kerja tim Anda di bawah ini untuk mulai berkolaborasi.
-                </p>
-              </div>
-
-              {/* Action Bar (Search & Create/Join Buttons) */}
-              <div
-                className="card"
-                style={{
-                  padding: '16px 20px',
-                  marginBottom: 28,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  flexWrap: 'wrap',
-                  gap: 14,
-                }}
-              >
-                {/* Search */}
-                <div style={{ position: 'relative', flex: 1, minWidth: 260, maxWidth: 420 }}>
-                  <Search size={16} color="var(--text-muted)" style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)' }} />
-                  <input
-                    type="text"
-                    placeholder="Cari nama tim atau @username..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="form-input"
-                    style={{ paddingLeft: 40, height: 40, fontSize: '0.875rem' }}
-                  />
+              {/* Hero Banner Overview */}
+              <div style={{ marginBottom: 32, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
+                <div>
+                  <div className="onboarding-hero-badge" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: isDarkMode ? 'rgba(99, 102, 241, 0.2)' : '#e0e7ff', color: isDarkMode ? '#a5b4fc' : '#4338ca', padding: '4px 14px', borderRadius: 99, fontSize: '0.8rem', fontWeight: 700, marginBottom: 10 }}>
+                    <Sparkles size={14} /> Overview Akun TimJuara
+                  </div>
+                  <h2 style={{ fontSize: '1.85rem', fontWeight: 800, color: 'var(--text-main)', letterSpacing: '-0.02em', margin: 0 }}>
+                    Halo, {currentUser?.full_name?.split(' ')[0]}! 👋
+                  </h2>
+                  <p style={{ fontSize: '0.925rem', color: 'var(--text-muted)', margin: '6px 0 0 0' }}>
+                    Pantau seluruh tugas aktif, progres tim, dan ruang kerja Anda dalam satu tempat.
+                  </p>
                 </div>
 
-                {/* Create & Join Buttons */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <button
                     onClick={() => { setViewMode('create'); setErrorMsg(null); }}
@@ -310,129 +293,264 @@ function OnboardingContent() {
                     className="btn btn-secondary btn-sm"
                     style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 600 }}
                   >
-                    <UserPlus size={15} /> Gabung Tim Lain
+                    <UserPlus size={15} /> Gabung Tim
                   </button>
                 </div>
               </div>
 
-              {/* Grid of Teams */}
-              {filteredTeams.length === 0 ? (
-                <div className="card" style={{ padding: '48px 24px', textAlign: 'center', color: 'var(--text-muted)' }}>
-                  <LayoutGrid size={44} style={{ opacity: 0.3, margin: '0 auto 12px' }} />
-                  <h4 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-main)', marginBottom: 6 }}>
-                    Tidak ada tim yang cocok
-                  </h4>
-                  <p style={{ fontSize: '0.875rem', marginBottom: 18 }}>
-                    {searchQuery ? `Tidak ada hasil pencarian untuk "${searchQuery}".` : 'Anda belum bergabung ke tim manapun.'}
-                  </p>
-                  {searchQuery ? (
-                    <button onClick={() => setSearchQuery('')} className="btn btn-secondary btn-sm">
-                      Reset Pencarian
-                    </button>
-                  ) : (
+              {/* 4 Metric Summary Cards */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 16, marginBottom: 32 }}>
+                <div className="card" style={{ padding: '18px 20px', display: 'flex', alignItems: 'center', gap: 14 }}>
+                  <div style={{ width: 44, height: 44, borderRadius: 12, background: isDarkMode ? 'rgba(79, 70, 229, 0.2)' : '#e0e7ff', color: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Users size={22} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--text-main)' }}>{userTeams.length}</div>
+                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Tim Diikuti</div>
+                  </div>
+                </div>
+
+                <div className="card" style={{ padding: '18px 20px', display: 'flex', alignItems: 'center', gap: 14 }}>
+                  <div style={{ width: 44, height: 44, borderRadius: 12, background: isDarkMode ? 'rgba(59, 130, 246, 0.2)' : '#eff6ff', color: '#3b82f6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Clock size={22} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--text-main)' }}>
+                      {userTasks.filter((t) => t.status === 'in_progress').length}
+                    </div>
+                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Tugas Dikerjakan</div>
+                  </div>
+                </div>
+
+                <div className="card" style={{ padding: '18px 20px', display: 'flex', alignItems: 'center', gap: 14 }}>
+                  <div style={{ width: 44, height: 44, borderRadius: 12, background: isDarkMode ? 'rgba(245, 158, 11, 0.2)' : '#fef3c7', color: '#f59e0b', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <RotateCcw size={22} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--text-main)' }}>
+                      {userTasks.filter((t) => t.status === 'review' || t.review_notes?.toLowerCase().includes('revisi')).length}
+                    </div>
+                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Review / Revisi</div>
+                  </div>
+                </div>
+
+                <div className="card" style={{ padding: '18px 20px', display: 'flex', alignItems: 'center', gap: 14 }}>
+                  <div style={{ width: 44, height: 44, borderRadius: 12, background: isDarkMode ? 'rgba(16, 185, 129, 0.2)' : '#ecfdf5', color: '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <CheckCircle2 size={22} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--text-main)' }}>
+                      {userTasks.filter((t) => t.status === 'done').length}
+                    </div>
+                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Tugas Selesai</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Section: Tugas Saya di Seluruh Tim */}
+              {userTasks.filter((t) => t.status !== 'done').length > 0 && (
+                <div style={{ marginBottom: 32 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+                    <h3 style={{ fontSize: '1.15rem', fontWeight: 800, margin: 0, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <CheckCircle2 size={18} color="var(--primary)" /> Tugas Aktif Anda di Seluruh Tim
+                    </h3>
+                    <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                      {userTasks.filter((t) => t.status !== 'done').length} tugas perlu diselesaikan
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    {userTasks
+                      .filter((t) => t.status !== 'done')
+                      .slice(0, 5)
+                      .map((task) => (
+                        <div
+                          key={task.id}
+                          className="card"
+                          onClick={() => task.team_username && router.push(`/team/${task.team_username}`)}
+                          style={{
+                            padding: '14px 18px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            cursor: 'pointer',
+                            flexWrap: 'wrap',
+                            gap: 12,
+                            transition: 'all 0.15s ease',
+                          }}
+                        >
+                          <div style={{ minWidth: 0, flex: 1 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 4 }}>
+                              <span style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--text-main)' }}>
+                                {task.title}
+                              </span>
+                              {task.team_name && (
+                                <span className="badge badge-primary" style={{ fontSize: '0.7rem', padding: '2px 8px' }}>
+                                  {task.team_name}
+                                </span>
+                              )}
+                              {task.status === 'review' ? (
+                                <span className="badge badge-purple" style={{ fontSize: '0.7rem' }}>
+                                  🔍 Menunggu Review
+                                </span>
+                              ) : task.review_notes?.toLowerCase().includes('revisi') ? (
+                                <span className="badge badge-warning" style={{ fontSize: '0.7rem' }}>
+                                  ⚠️ Perlu Revisi
+                                </span>
+                              ) : (
+                                <span className="badge badge-blue" style={{ fontSize: '0.7rem' }}>
+                                  Sedang Dikerjakan
+                                </span>
+                              )}
+                            </div>
+                            {task.deadline && (
+                              <div style={{ fontSize: '0.775rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                                <Calendar size={12} /> Deadline: {new Date(task.deadline).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
+                              </div>
+                            )}
+                          </div>
+                          <button className="btn btn-secondary btn-sm" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                            Buka Tugas <ArrowRight size={13} />
+                          </button>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Section: Tim Saya */}
+              <div style={{ marginBottom: 20 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, flexWrap: 'wrap', gap: 10 }}>
+                  <h3 style={{ fontSize: '1.15rem', fontWeight: 800, margin: 0, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <Layers size={18} color="var(--primary)" /> Koleksi Ruang Kerja Tim Anda
+                  </h3>
+
+                  {/* Search Tim */}
+                  <div style={{ position: 'relative', width: 280 }}>
+                    <Search size={15} color="var(--text-muted)" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }} />
+                    <input
+                      type="text"
+                      placeholder="Cari tim Anda..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="form-input"
+                      style={{ paddingLeft: 34, height: 36, fontSize: '0.825rem' }}
+                    />
+                  </div>
+                </div>
+
+                {filteredTeams.length === 0 ? (
+                  <div className="card" style={{ padding: '40px 24px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                    <LayoutGrid size={40} style={{ opacity: 0.3, margin: '0 auto 10px' }} />
+                    <h4 style={{ fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-main)', marginBottom: 6 }}>
+                      {searchQuery ? 'Tidak ada tim yang cocok dengan pencarian' : 'Anda belum bergabung ke tim manapun'}
+                    </h4>
+                    <p style={{ fontSize: '0.85rem', marginBottom: 16 }}>
+                      {searchQuery ? `Tidak ada hasil untuk "${searchQuery}".` : 'Buat tim pertama Anda atau bergabung ke tim rekan sekarang.'}
+                    </p>
                     <button onClick={() => setViewMode('create')} className="btn btn-primary btn-sm">
                       <PlusCircle size={15} /> Buat Tim Baru Sekarang
                     </button>
-                  )}
-                </div>
-              ) : (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(310px, 1fr))', gap: 20 }}>
-                  {filteredTeams.map((t) => {
-                    const isLeader = t.user_role === 'ketua';
-                    return (
-                      <div
-                        key={t.id}
-                        onClick={() => router.push(`/team/${t.username}`)}
-                        className="card"
-                        style={{
-                          cursor: 'pointer',
-                          padding: 24,
-                          display: 'flex',
-                          flexDirection: 'column',
-                          justifyContent: 'space-between',
-                          position: 'relative',
-                          overflow: 'hidden',
-                          transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.transform = 'translateY(-3px)';
-                          e.currentTarget.style.borderColor = 'var(--primary)';
-                          e.currentTarget.style.boxShadow = '0 12px 24px -6px rgba(79, 70, 229, 0.15)';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.transform = 'translateY(0)';
-                          e.currentTarget.style.borderColor = 'var(--surface-border)';
-                          e.currentTarget.style.boxShadow = 'var(--shadow-sm)';
-                        }}
-                      >
-                        {/* Top Row: Avatar + Title + Role */}
-                        <div>
-                          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 14 }}>
-                            <div
-                              style={{
-                                width: 46,
-                                height: 46,
-                                borderRadius: 12,
-                                background: isLeader
-                                  ? 'linear-gradient(135deg, #f59e0b, #ef4444)'
-                                  : 'linear-gradient(135deg, #4f46e5, #06b6d4)',
-                                color: '#ffffff',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                fontWeight: 800,
-                                fontSize: '1rem',
-                                boxShadow: isLeader
-                                  ? '0 4px 12px rgba(245, 158, 11, 0.25)'
-                                  : '0 4px 12px rgba(79, 70, 229, 0.25)',
-                                flexShrink: 0,
-                              }}
-                            >
-                              {t.name.slice(0, 2).toUpperCase()}
+                  </div>
+                ) : (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(310px, 1fr))', gap: 20 }}>
+                    {filteredTeams.map((t) => {
+                      const isLeader = t.user_role === 'ketua';
+                      return (
+                        <div
+                          key={t.id}
+                          onClick={() => router.push(`/team/${t.username}`)}
+                          className="card"
+                          style={{
+                            cursor: 'pointer',
+                            padding: 24,
+                            display: 'flex',
+                            flexDirection: 'column',
+                            justifyContent: 'space-between',
+                            position: 'relative',
+                            overflow: 'hidden',
+                            transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                          }}
+                        >
+                          {/* Top Row: Avatar + Title + Role */}
+                          <div>
+                            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 14 }}>
+                              {t.avatar_url ? (
+                                <img
+                                  src={t.avatar_url}
+                                  alt={t.name}
+                                  style={{
+                                    width: 48,
+                                    height: 48,
+                                    borderRadius: 12,
+                                    objectFit: 'cover',
+                                    border: '1px solid var(--surface-border)',
+                                    flexShrink: 0,
+                                  }}
+                                />
+                              ) : (
+                                <div
+                                  style={{
+                                    width: 48,
+                                    height: 48,
+                                    borderRadius: 12,
+                                    background: isLeader
+                                      ? 'linear-gradient(135deg, #f59e0b, #ef4444)'
+                                      : 'linear-gradient(135deg, #4f46e5, #06b6d4)',
+                                    color: '#ffffff',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    fontWeight: 800,
+                                    fontSize: '1rem',
+                                    boxShadow: isLeader
+                                      ? '0 4px 12px rgba(245, 158, 11, 0.25)'
+                                      : '0 4px 12px rgba(79, 70, 229, 0.25)',
+                                    flexShrink: 0,
+                                  }}
+                                >
+                                  {t.name.slice(0, 2).toUpperCase()}
+                                </div>
+                              )}
+
+                              {isLeader ? (
+                                <span
+                                  className="role-badge-leader"
+                                  style={{
+                                    background: '#fef3c7',
+                                    color: '#b45309',
+                                    padding: '4px 10px',
+                                    borderRadius: 99,
+                                    fontSize: '0.725rem',
+                                    fontWeight: 800,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 4,
+                                  }}
+                                >
+                                  👑 Ketua Tim
+                                </span>
+                              ) : (
+                                <span
+                                  className="role-badge-member"
+                                  style={{
+                                    background: '#eff6ff',
+                                    color: '#1d4ed8',
+                                    padding: '4px 10px',
+                                    borderRadius: 99,
+                                    fontSize: '0.725rem',
+                                    fontWeight: 700,
+                                  }}
+                                >
+                                  Anggota
+                                </span>
+                              )}
                             </div>
 
-                            {/* Role Badge */}
-                            {isLeader ? (
-                              <span
-                                className="role-badge-leader"
-                                style={{
-                                  background: '#fef3c7',
-                                  color: '#b45309',
-                                  padding: '4px 10px',
-                                  borderRadius: 99,
-                                  fontSize: '0.725rem',
-                                  fontWeight: 800,
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: 4,
-                                }}
-                              >
-                                👑 Ketua Tim
-                              </span>
-                            ) : (
-                              <span
-                                className="role-badge-member"
-                                style={{
-                                  background: '#eff6ff',
-                                  color: '#1d4ed8',
-                                  padding: '4px 10px',
-                                  borderRadius: 99,
-                                  fontSize: '0.725rem',
-                                  fontWeight: 700,
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: 4,
-                                }}
-                              >
-                                👤 Anggota
-                              </span>
-                            )}
-                          </div>
-
-                          {/* Team Name & Username */}
-                          <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-main)', margin: '0 0 4px', lineHeight: 1.3 }}>
-                            {t.name}
-                          </h3>
+                            {/* Team Name & Username */}
+                            <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-main)', margin: '0 0 4px', lineHeight: 1.3 }}>
+                              {t.name}
+                            </h3>
                           <span
                             className="team-username-chip"
                             style={{
@@ -498,7 +616,8 @@ function OnboardingContent() {
                 </div>
               )}
             </div>
-          )}
+          </div>
+        )}
 
           {/* ========================================================================= */}
           {/* VIEW 2 & 3: FORM BUAT TIM / GABUNG TIM                                    */}
