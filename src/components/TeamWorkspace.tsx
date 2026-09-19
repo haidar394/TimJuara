@@ -2892,12 +2892,26 @@ export default function TeamWorkspace() {
                       title="Klik untuk ganti foto profil tim"
                     >
                       {team?.avatar_url ? (
-                        <img
-                          src={team.avatar_url}
-                          alt={team.name}
-                          className="avatar-photo"
-                          style={{ width: 64, height: 64, border: '2px solid var(--primary)', objectFit: 'cover' }}
-                        />
+                        <>
+                          <img
+                            src={team.avatar_url}
+                            alt={team.name}
+                            className="avatar-photo"
+                            style={{ width: 64, height: 64, border: '2px solid var(--primary)', objectFit: 'cover' }}
+                            onError={(e) => {
+                              (e.target as HTMLElement).style.display = 'none';
+                              const fallback = document.getElementById(`settings-team-fallback-${team.id}`);
+                              if (fallback) fallback.style.display = 'flex';
+                            }}
+                          />
+                          <div
+                            id={`settings-team-fallback-${team.id}`}
+                            className="team-avatar-header"
+                            style={{ width: 64, height: 64, fontSize: '1.5rem', display: 'none' }}
+                          >
+                            {team?.name.slice(0, 2).toUpperCase()}
+                          </div>
+                        </>
                       ) : (
                         <div className="team-avatar-header" style={{ width: 64, height: 64, fontSize: '1.5rem' }}>
                           {team?.name.slice(0, 2).toUpperCase()}
@@ -2932,14 +2946,35 @@ export default function TeamWorkspace() {
                       </p>
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setShowTeamAvatarModal(true)}
-                    className="btn btn-primary"
-                    style={{ whiteSpace: 'nowrap' }}
-                  >
-                    <Camera size={16} /> Ganti Foto Tim
-                  </button>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                    <button
+                      type="button"
+                      onClick={() => setShowTeamAvatarModal(true)}
+                      className="btn btn-primary"
+                      style={{ whiteSpace: 'nowrap' }}
+                    >
+                      <Camera size={16} /> Ganti Foto Tim
+                    </button>
+                    {team?.avatar_url && (
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          if (!team) return;
+                          setSavingTeamAvatar(true);
+                          await updateTeamAvatar(team.id, '');
+                          setSavingTeamAvatar(false);
+                          setTeamAvatarUrl('');
+                          setTeam((prev) => prev ? { ...prev, avatar_url: '' } : null);
+                          showToast('Foto profil tim berhasil dihapus.');
+                        }}
+                        disabled={savingTeamAvatar}
+                        className="btn btn-secondary"
+                        style={{ whiteSpace: 'nowrap' }}
+                      >
+                        Hapus Foto Tim
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
 
