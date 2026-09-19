@@ -99,7 +99,7 @@ export default function HomePage() {
             </div>
 
             <h2 style={{ fontSize: 'clamp(2.2rem, 5vw, 3.4rem)', fontWeight: 800, lineHeight: 1.15, letterSpacing: '-0.03em', marginBottom: 20 }}>
-              Atur Tugas, Pantau Deadline, & Lihat <span style={{ color: 'var(--primary)' }}>Siapa yang Paling Banyak Kerja</span>
+              Atur Tugas, Pantau Deadline, & <span style={{ color: 'var(--primary)' }}>Raih Kemenangan Bersama</span>
             </h2>
 
             <p style={{ fontSize: '1.15rem', color: 'var(--text-muted)', lineHeight: 1.6, marginBottom: 32 }}>
