@@ -1018,7 +1018,7 @@ export default function TeamWorkspace() {
       return <span className="badge badge-success"><CheckCircle2 size={12} /> Selesai</span>;
     }
     if (status === 'review') {
-      return <span className="badge" style={{ background: '#f3e8ff', color: '#7e22ce', border: '1px solid #d8b4fe' }}><Clock size={12} /> Menunggu Dicek Ketua</span>;
+      return <span className="badge badge-purple"><Clock size={12} /> Menunggu Dicek Ketua</span>;
     }
     if (!deadlineStr) {
       return <span className="badge badge-neutral"><Clock size={12} /> Tanpa Deadline</span>;
@@ -1432,9 +1432,11 @@ export default function TeamWorkspace() {
           {isMasterAdminUser && (
             <div
               style={{
-                background: 'linear-gradient(135deg, #fef3c7 0%, #fffbeb 100%)',
-                border: '1px solid #fde68a',
-                color: '#92400e',
+                background: isDarkMode
+                  ? 'linear-gradient(135deg, rgba(245, 158, 11, 0.15) 0%, rgba(217, 119, 6, 0.08) 100%)'
+                  : 'linear-gradient(135deg, #fef3c7 0%, #fffbeb 100%)',
+                border: isDarkMode ? '1px solid rgba(245, 158, 11, 0.35)' : '1px solid #fde68a',
+                color: isDarkMode ? '#fde68a' : '#92400e',
                 borderRadius: 'var(--radius-md)',
                 padding: '12px 18px',
                 marginBottom: 20,
@@ -1443,11 +1445,11 @@ export default function TeamWorkspace() {
                 justifyContent: 'space-between',
                 flexWrap: 'wrap',
                 gap: 12,
-                boxShadow: '0 2px 8px rgba(217, 119, 6, 0.08)',
+                boxShadow: isDarkMode ? '0 2px 12px rgba(0, 0, 0, 0.4)' : '0 2px 8px rgba(217, 119, 6, 0.08)',
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: '0.875rem', fontWeight: 700 }}>
-                <ShieldAlert size={20} color="#d97706" />
+                <ShieldAlert size={20} color={isDarkMode ? '#fbbf24' : '#d97706'} />
                 <span>
                   🛡️ <strong>Mode Master Admin</strong>: Anda memiliki hak akses penuh untuk mengelola anggota, peran, dan tugas di tim ini.
                 </span>
@@ -1455,7 +1457,14 @@ export default function TeamWorkspace() {
               <Link
                 href="/admin"
                 className="btn btn-secondary btn-sm"
-                style={{ background: '#ffffff', borderColor: '#fcd34d', color: '#b45309', fontWeight: 700, fontSize: '0.8rem', padding: '6px 14px' }}
+                style={{
+                  background: isDarkMode ? '#1e293b' : '#ffffff',
+                  borderColor: isDarkMode ? 'rgba(245, 158, 11, 0.4)' : '#fcd34d',
+                  color: isDarkMode ? '#fbbf24' : '#b45309',
+                  fontWeight: 700,
+                  fontSize: '0.8rem',
+                  padding: '6px 14px',
+                }}
               >
                 ← Kembali ke Panel Admin
               </Link>
@@ -1471,8 +1480,8 @@ export default function TeamWorkspace() {
               {isKetua && inReviewTasks > 0 && (
                 <div
                   style={{
-                    background: '#fdf4ff',
-                    border: '1px solid #f0abfc',
+                    background: isDarkMode ? 'rgba(168, 85, 247, 0.12)' : '#fdf4ff',
+                    border: isDarkMode ? '1px solid rgba(168, 85, 247, 0.3)' : '1px solid #f0abfc',
                     borderRadius: 'var(--radius-md)',
                     padding: '14px 20px',
                     display: 'flex',
@@ -1483,12 +1492,12 @@ export default function TeamWorkspace() {
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <ShieldAlert size={20} color="#a21caf" />
+                    <ShieldAlert size={20} color={isDarkMode ? '#c084fc' : '#a21caf'} />
                     <div>
-                      <h4 style={{ fontSize: '0.9rem', fontWeight: 700, color: '#86198f' }}>
+                      <h4 style={{ fontSize: '0.9rem', fontWeight: 700, color: isDarkMode ? '#f5d0fe' : '#86198f' }}>
                         Ada {inReviewTasks} tugas yang sudah diselesaikan anggota dan menunggu pengecekan Anda!
                       </h4>
-                      <p style={{ fontSize: '0.8rem', color: '#a21caf' }}>
+                      <p style={{ fontSize: '0.8rem', color: isDarkMode ? '#d8b4fe' : '#a21caf' }}>
                         Periksa link hasil kerja anggota di bawah, lalu klik &quot;Setujui Selesai&quot; atau &quot;Minta Revisi&quot;.
                       </p>
                     </div>
@@ -1560,8 +1569,8 @@ export default function TeamWorkspace() {
 
               {/* Task List */}
               {filteredTasks.length === 0 ? (
-                <div className="card" style={{ textAlign: 'center', padding: '50px 20px', background: '#fafbfc' }}>
-                  <div style={{ width: 54, height: 54, borderRadius: 16, background: '#eef2ff', color: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+                <div className="card" style={{ textAlign: 'center', padding: '50px 20px', background: 'var(--surface)' }}>
+                  <div style={{ width: 54, height: 54, borderRadius: 16, background: 'var(--primary-light)', color: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
                     <CheckCircle2 size={28} />
                   </div>
                   <h3 style={{ fontSize: '1.15rem', fontWeight: 700, marginBottom: 6 }}>
@@ -1592,7 +1601,11 @@ export default function TeamWorkspace() {
                         className="card task-card-responsive"
                         style={{
                           borderLeft: `5px solid ${borderLeftColor}`,
-                          background: isReview ? '#fdfaff' : 'var(--surface)',
+                          background: isReview
+                            ? isDarkMode
+                              ? 'rgba(168, 85, 247, 0.08)'
+                              : '#fdfaff'
+                            : 'var(--surface)',
                           opacity: isDone ? 0.88 : 1,
                         }}
                       >
@@ -1609,8 +1622,20 @@ export default function TeamWorkspace() {
                               width: 28,
                               height: 28,
                               borderRadius: 8,
-                              background: isDone ? 'var(--success)' : isReview ? '#f3e8ff' : isInProgress ? 'var(--primary-light)' : '#f1f5f9',
-                              color: isDone ? 'white' : isReview ? '#7e22ce' : isInProgress ? 'var(--primary)' : '#94a3b8',
+                              background: isDone
+                                ? 'var(--success)'
+                                : isReview
+                                ? isDarkMode ? 'rgba(168, 85, 247, 0.22)' : '#f3e8ff'
+                                : isInProgress
+                                ? 'var(--primary-light)'
+                                : isDarkMode ? '#1e293b' : '#f1f5f9',
+                              color: isDone
+                                ? 'white'
+                                : isReview
+                                ? isDarkMode ? '#c084fc' : '#7e22ce'
+                                : isInProgress
+                                ? 'var(--primary)'
+                                : 'var(--text-muted)',
                               border: 'none',
                               cursor: isDone || task.status === 'todo' ? 'pointer' : 'default',
                               display: 'flex',
@@ -1653,13 +1678,21 @@ export default function TeamWorkspace() {
                             {task.review_notes && (
                               <div
                                 style={{
-                                  background: isReview ? '#f5f3ff' : '#fffbeb',
-                                  border: `1px solid ${isReview ? '#ddd6fe' : '#fde68a'}`,
+                                  background: isReview
+                                    ? isDarkMode ? 'rgba(168, 85, 247, 0.12)' : '#f5f3ff'
+                                    : isDarkMode ? 'rgba(245, 158, 11, 0.12)' : '#fffbeb',
+                                  border: `1px solid ${
+                                    isReview
+                                      ? isDarkMode ? 'rgba(168, 85, 247, 0.3)' : '#ddd6fe'
+                                      : isDarkMode ? 'rgba(245, 158, 11, 0.3)' : '#fde68a'
+                                  }`,
                                   borderRadius: 8,
                                   padding: '8px 12px',
                                   marginBottom: 12,
                                   fontSize: '0.825rem',
-                                  color: isReview ? '#5b21b6' : '#92400e',
+                                  color: isReview
+                                    ? isDarkMode ? '#d8b4fe' : '#5b21b6'
+                                    : isDarkMode ? '#fcd34d' : '#92400e',
                                   wordBreak: 'break-word',
                                   overflowWrap: 'anywhere',
                                 }}
@@ -1772,7 +1805,7 @@ export default function TeamWorkspace() {
                                     </button>
                                   </div>
                                 ) : (
-                                  <span className="badge" style={{ background: '#f3e8ff', color: '#7e22ce' }}>
+                                  <span className="badge badge-purple">
                                     Sedang Dicek Ketua
                                   </span>
                                 )}
@@ -1853,7 +1886,7 @@ export default function TeamWorkspace() {
           {activeTab === 'stats' && (
             <div className="animate-fade-in">
               {/* Progress Tim Card */}
-              <div className="card" style={{ padding: 28, marginBottom: 24, background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)' }}>
+              <div className="card stats-progress-card" style={{ padding: 28, marginBottom: 24, background: 'var(--surface)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16, marginBottom: 16 }}>
                   <div>
                     <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-main)', marginBottom: 4 }}>
@@ -1870,7 +1903,7 @@ export default function TeamWorkspace() {
                 </div>
 
                 {/* Progress Bar */}
-                <div style={{ width: '100%', height: 14, background: '#e2e8f0', borderRadius: 9999, overflow: 'hidden' }}>
+                <div style={{ width: '100%', height: 14, background: 'var(--surface-border)', borderRadius: 9999, overflow: 'hidden' }}>
                   <div
                     style={{
                       width: `${overallProgress}%`,
@@ -1897,31 +1930,40 @@ export default function TeamWorkspace() {
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                   {contributions.map((item, idx) => {
+                    const isChampion = idx === 0 && item.completed_count > 0;
                     let rankBadge = `${idx + 1}`;
-                    let rankBg = '#f1f5f9';
-                    let rankColor = '#475569';
+                    let rankBg = isDarkMode ? 'rgba(148, 163, 184, 0.15)' : '#f1f5f9';
+                    let rankColor = isDarkMode ? '#cbd5e1' : '#475569';
 
-                    if (idx === 0 && item.completed_count > 0) {
+                    if (isChampion) {
                       rankBadge = '🥇 Juara 1';
-                      rankBg = '#fef3c7';
-                      rankColor = '#b45309';
+                      rankBg = isDarkMode ? 'rgba(245, 158, 11, 0.25)' : '#fef3c7';
+                      rankColor = isDarkMode ? '#fbbf24' : '#b45309';
                     } else if (idx === 1 && item.completed_count > 0) {
                       rankBadge = '🥈 Juara 2';
-                      rankBg = '#f1f5f9';
-                      rankColor = '#334155';
+                      rankBg = isDarkMode ? 'rgba(148, 163, 184, 0.2)' : '#f1f5f9';
+                      rankColor = isDarkMode ? '#e2e8f0' : '#334155';
                     } else if (idx === 2 && item.completed_count > 0) {
                       rankBadge = '🥉 Juara 3';
-                      rankBg = '#ffedd5';
-                      rankColor = '#9a3412';
+                      rankBg = isDarkMode ? 'rgba(234, 88, 12, 0.22)' : '#ffedd5';
+                      rankColor = isDarkMode ? '#fdba74' : '#9a3412';
                     }
 
                     return (
                       <div
                         key={item.user_id}
-                        className="card contributor-card-responsive"
+                        className={`card contributor-card-responsive ${isChampion ? 'contributor-card-champion' : ''}`}
                         style={{
-                          border: idx === 0 && item.completed_count > 0 ? '2px solid #fde68a' : '1px solid var(--surface-border)',
-                          background: idx === 0 && item.completed_count > 0 ? '#fffdf7' : 'var(--surface)',
+                          border: isChampion
+                            ? isDarkMode
+                              ? '1px solid rgba(245, 158, 11, 0.45)'
+                              : '2px solid #fde68a'
+                            : '1px solid var(--surface-border)',
+                          background: isChampion
+                            ? isDarkMode
+                              ? 'linear-gradient(135deg, rgba(245, 158, 11, 0.12) 0%, rgba(217, 119, 6, 0.05) 100%)'
+                              : '#fffdf7'
+                            : 'var(--surface)',
                         }}
                       >
                         <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0, flex: 1 }}>
@@ -2000,8 +2042,8 @@ export default function TeamWorkspace() {
 
               {/* Research List */}
               {research.length === 0 ? (
-                <div className="card" style={{ textAlign: 'center', padding: '50px 20px', background: '#fafbfc' }}>
-                  <div style={{ width: 54, height: 54, borderRadius: 16, background: '#ecfeff', color: '#0891b2', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+                <div className="card" style={{ textAlign: 'center', padding: '50px 20px', background: 'var(--surface)' }}>
+                  <div style={{ width: 54, height: 54, borderRadius: 16, background: 'var(--primary-light)', color: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
                     <FolderGit2 size={28} />
                   </div>
                   <h3 style={{ fontSize: '1.15rem', fontWeight: 700, marginBottom: 6 }}>
@@ -2059,7 +2101,7 @@ export default function TeamWorkspace() {
                         </h4>
 
                         {item.notes && (
-                          <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', background: '#f8fafc', padding: 10, borderRadius: 8, border: '1px solid #f1f5f9', marginBottom: 14, lineHeight: 1.4 }}>
+                          <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', background: 'var(--surface-secondary)', padding: 10, borderRadius: 8, border: '1px solid var(--surface-border)', marginBottom: 14, lineHeight: 1.4 }}>
                             {item.notes}
                           </p>
                         )}
@@ -2102,7 +2144,7 @@ export default function TeamWorkspace() {
                 </p>
 
                 <div className="share-box-inputs">
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#f8fafc', border: '1px solid var(--surface-border)', borderRadius: 'var(--radius-md)', padding: '10px 16px', flex: 1, minWidth: 220 }}>
+                  <div className="share-box-input-container" style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--surface-secondary)', border: '1px solid var(--surface-border)', borderRadius: 'var(--radius-md)', padding: '10px 16px', flex: 1, minWidth: 220 }}>
                     <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Username Tim:</span>
                     <code style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--primary)', wordBreak: 'break-all' }}>
                       @{team.username}
@@ -2140,7 +2182,7 @@ export default function TeamWorkspace() {
                         className="member-card-responsive"
                         style={{
                           borderRadius: 'var(--radius-md)',
-                          background: '#f8fafc',
+                          background: 'var(--surface-secondary)',
                           border: '1px solid var(--surface-border)',
                         }}
                       >
@@ -2243,7 +2285,7 @@ export default function TeamWorkspace() {
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
                   {/* Bagian 1: Ganti Nama Lengkap */}
-                  <div style={{ padding: '20px 22px', borderRadius: 'var(--radius-md)', background: '#f8fafc', border: '1px solid var(--surface-border)' }}>
+                  <div className="profile-edit-box">
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                       <User size={16} color="var(--primary)" />
                       <h4 style={{ fontSize: '0.95rem', fontWeight: 700 }}>Nama Lengkap</h4>
@@ -2274,7 +2316,7 @@ export default function TeamWorkspace() {
                   </div>
 
                   {/* Bagian 2: Nomor WhatsApp Saya */}
-                  <div style={{ padding: '20px 22px', borderRadius: 'var(--radius-md)', background: '#f8fafc', border: '1px solid var(--surface-border)' }}>
+                  <div className="profile-edit-box">
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                       <Smartphone size={16} color="#16a34a" />
                       <h4 style={{ fontSize: '0.95rem', fontWeight: 700 }}>Nomor WhatsApp</h4>
@@ -2302,14 +2344,14 @@ export default function TeamWorkspace() {
                           {savingPhone ? 'Menyimpan...' : 'Simpan Nomor WA'}
                         </button>
                       </div>
-                      <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                         💡 Masukkan nomor dengan awalan 08... atau 628... Sistem otomatis memformat nomor menjadi standar internasional.
                       </span>
                     </form>
                   </div>
 
                   {/* Bagian 3: Ganti Alamat Email */}
-                  <div style={{ padding: '20px 22px', borderRadius: 'var(--radius-md)', background: '#f8fafc', border: '1px solid var(--surface-border)' }}>
+                  <div className="profile-edit-box">
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                       <Mail size={16} color="#059669" />
                       <h4 style={{ fontSize: '0.95rem', fontWeight: 700 }}>Alamat Email</h4>
@@ -2338,14 +2380,14 @@ export default function TeamWorkspace() {
                           {savingEmail ? 'Menyimpan...' : 'Perbarui Email'}
                         </button>
                       </div>
-                      <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                         ℹ️ Catatan: Layanan email bawaan Supabase (Free Tier) memiliki kuota maksimal 2-3 pengiriman per jam.
                       </span>
                     </form>
                   </div>
 
                   {/* Bagian 4: Ganti Kata Sandi */}
-                  <div style={{ padding: '20px 22px', borderRadius: 'var(--radius-md)', background: '#f8fafc', border: '1px solid var(--surface-border)' }}>
+                  <div className="profile-edit-box">
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                       <Lock size={16} color="#d97706" />
                       <h4 style={{ fontSize: '0.95rem', fontWeight: 700 }}>Kata Sandi Akun</h4>
@@ -2670,7 +2712,15 @@ export default function TeamWorkspace() {
             </div>
             <form onSubmit={handleConfirmSubmitReview}>
               <div className="modal-body">
-                <div style={{ background: '#f5f3ff', border: '1px solid #ddd6fe', padding: 12, borderRadius: 'var(--radius-md)', marginBottom: 16, fontSize: '0.825rem', color: '#5b21b6' }}>
+                <div style={{
+                  background: isDarkMode ? 'rgba(168, 85, 247, 0.12)' : '#f5f3ff',
+                  border: isDarkMode ? '1px solid rgba(168, 85, 247, 0.3)' : '1px solid #ddd6fe',
+                  padding: 12,
+                  borderRadius: 'var(--radius-md)',
+                  marginBottom: 16,
+                  fontSize: '0.825rem',
+                  color: isDarkMode ? '#d8b4fe' : '#5b21b6',
+                }}>
                   📌 <b>Info:</b> Tugas ini akan masuk ke daftar <i>&quot;Menunggu Review Ketua&quot;</i> agar dicek kelayakannya terlebih dahulu sebelum ditandai resmi selesai.
                 </div>
 

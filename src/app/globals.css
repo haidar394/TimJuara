@@ -91,6 +91,101 @@
   border-color: rgba(239, 68, 68, 0.3);
 }
 
+.badge-purple {
+  background: #f3e8ff;
+  color: #7e22ce;
+  border: 1px solid #d8b4fe;
+}
+
+[data-theme="dark"] .badge-purple,
+.dark .badge-purple {
+  background: rgba(168, 85, 247, 0.18) !important;
+  color: #c084fc !important;
+  border-color: rgba(168, 85, 247, 0.35) !important;
+}
+
+/* Member Item Card in Dark Mode */
+.member-card-responsive {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  gap: 12px;
+  background: var(--surface-secondary);
+  border: 1px solid var(--surface-border);
+  border-radius: var(--radius-md);
+  transition: all 0.2s ease;
+}
+
+[data-theme="dark"] .member-card-responsive,
+.dark .member-card-responsive {
+  background: #152038 !important;
+  border-color: #223254 !important;
+}
+
+[data-theme="dark"] .member-card-responsive:hover,
+.dark .member-card-responsive:hover {
+  border-color: #4f46e5 !important;
+  background: #1a2744 !important;
+}
+
+/* Profile Edit Sub-Cards in Dark Mode */
+.profile-edit-box {
+  padding: 20px 22px;
+  border-radius: var(--radius-md);
+  background: var(--surface-secondary);
+  border: 1px solid var(--surface-border);
+  transition: all 0.2s ease;
+}
+
+[data-theme="dark"] .profile-edit-box,
+.dark .profile-edit-box {
+  background: #152038 !important;
+  border-color: #223254 !important;
+}
+
+/* Progress card in Stats */
+.stats-progress-card {
+  background: var(--surface);
+  border: 1px solid var(--surface-border);
+}
+
+[data-theme="dark"] .stats-progress-card,
+.dark .stats-progress-card {
+  background: #131d33 !important;
+  border-color: #243455 !important;
+}
+
+/* Contributor / Leaderboard Cards */
+.contributor-card-responsive {
+  transition: all 0.2s ease;
+}
+
+[data-theme="dark"] .contributor-card-responsive,
+.dark .contributor-card-responsive {
+  background: #131d33 !important;
+  border-color: #243455 !important;
+}
+
+[data-theme="dark"] .contributor-card-champion,
+.dark .contributor-card-champion {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.12) 0%, rgba(217, 119, 6, 0.05) 100%) !important;
+  border: 1px solid rgba(245, 158, 11, 0.45) !important;
+  box-shadow: 0 4px 20px rgba(245, 158, 11, 0.08) !important;
+}
+
+/* Share Box in Dark Mode */
+.share-box-input-container {
+  background: var(--surface-secondary);
+  border: 1px solid var(--surface-border);
+}
+
+[data-theme="dark"] .share-box-input-container,
+.dark .share-box-input-container {
+  background: #152038 !important;
+  border-color: #223254 !important;
+}
+
 [data-theme="dark"] .btn-secondary,
 .dark .btn-secondary {
   background: #1a2744;
@@ -965,21 +1060,13 @@ button, input, select, textarea {
   }
   .contributor-stats-group {
     justify-content: space-between;
-    border-top: 1px solid #f1f5f9;
+    border-top: 1px solid var(--surface-border);
     padding-top: 10px;
     margin-top: 4px;
   }
 }
 
-/* Member Item Card */
-.member-card-responsive {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 14px 18px;
-  gap: 12px;
-}
-
+/* Member Item Card responsive */
 @media (max-width: 640px) {
   .member-card-responsive {
     flex-direction: column;
@@ -991,7 +1078,7 @@ button, input, select, textarea {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    border-top: 1px solid #f1f5f9;
+    border-top: 1px solid var(--surface-border);
     padding-top: 10px;
     width: 100%;
   }
@@ -1271,17 +1358,33 @@ button, input, select, textarea {
 
 /* Task Comment Styles */
 .comment-bubble {
-  background: var(--surface-secondary);
-  border: 1px solid var(--surface-border);
-  border-radius: 14px;
   padding: 10px 14px;
-  margin-bottom: 10px;
+  font-size: 0.9rem;
+  line-height: 1.45;
   animation: fadeIn 0.2s ease;
+  word-break: break-word;
+  max-width: 85%;
 }
 
-.comment-bubble.own {
-  background: var(--primary-light);
-  border-color: rgba(79, 70, 229, 0.2);
+.comment-bubble-me {
+  background: var(--primary);
+  color: #ffffff;
+  border-radius: 16px 16px 4px 16px;
+  box-shadow: 0 2px 8px rgba(79, 70, 229, 0.25);
+}
+
+.comment-bubble-other {
+  background: var(--surface-secondary);
+  color: var(--text-main);
+  border: 1px solid var(--surface-border);
+  border-radius: 16px 16px 16px 4px;
+}
+
+[data-theme="dark"] .comment-bubble-other,
+.dark .comment-bubble-other {
+  background: #18233c !important;
+  border-color: #293a5e !important;
+  color: #f1f5f9 !important;
 }
 
 .comment-header {
@@ -1312,5 +1415,6 @@ button, input, select, textarea {
   white-space: pre-wrap;
   word-break: break-word;
 }
+
 
 
