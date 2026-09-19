@@ -132,6 +132,8 @@ export default function TeamWorkspace() {
   const [allUserTasks, setAllUserTasks] = useState<(Task & { team_name?: string; team_username?: string })[]>([]);
   const [searchTeamQuery, setSearchTeamQuery] = useState('');
   const [showTeamSwitcher, setShowTeamSwitcher] = useState(false);
+  const [overviewTaskFilter, setOverviewTaskFilter] = useState<'adaptive' | 'current_team' | 'urgent'>('adaptive');
+  const [showAllOverviewTasks, setShowAllOverviewTasks] = useState(false);
 
   // Modals for Create & Join Team directly from Workspace
   const [showCreateTeamModal, setShowCreateTeamModal] = useState(false);
@@ -1967,99 +1969,248 @@ export default function TeamWorkspace() {
                 </div>
 
                 {/* Section: Tugas Aktif Anda di Seluruh Tim */}
-                {allUserTasks.filter((t) => t.status !== 'done').length > 0 && (
-                  <div style={{ marginBottom: 30 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-                      <h3 style={{ fontSize: '1.15rem', fontWeight: 800, margin: 0, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <CheckCircle2 size={18} color="var(--primary)" /> Tugas Aktif Anda di Seluruh Tim
-                      </h3>
-                      <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                        {allUserTasks.filter((t) => t.status !== 'done').length} tugas perlu diselesaikan
-                      </span>
-                    </div>
+                {(() => {
+                  const uncompletedTasks = allUserTasks.filter((t) => t.status !== 'done');
+                  if (uncompletedTasks.length === 0) return null;
 
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                      {allUserTasks
-                        .filter((t) => t.status !== 'done')
-                        .slice(0, 6)
-                        .map((task) => {
-                          const handleOpenTask = () => {
-                            if (task.team_username === team?.username) {
-                              setActiveTab('tasks');
-                              setTimeout(() => {
-                                const el = document.getElementById(`task-${task.id}`);
-                                if (el) {
-                                  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                                }
-                              }, 150);
-                            } else if (task.team_username) {
-                              router.push(`/team/${task.team_username}?tab=tasks&taskId=${task.id}`);
-                            }
-                          };
+                  const calculateAdaptiveScore = (t: typeof uncompletedTasks[0]) => {
+                    let score = 0;
+                    const isCurrent = team?.username && t.team_username === team.username;
+                    if (isCurrent) score += 1000;
 
-                          return (
-                            <div
-                              key={task.id}
-                              className="card"
-                              onClick={handleOpenTask}
-                              style={{
-                                padding: '14px 18px',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'space-between',
-                                cursor: 'pointer',
-                                flexWrap: 'wrap',
-                                gap: 12,
-                                transition: 'all 0.15s ease',
-                              }}
+                    if (t.review_notes?.toLowerCase().includes('revisi')) score += 350;
+                    else if (t.status === 'review') score += 200;
+                    else if (t.status === 'in_progress') score += 100;
+
+                    if (t.deadline) {
+                      const today = new Date();
+                      today.setHours(0, 0, 0, 0);
+                      const d = new Date(t.deadline);
+                      d.setHours(0, 0, 0, 0);
+                      const diffDays = Math.round((d.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+
+                      if (diffDays < 0) score += 600 + Math.min(Math.abs(diffDays) * 10, 200);
+                      else if (diffDays === 0) score += 500;
+                      else if (diffDays === 1) score += 400;
+                      else if (diffDays <= 3) score += 250;
+                      else if (diffDays <= 7) score += 150;
+                      else score += Math.max(0, 100 - diffDays);
+                    }
+                    return score;
+                  };
+
+                  const sortedTasks = [...uncompletedTasks].sort((a, b) => {
+                    return calculateAdaptiveScore(b) - calculateAdaptiveScore(a);
+                  });
+
+                  const filteredTasks = sortedTasks.filter((t) => {
+                    if (overviewTaskFilter === 'current_team') {
+                      return team?.username && t.team_username === team.username;
+                    }
+                    if (overviewTaskFilter === 'urgent') {
+                      if (!t.deadline) return false;
+                      const today = new Date();
+                      today.setHours(0, 0, 0, 0);
+                      const d = new Date(t.deadline);
+                      d.setHours(0, 0, 0, 0);
+                      const diffDays = Math.round((d.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+                      return diffDays <= 1 || t.review_notes?.toLowerCase().includes('revisi');
+                    }
+                    return true;
+                  });
+
+                  const displayedTasks = showAllOverviewTasks ? filteredTasks : filteredTasks.slice(0, 6);
+
+                  const getUrgencyBadge = (deadlineStr?: string) => {
+                    if (!deadlineStr) return null;
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+                    const d = new Date(deadlineStr);
+                    d.setHours(0, 0, 0, 0);
+                    const diffDays = Math.round((d.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+
+                    if (diffDays < 0) {
+                      return (
+                        <span className="badge" style={{ background: '#ef4444', color: '#fff', fontWeight: 800, fontSize: '0.675rem', padding: '2px 8px' }}>
+                          ⚠️ Terlewat {Math.abs(diffDays)} Hari!
+                        </span>
+                      );
+                    }
+                    if (diffDays === 0) {
+                      return (
+                        <span className="badge" style={{ background: '#dc2626', color: '#fff', fontWeight: 800, fontSize: '0.675rem', padding: '2px 8px' }}>
+                          🚨 Hari Ini!
+                        </span>
+                      );
+                    }
+                    if (diffDays === 1) {
+                      return (
+                        <span className="badge" style={{ background: '#f59e0b', color: '#fff', fontWeight: 800, fontSize: '0.675rem', padding: '2px 8px' }}>
+                          ⏳ Besok!
+                        </span>
+                      );
+                    }
+                    if (diffDays <= 3) {
+                      return (
+                        <span className="badge" style={{ background: 'rgba(245, 158, 11, 0.16)', color: '#d97706', fontWeight: 700, fontSize: '0.675rem', padding: '2px 8px' }}>
+                          ⏱️ {diffDays} Hari Lagi
+                        </span>
+                      );
+                    }
+                    return null;
+                  };
+
+                  return (
+                    <div style={{ marginBottom: 30 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, flexWrap: 'wrap', gap: 10 }}>
+                        <div>
+                          <h3 style={{ fontSize: '1.15rem', fontWeight: 800, margin: 0, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <CheckCircle2 size={18} color="var(--primary)" /> Tugas Aktif Anda di Seluruh Tim
+                          </h3>
+                          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                            Urutan adaptif: Tugas tim aktif & batas waktu terdekat diprioritaskan
+                          </span>
+                        </div>
+
+                        {/* Filter Tabs */}
+                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+                          <button
+                            type="button"
+                            onClick={() => setOverviewTaskFilter('adaptive')}
+                            className={`btn btn-sm ${overviewTaskFilter === 'adaptive' ? 'btn-primary' : 'btn-secondary'}`}
+                            style={{ fontSize: '0.75rem', padding: '4px 10px', borderRadius: 20 }}
+                          >
+                            ⚡ Prioritas Adaptif ({sortedTasks.length})
+                          </button>
+                          {team?.name && (
+                            <button
+                              type="button"
+                              onClick={() => setOverviewTaskFilter('current_team')}
+                              className={`btn btn-sm ${overviewTaskFilter === 'current_team' ? 'btn-primary' : 'btn-secondary'}`}
+                              style={{ fontSize: '0.75rem', padding: '4px 10px', borderRadius: 20 }}
                             >
-                              <div style={{ minWidth: 0, flex: 1 }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 4 }}>
-                                  <span style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--text-main)' }}>
-                                    {task.title}
-                                  </span>
-                                  {task.team_name && (
-                                    <span className="badge badge-primary" style={{ fontSize: '0.7rem', padding: '2px 8px' }}>
-                                      {task.team_name}
+                              📌 Tim Ini ({sortedTasks.filter((t) => t.team_username === team.username).length})
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => setOverviewTaskFilter('urgent')}
+                            className={`btn btn-sm ${overviewTaskFilter === 'urgent' ? 'btn-primary' : 'btn-secondary'}`}
+                            style={{ fontSize: '0.75rem', padding: '4px 10px', borderRadius: 20 }}
+                          >
+                            🔥 Mendesak
+                          </button>
+                        </div>
+                      </div>
+
+                      {displayedTasks.length === 0 ? (
+                        <div className="card" style={{ padding: '24px 16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                          Tidak ada tugas yang sesuai dengan filter ini.
+                        </div>
+                      ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                          {displayedTasks.map((task) => {
+                            const isCurrentTeamTask = team?.username && task.team_username === team.username;
+                            const handleOpenTask = () => {
+                              if (task.team_username === team?.username) {
+                                setActiveTab('tasks');
+                                setTimeout(() => {
+                                  const el = document.getElementById(`task-${task.id}`);
+                                  if (el) {
+                                    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                  }
+                                }, 150);
+                              } else if (task.team_username) {
+                                router.push(`/team/${task.team_username}?tab=tasks&taskId=${task.id}`);
+                              }
+                            };
+
+                            return (
+                              <div
+                                key={task.id}
+                                className="card"
+                                onClick={handleOpenTask}
+                                style={{
+                                  padding: '14px 18px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'space-between',
+                                  cursor: 'pointer',
+                                  flexWrap: 'wrap',
+                                  gap: 12,
+                                  transition: 'all 0.15s ease',
+                                  borderLeft: isCurrentTeamTask ? '4px solid var(--primary)' : '1px solid var(--surface-border)',
+                                }}
+                              >
+                                <div style={{ minWidth: 0, flex: 1 }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 4 }}>
+                                    <span style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--text-main)' }}>
+                                      {task.title}
                                     </span>
-                                  )}
-                                  {task.status === 'review' ? (
-                                    <span className="badge badge-purple" style={{ fontSize: '0.7rem' }}>
-                                      🔍 Menunggu Review
-                                    </span>
-                                  ) : task.review_notes?.toLowerCase().includes('revisi') ? (
-                                    <span className="badge badge-warning" style={{ fontSize: '0.7rem' }}>
-                                      ⚠️ Perlu Revisi
-                                    </span>
-                                  ) : (
-                                    <span className="badge badge-blue" style={{ fontSize: '0.7rem' }}>
-                                      Sedang Dikerjakan
-                                    </span>
+                                    {isCurrentTeamTask ? (
+                                      <span className="badge badge-primary" style={{ fontSize: '0.675rem', padding: '2px 8px', fontWeight: 800 }}>
+                                        📌 {task.team_name || 'Tim Ini'}
+                                      </span>
+                                    ) : task.team_name ? (
+                                      <span className="badge badge-neutral" style={{ fontSize: '0.675rem', padding: '2px 8px' }}>
+                                        {task.team_name}
+                                      </span>
+                                    ) : null}
+
+                                    {getUrgencyBadge(task.deadline)}
+
+                                    {task.status === 'review' ? (
+                                      <span className="badge badge-purple" style={{ fontSize: '0.675rem' }}>
+                                        🔍 Menunggu Review
+                                      </span>
+                                    ) : task.review_notes?.toLowerCase().includes('revisi') ? (
+                                      <span className="badge badge-warning" style={{ fontSize: '0.675rem' }}>
+                                        ⚠️ Perlu Revisi
+                                      </span>
+                                    ) : (
+                                      <span className="badge badge-blue" style={{ fontSize: '0.675rem' }}>
+                                        Sedang Dikerjakan
+                                      </span>
+                                    )}
+                                  </div>
+                                  {task.deadline && (
+                                    <div style={{ fontSize: '0.775rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                                      <Calendar size={12} /> Deadline: {new Date(task.deadline).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                    </div>
                                   )}
                                 </div>
-                                {task.deadline && (
-                                  <div style={{ fontSize: '0.775rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 4 }}>
-                                    <Calendar size={12} /> Deadline: {new Date(task.deadline).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
-                                  </div>
-                                )}
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleOpenTask();
+                                  }}
+                                  className="btn btn-secondary btn-sm"
+                                  style={{ display: 'flex', alignItems: 'center', gap: 4 }}
+                                >
+                                  Buka Tugas <ArrowRight size={13} />
+                                </button>
                               </div>
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleOpenTask();
-                                }}
-                                className="btn btn-secondary btn-sm"
-                                style={{ display: 'flex', alignItems: 'center', gap: 4 }}
-                              >
-                                Buka Tugas <ArrowRight size={13} />
-                              </button>
-                            </div>
-                          );
-                        })}
+                            );
+                          })}
+                        </div>
+                      )}
+
+                      {filteredTasks.length > 6 && (
+                        <div style={{ textAlign: 'center', marginTop: 12 }}>
+                          <button
+                            type="button"
+                            onClick={() => setShowAllOverviewTasks(!showAllOverviewTasks)}
+                            className="btn btn-secondary btn-sm"
+                            style={{ borderRadius: 20, padding: '5px 16px', fontSize: '0.775rem' }}
+                          >
+                            {showAllOverviewTasks ? 'Tampilkan Lebih Sedikit' : `Lihat Semua ${filteredTasks.length} Tugas (${filteredTasks.length - 6} Lainnya)`}
+                          </button>
+                        </div>
+                      )}
                     </div>
-                  </div>
-                )}
+                  );
+                })()}
 
                 {/* Section: Koleksi Ruang Kerja Tim Anda */}
                 <div style={{ marginBottom: 20 }}>
