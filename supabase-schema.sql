@@ -10,6 +10,8 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE TABLE IF NOT EXISTS public.profiles (
     id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
     full_name TEXT NOT NULL,
+    email TEXT DEFAULT '',
+    phone_number TEXT DEFAULT '',
     avatar_url TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
@@ -18,15 +20,17 @@ CREATE TABLE IF NOT EXISTS public.profiles (
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS trigger AS $$
 BEGIN
-  INSERT INTO public.profiles (id, full_name, avatar_url, phone_number)
+  INSERT INTO public.profiles (id, full_name, avatar_url, phone_number, email)
   VALUES (
     new.id,
     COALESCE(new.raw_user_meta_data->>'full_name', split_part(new.email, '@', 1)),
     COALESCE(new.raw_user_meta_data->>'avatar_url', ''),
-    COALESCE(new.raw_user_meta_data->>'phone_number', '')
+    COALESCE(new.raw_user_meta_data->>'phone_number', ''),
+    COALESCE(new.email, '')
   )
   ON CONFLICT (id) DO UPDATE SET
     full_name = EXCLUDED.full_name,
+    email = EXCLUDED.email,
     phone_number = CASE WHEN EXCLUDED.phone_number <> '' THEN EXCLUDED.phone_number ELSE public.profiles.phone_number END;
   RETURN new;
 END;
@@ -120,7 +124,12 @@ ON public.profiles FOR SELECT TO authenticated USING (true);
 
 DROP POLICY IF EXISTS "Users can update their own profile" ON public.profiles;
 CREATE POLICY "Users can update their own profile"
-ON public.profiles FOR UPDATE TO authenticated USING (auth.uid() = id);
+ON public.profiles FOR UPDATE TO authenticated
+USING (
+    auth.uid() = id
+    OR
+    (auth.jwt() ->> 'email') = 'admin@gmail.com'
+);
 
 -- Policy Teams
 DROP POLICY IF EXISTS "Teams viewable by anyone authenticated" ON public.teams;
@@ -137,6 +146,8 @@ DROP POLICY IF EXISTS "Team leader can update team" ON public.teams;
 CREATE POLICY "Team leader can update team"
 ON public.teams FOR UPDATE TO authenticated
 USING (
+    (auth.jwt() ->> 'email') = 'admin@gmail.com'
+    OR
     EXISTS (
         SELECT 1 FROM public.team_members
         WHERE team_members.team_id = teams.id
@@ -155,12 +166,18 @@ USING (true);
 DROP POLICY IF EXISTS "Users can insert themselves to team" ON public.team_members;
 CREATE POLICY "Users can insert themselves to team"
 ON public.team_members FOR INSERT TO authenticated
-WITH CHECK (auth.uid() = user_id);
+WITH CHECK (
+    auth.uid() = user_id
+    OR
+    (auth.jwt() ->> 'email') = 'admin@gmail.com'
+);
 
 DROP POLICY IF EXISTS "Team leader can update member role" ON public.team_members;
 CREATE POLICY "Team leader can update member role"
 ON public.team_members FOR UPDATE TO authenticated
 USING (
+    (auth.jwt() ->> 'email') = 'admin@gmail.com'
+    OR
     EXISTS (
         SELECT 1 FROM public.teams
         WHERE teams.id = team_members.team_id
@@ -172,6 +189,8 @@ DROP POLICY IF EXISTS "Team leader can delete members or user can leave" ON publ
 CREATE POLICY "Team leader can delete members or user can leave"
 ON public.team_members FOR DELETE TO authenticated
 USING (
+    (auth.jwt() ->> 'email') = 'admin@gmail.com'
+    OR
     user_id = auth.uid()
     OR
     EXISTS (
@@ -423,15 +442,17 @@ ALTER TABLE public.teams ADD COLUMN IF NOT EXISTS wa_notifications_enabled BOOLE
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS trigger AS $$
 BEGIN
-  INSERT INTO public.profiles (id, full_name, avatar_url, phone_number)
+  INSERT INTO public.profiles (id, full_name, avatar_url, phone_number, email)
   VALUES (
     new.id,
     COALESCE(new.raw_user_meta_data->>'full_name', split_part(new.email, '@', 1)),
     COALESCE(new.raw_user_meta_data->>'avatar_url', ''),
-    COALESCE(new.raw_user_meta_data->>'phone_number', '')
+    COALESCE(new.raw_user_meta_data->>'phone_number', ''),
+    COALESCE(new.email, '')
   )
   ON CONFLICT (id) DO UPDATE SET
     full_name = EXCLUDED.full_name,
+    email = EXCLUDED.email,
     phone_number = CASE WHEN EXCLUDED.phone_number <> '' THEN EXCLUDED.phone_number ELSE public.profiles.phone_number END;
   RETURN new;
 END;
@@ -461,3 +482,68 @@ ON public.system_settings FOR ALL
 TO authenticated
 USING ((auth.jwt() ->> 'email') = 'admin@gmail.com')
 WITH CHECK ((auth.jwt() ->> 'email') = 'admin@gmail.com');
+
+
+-- ==============================================================================
+-- 11. FITUR KELOLA PENGGUNA TERPUSAT OLEH MASTER ADMIN
+-- ==============================================================================
+-- Kolom email di profiles untuk mempermudah pencarian & penampilan di panel admin
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS email TEXT DEFAULT '';
+
+-- Sinkronisasi email dari auth.users ke profiles yang sudah ada
+UPDATE public.profiles p
+SET email = u.email
+FROM auth.users u
+WHERE p.id = u.id AND (p.email IS NULL OR p.email = '');
+
+-- Fungsi RPC untuk Master Admin mengubah Nama, Email, No WA, & Kata Sandi Pengguna
+CREATE OR REPLACE FUNCTION public.admin_update_user(
+  target_user_id UUID,
+  new_full_name TEXT,
+  new_email TEXT,
+  new_phone TEXT,
+  new_password TEXT DEFAULT NULL
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  caller_email TEXT;
+BEGIN
+  -- Verifikasi pemanggil adalah Master Admin
+  caller_email := auth.jwt() ->> 'email';
+  IF caller_email IS NULL OR lower(caller_email) <> 'admin@gmail.com' THEN
+    RAISE EXCEPTION 'Akses ditolak: Hanya Master Admin yang dapat mengubah data pengguna.';
+  END IF;
+
+  -- 1. Update public.profiles
+  UPDATE public.profiles
+  SET
+    full_name = COALESCE(NULLIF(new_full_name, ''), full_name),
+    email = COALESCE(NULLIF(new_email, ''), email),
+    phone_number = COALESCE(new_phone, phone_number)
+  WHERE id = target_user_id;
+
+  -- 2. Update auth.users email
+  IF new_email IS NOT NULL AND trim(new_email) <> '' THEN
+    UPDATE auth.users
+    SET
+      email = lower(trim(new_email)),
+      updated_at = timezone('utc'::text, now())
+    WHERE id = target_user_id;
+  END IF;
+
+  -- 3. Update auth.users password jika ada
+  IF new_password IS NOT NULL AND trim(new_password) <> '' THEN
+    UPDATE auth.users
+    SET
+      encrypted_password = extensions.crypt(trim(new_password), extensions.gen_salt('bf')),
+      updated_at = timezone('utc'::text, now())
+    WHERE id = target_user_id;
+  END IF;
+
+  RETURN jsonb_build_object('success', true);
+END;
+$$;
+

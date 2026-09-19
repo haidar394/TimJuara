@@ -17,6 +17,7 @@ import {
   deleteResearchMaterial,
   updateMemberRole,
   removeTeamMember,
+  isMasterAdmin,
   calculateContributionStats,
   signOutUser,
   updateUserProfile,
@@ -184,9 +185,11 @@ export default function TeamWorkspace() {
     loadWorkspaceData();
   }, [teamUsername]);
 
-  // Current User Role in this team
+  // Current User Role in this team & Master Admin Privilege
   const currentMember = members.find((m) => m.user_id === currentUser?.id);
   const isKetua = currentMember?.role === 'ketua' || (team && currentUser && team.created_by === currentUser.id);
+  const isMasterAdminUser = isMasterAdmin(currentUser);
+  const canManageMembers = isKetua || isMasterAdminUser;
 
   // Copy Team Username / Invite Link
   const handleCopyCode = () => {
@@ -1023,6 +1026,40 @@ export default function TeamWorkspace() {
             </button>
           </div>
 
+          {/* Master Admin Management Notice Banner */}
+          {isMasterAdminUser && (
+            <div
+              style={{
+                background: 'linear-gradient(135deg, #fef3c7 0%, #fffbeb 100%)',
+                border: '1px solid #fde68a',
+                color: '#92400e',
+                borderRadius: 'var(--radius-md)',
+                padding: '12px 18px',
+                marginBottom: 20,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: 12,
+                boxShadow: '0 2px 8px rgba(217, 119, 6, 0.08)',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: '0.875rem', fontWeight: 700 }}>
+                <ShieldAlert size={20} color="#d97706" />
+                <span>
+                  🛡️ <strong>Mode Master Admin</strong>: Anda memiliki hak akses penuh untuk mengelola anggota, peran, dan tugas di tim ini.
+                </span>
+              </div>
+              <Link
+                href="/admin"
+                className="btn btn-secondary btn-sm"
+                style={{ background: '#ffffff', borderColor: '#fcd34d', color: '#b45309', fontWeight: 700, fontSize: '0.8rem', padding: '6px 14px' }}
+              >
+                ← Kembali ke Panel Admin
+              </Link>
+            </div>
+          )}
+
           {/* ========================================================================= */}
           {/* TAB 1: TUGAS & DEADLINE                                                   */}
           {/* ========================================================================= */}
@@ -1676,8 +1713,8 @@ export default function TeamWorkspace() {
                   <div>
                     <h3 style={{ fontSize: '1.15rem', fontWeight: 800 }}>Daftar Anggota & Peran ({members.length})</h3>
                     <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                      {isKetua
-                        ? 'Sebagai Ketua, Anda dapat mengatur siapa yang menjadi Ketua atau Anggota.'
+                      {canManageMembers
+                        ? 'Sebagai Ketua Tim / Master Admin, Anda dapat mengatur siapa yang menjadi Ketua atau Anggota serta mengelola anggota tim.'
                         : 'Daftar rekan satu kelompok dan penanggung jawab tim.'}
                     </p>
                   </div>
@@ -1732,7 +1769,7 @@ export default function TeamWorkspace() {
 
                         {/* Role Selector or Badge */}
                         <div className="member-card-actions">
-                          {isKetua && !isSelf ? (
+                          {canManageMembers && (!isSelf || isMasterAdminUser) ? (
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', justifyContent: 'flex-end' }}>
                               <select
                                 value={m.role}
@@ -1770,8 +1807,8 @@ export default function TeamWorkspace() {
                   })}
                 </div>
 
-                {/* Leave Team Button for Members */}
-                {!isKetua && (
+                {/* Leave Team Button for Regular Members */}
+                {!isKetua && currentMember && !isMasterAdminUser && (
                   <div style={{ marginTop: 24, paddingTop: 20, borderTop: '1px solid var(--surface-border)', textAlign: 'right' }}>
                     <button onClick={handleLeaveTeam} className="btn btn-danger btn-sm">
                       <LogOut size={14} /> Keluar dari Tim Ini
@@ -1854,18 +1891,6 @@ export default function TeamWorkspace() {
                         >
                           {savingPhone ? 'Menyimpan...' : 'Simpan Nomor WA'}
                         </button>
-                        {profilePhone && (
-                          <button
-                            type="button"
-                            onClick={handleTestWhatsApp}
-                            disabled={testingWa}
-                            className="btn btn-secondary"
-                            style={{ whiteSpace: 'nowrap', color: '#16a34a', borderColor: '#86efac' }}
-                            title="Kirim pesan uji coba ke nomor ini"
-                          >
-                            {testingWa ? 'Mengirim Tes...' : '📲 Tes Kirim WA'}
-                          </button>
-                        )}
                       </div>
                       <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
                         💡 Masukkan nomor dengan awalan 08... atau 628... Sistem otomatis memformat nomor menjadi standar internasional.

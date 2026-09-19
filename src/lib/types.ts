@@ -89,6 +89,7 @@ export interface AdminTeamItem extends Team {
 
 export interface AdminUserItem extends Profile {
   teams_joined: string[];
+  team_ids?: string[];
 }
 
 export interface UserTeamItem extends Team {

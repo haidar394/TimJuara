@@ -17,6 +17,7 @@ import {
   updateGlobalWhatsAppConfig,
   sendTestWhatsAppMessage,
   triggerDeadlineReminders,
+  updateUserByMasterAdmin,
 } from '@/lib/dataService';
 import {
   Profile,
@@ -48,6 +49,9 @@ import {
   Smartphone,
   BellRing,
   Lock,
+  Edit,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -85,6 +89,16 @@ export default function AdminDashboard() {
   const [teamToDelete, setTeamToDelete] = useState<AdminTeamItem | null>(null);
   const [userToDelete, setUserToDelete] = useState<AdminUserItem | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // Edit User Modal (Master Admin)
+  const [userToEdit, setUserToEdit] = useState<AdminUserItem | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editEmail, setEditEmail] = useState('');
+  const [editPhone, setEditPhone] = useState('');
+  const [editPassword, setEditPassword] = useState('');
+  const [editSelectedTeamIds, setEditSelectedTeamIds] = useState<string[]>([]);
+  const [showEditPassword, setShowEditPassword] = useState(false);
+  const [isSavingUser, setIsSavingUser] = useState(false);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -214,6 +228,61 @@ export default function AdminDashboard() {
       showToast(`Pengguna "${userToDelete.full_name}" berhasil dihapus.`);
       setUserToDelete(null);
       setSelectedUserIds((prev) => prev.filter((id) => id !== userToDelete.id));
+      await loadAdminData();
+    }
+  };
+
+  // Handle Open Edit User Modal
+  const handleOpenEditUser = (u: AdminUserItem) => {
+    setUserToEdit(u);
+    setEditName(u.full_name || '');
+    setEditEmail(u.email || '');
+    setEditPhone(u.phone_number || '');
+    setEditPassword('');
+    setShowEditPassword(false);
+    setEditSelectedTeamIds(u.team_ids || []);
+  };
+
+  // Handle Toggle Team for User
+  const handleToggleUserTeam = (teamId: string) => {
+    setEditSelectedTeamIds((prev) =>
+      prev.includes(teamId) ? prev.filter((id) => id !== teamId) : [...prev, teamId]
+    );
+  };
+
+  // Handle Save User Changes (Full Edit: Name, Email, Phone, Password, Teams)
+  const handleSaveUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!userToEdit) return;
+
+    if (!editName.trim()) {
+      showToast('Nama lengkap tidak boleh kosong.');
+      return;
+    }
+    if (!editEmail.trim()) {
+      showToast('Alamat email tidak boleh kosong.');
+      return;
+    }
+
+    setIsSavingUser(true);
+    const { success, error } = await updateUserByMasterAdmin({
+      userId: userToEdit.id,
+      fullName: editName.trim(),
+      email: editEmail.trim(),
+      phoneNumber: editPhone.trim(),
+      password: editPassword.trim() || undefined,
+      teamIds: editSelectedTeamIds,
+    });
+    setIsSavingUser(false);
+
+    if (error) {
+      showToast(`Gagal menyimpan perubahan: ${error}`);
+      return;
+    }
+
+    if (success) {
+      showToast(`Data pengguna "${editName}" berhasil diperbarui! ✨`);
+      setUserToEdit(null);
       await loadAdminData();
     }
   };
@@ -905,20 +974,39 @@ export default function AdminDashboard() {
                               )}
                             </td>
                             <td style={{ padding: '14px', textAlign: 'right' }}>
-                              {isAdminUser ? (
-                                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
-                                  Akun Terlindungi
-                                </span>
-                              ) : (
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8 }}>
                                 <button
-                                  onClick={() => setUserToDelete(u)}
-                                  className="btn btn-danger btn-sm"
-                                  style={{ fontSize: '0.75rem', padding: '5px 10px' }}
-                                  title="Hapus akun pengguna ini"
+                                  onClick={() => handleOpenEditUser(u)}
+                                  className="btn btn-secondary btn-sm"
+                                  style={{
+                                    fontSize: '0.75rem',
+                                    padding: '5px 10px',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: 5,
+                                    color: 'var(--primary)',
+                                    borderColor: '#93c5fd',
+                                    background: '#eff6ff',
+                                  }}
+                                  title="Edit data pengguna (Nama, Email, No WA, Kata Sandi, dan Tim)"
                                 >
-                                  <Trash2 size={13} /> Hapus Pengguna
+                                  <Edit size={13} /> Edit
                                 </button>
-                              )}
+                                {isAdminUser ? (
+                                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontStyle: 'italic', padding: '5px 8px' }}>
+                                    Terlindungi
+                                  </span>
+                                ) : (
+                                  <button
+                                    onClick={() => setUserToDelete(u)}
+                                    className="btn btn-danger btn-sm"
+                                    style={{ fontSize: '0.75rem', padding: '5px 10px', display: 'inline-flex', alignItems: 'center', gap: 5 }}
+                                    title="Hapus akun pengguna ini"
+                                  >
+                                    <Trash2 size={13} /> Hapus
+                                  </button>
+                                )}
+                              </div>
                             </td>
                           </tr>
                         );
@@ -1258,6 +1346,309 @@ export default function AdminDashboard() {
                 </span>
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL EDIT DATA PENGGUNA (MASTER ADMIN)                                  */}
+      {/* ========================================================================= */}
+      {userToEdit && (
+        <div
+          className="modal-overlay"
+          onClick={() => !isSavingUser && setUserToEdit(null)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(15, 23, 42, 0.7)',
+            backdropFilter: 'blur(8px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            padding: 16,
+          }}
+        >
+          <div
+            className="modal-card"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: '100%',
+              maxWidth: 580,
+              background: '#ffffff',
+              borderRadius: 20,
+              padding: '26px 28px',
+              position: 'relative',
+              boxShadow: '0 25px 60px -12px rgba(15, 23, 42, 0.35)',
+              maxHeight: '90vh',
+              overflowY: 'auto',
+            }}
+          >
+            {/* Close Button */}
+            <button
+              onClick={() => !isSavingUser && setUserToEdit(null)}
+              style={{
+                position: 'absolute',
+                top: 18,
+                right: 18,
+                background: '#f1f5f9',
+                border: 'none',
+                width: 32,
+                height: 32,
+                borderRadius: 8,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                color: '#64748b',
+              }}
+              title="Tutup"
+            >
+              <X size={16} />
+            </button>
+
+            {/* Header with Icon */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 20, paddingRight: 32 }}>
+              <div
+                style={{
+                  width: 48,
+                  height: 48,
+                  borderRadius: 14,
+                  background: '#eff6ff',
+                  border: '2px solid #bfdbfe',
+                  color: 'var(--primary)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                }}
+              >
+                <Edit size={22} />
+              </div>
+              <div>
+                <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
+                  Edit Data Pengguna
+                </h3>
+                <span style={{ fontSize: '0.8rem', color: '#64748b' }}>
+                  Ubah nama, email, nomor WA, kata sandi, dan partisipasi tim pengguna ini.
+                </span>
+              </div>
+            </div>
+
+            <form onSubmit={handleSaveUser} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {/* Nama Lengkap */}
+              <div>
+                <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 700, marginBottom: 6, color: '#1e293b' }}>
+                  Nama Lengkap <span style={{ color: '#ef4444' }}>*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  placeholder="Nama lengkap pengguna..."
+                  className="form-input"
+                  style={{ width: '100%' }}
+                />
+              </div>
+
+              {/* Alamat Email */}
+              <div>
+                <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 700, marginBottom: 6, color: '#1e293b' }}>
+                  Alamat Email (Login) <span style={{ color: '#ef4444' }}>*</span>
+                </label>
+                <input
+                  type="email"
+                  required
+                  value={editEmail}
+                  onChange={(e) => setEditEmail(e.target.value)}
+                  placeholder="contoh@gmail.com"
+                  className="form-input"
+                  style={{ width: '100%' }}
+                />
+              </div>
+
+              {/* Nomor WhatsApp */}
+              <div>
+                <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 700, marginBottom: 6, color: '#1e293b' }}>
+                  Nomor WhatsApp
+                </label>
+                <input
+                  type="text"
+                  value={editPhone}
+                  onChange={(e) => setEditPhone(e.target.value)}
+                  placeholder="Contoh: 08123456789 atau 628123456789"
+                  className="form-input"
+                  style={{ width: '100%' }}
+                />
+                <span style={{ fontSize: '0.725rem', color: '#64748b', marginTop: 4, display: 'block' }}>
+                  📱 Digunakan untuk menerima notifikasi pengingat deadline tugas otomatis dari bot platform.
+                </span>
+              </div>
+
+              {/* Kata Sandi Baru */}
+              <div>
+                <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 700, marginBottom: 6, color: '#1e293b' }}>
+                  Kata Sandi Baru (Opsional)
+                </label>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type={showEditPassword ? 'text' : 'password'}
+                    value={editPassword}
+                    onChange={(e) => setEditPassword(e.target.value)}
+                    placeholder="Kosongkan jika tidak ingin mengganti kata sandi"
+                    className="form-input"
+                    style={{ width: '100%', paddingRight: 40 }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowEditPassword(!showEditPassword)}
+                    style={{
+                      position: 'absolute',
+                      right: 10,
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      color: '#64748b',
+                    }}
+                    title={showEditPassword ? 'Sembunyikan sandi' : 'Lihat sandi'}
+                  >
+                    {showEditPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+                <span style={{ fontSize: '0.725rem', color: '#64748b', marginTop: 4, display: 'block' }}>
+                  💡 Master Admin dapat mereset sandi pengguna jika mereka lupa kata sandi akunnya.
+                </span>
+              </div>
+
+              {/* Tim yang Diikuti */}
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                  <label style={{ fontSize: '0.825rem', fontWeight: 700, color: '#1e293b', margin: 0 }}>
+                    Tim yang Diikuti ({editSelectedTeamIds.length} Tim Dipilih)
+                  </label>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <button
+                      type="button"
+                      onClick={() => setEditSelectedTeamIds(teams.map((t) => t.id))}
+                      style={{ background: 'none', border: 'none', fontSize: '0.75rem', color: 'var(--primary)', cursor: 'pointer', fontWeight: 600 }}
+                    >
+                      Pilih Semua
+                    </button>
+                    <span style={{ color: '#cbd5e1' }}>•</span>
+                    <button
+                      type="button"
+                      onClick={() => setEditSelectedTeamIds([])}
+                      style={{ background: 'none', border: 'none', fontSize: '0.75rem', color: '#64748b', cursor: 'pointer', fontWeight: 600 }}
+                    >
+                      Hapus Semua
+                    </button>
+                  </div>
+                </div>
+
+                <div
+                  style={{
+                    maxHeight: 180,
+                    overflowY: 'auto',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: 12,
+                    padding: '8px 12px',
+                    background: '#f8fafc',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 6,
+                  }}
+                >
+                  {teams.length === 0 ? (
+                    <span style={{ fontSize: '0.8rem', color: '#94a3b8', textAlign: 'center', padding: 12 }}>
+                      Belum ada tim terdaftar di sistem.
+                    </span>
+                  ) : (
+                    teams.map((team) => {
+                      const isJoined = editSelectedTeamIds.includes(team.id);
+                      return (
+                        <label
+                          key={team.id}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            padding: '8px 10px',
+                            borderRadius: 8,
+                            background: isJoined ? '#eff6ff' : '#ffffff',
+                            border: `1px solid ${isJoined ? '#93c5fd' : '#e2e8f0'}`,
+                            cursor: 'pointer',
+                            transition: 'all 0.15s',
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                            <input
+                              type="checkbox"
+                              checked={isJoined}
+                              onChange={() => handleToggleUserTeam(team.id)}
+                              style={{ width: 16, height: 16, cursor: 'pointer' }}
+                            />
+                            <div>
+                              <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#0f172a' }}>
+                                {team.name}
+                              </div>
+                              <div style={{ fontSize: '0.725rem', color: '#64748b' }}>
+                                @{team.username}
+                              </div>
+                            </div>
+                          </div>
+                          {isJoined && (
+                            <span className="badge badge-primary" style={{ fontSize: '0.65rem' }}>
+                              Terdaftar
+                            </span>
+                          )}
+                        </label>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.6fr', gap: 12, marginTop: 10 }}>
+                <button
+                  type="button"
+                  disabled={isSavingUser}
+                  onClick={() => setUserToEdit(null)}
+                  style={{
+                    padding: '11px 16px',
+                    borderRadius: 10,
+                    background: '#f1f5f9',
+                    border: '1px solid #e2e8f0',
+                    color: '#475569',
+                    fontWeight: 700,
+                    fontSize: '0.875rem',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingUser}
+                  className="btn btn-primary"
+                  style={{
+                    padding: '11px 16px',
+                    borderRadius: 10,
+                    fontWeight: 700,
+                    fontSize: '0.875rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 8,
+                  }}
+                >
+                  {isSavingUser ? 'Menyimpan...' : 'Simpan Perubahan'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
