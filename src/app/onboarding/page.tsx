@@ -94,9 +94,15 @@ function OnboardingContent() {
       setUserTeams(teams);
       setUserTasks(tasks);
 
-      // Check query params
       const joinParam = searchParams.get('join');
       const tabParam = searchParams.get('tab');
+
+      // Jika pengguna sudah memiliki tim dan tidak sedang join/create tim via URL,
+      // langsung alihkan ke workspace tim pertama (Gambar 2)
+      if (!joinParam && !tabParam && teams.length > 0) {
+        router.replace(`/team/${teams[0].username}`);
+        return;
+      }
 
       if (joinParam) {
         setJoinUsername(joinParam);

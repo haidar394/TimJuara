@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { getCurrentUser } from '@/lib/dataService';
+import { getCurrentUser, getUserTeams } from '@/lib/dataService';
 import { Users, CheckCircle2, Trophy, FolderGit2, ArrowRight, Sparkles, Sun, Moon } from 'lucide-react';
 import Link from 'next/link';
 
@@ -37,7 +37,12 @@ export default function HomePage() {
           router.replace('/admin');
           return;
         }
-        router.replace('/onboarding');
+        const teams = await getUserTeams(user.id);
+        if (teams && teams.length > 0) {
+          router.replace(`/team/${teams[0].username}`);
+        } else {
+          router.replace('/onboarding');
+        }
         return;
       }
       setLoading(false);

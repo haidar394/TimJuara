@@ -66,7 +66,12 @@ export default function AuthPage() {
             setLoading(false);
             return;
           }
-          router.push('/onboarding');
+          const teams = await getUserTeams(user.id);
+          if (teams && teams.length > 0) {
+            router.push(`/team/${teams[0].username}`);
+          } else {
+            router.push('/onboarding');
+          }
         }
       } else {
         const { user, error } = await signInUser(email.trim(), password);
@@ -80,8 +85,13 @@ export default function AuthPage() {
             router.push('/admin');
             return;
           }
-          // Setelah login, arahkan pengguna ke halaman overview akun
-          router.push('/onboarding');
+          // Setelah login, arahkan pengguna langsung ke workspace tim (Overview Seluruh Tim)
+          const teams = await getUserTeams(user.id);
+          if (teams && teams.length > 0) {
+            router.push(`/team/${teams[0].username}`);
+          } else {
+            router.push('/onboarding');
+          }
         }
       }
     } catch (err: any) {

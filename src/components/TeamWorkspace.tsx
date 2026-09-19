@@ -407,7 +407,12 @@ export default function TeamWorkspace() {
 
     const { team: teamData, members: membersData } = await getTeamByUsername(teamUsername);
     if (!teamData) {
-      router.replace('/onboarding');
+      const myTeams = await getUserTeamsWithDetails(user.id);
+      if (myTeams && myTeams.length > 0) {
+        router.replace(`/team/${myTeams[0].username}`);
+      } else {
+        router.replace('/onboarding');
+      }
       return;
     }
 
@@ -1058,10 +1063,15 @@ export default function TeamWorkspace() {
   };
 
   const handleLeaveTeam = async () => {
-    if (!team || !currentMember) return;
+    if (!team || !currentMember || !currentUser) return;
     if (!confirm('Apakah Anda yakin ingin keluar dari tim ini?')) return;
     await removeTeamMember(team.id, currentMember.id);
-    router.push('/onboarding');
+    const otherTeams = userTeams.filter((t) => t.id !== team.id);
+    if (otherTeams.length > 0) {
+      router.push(`/team/${otherTeams[0].username}`);
+    } else {
+      router.push('/onboarding');
+    }
   };
 
   // -------------------------------------------------------------
@@ -1385,12 +1395,16 @@ export default function TeamWorkspace() {
         {/* App & Team Header */}
         <div style={{ padding: '20px 16px 16px', borderBottom: '1px solid var(--surface-border)' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-            <Link href="/onboarding" style={{ display: 'flex', alignItems: 'center', gap: 8, textDecoration: 'none' }}>
+            <div
+              onClick={() => setActiveTab('overview')}
+              style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', userSelect: 'none' }}
+              title="Overview Seluruh Tim"
+            >
               <div style={{ width: 32, height: 32, borderRadius: 10, background: 'var(--primary)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800 }}>
                 TJ
               </div>
               <span style={{ fontWeight: 800, fontSize: '1.1rem', color: 'var(--text-main)' }}>TimJuara</span>
-            </Link>
+            </div>
 
             {currentUser?.email?.toLowerCase() === 'admin@gmail.com' && (
               <Link href="/admin" className="badge" style={{ background: '#ef4444', color: '#fff', fontSize: '0.65rem', padding: '3px 6px', display: 'flex', alignItems: 'center', gap: 4 }}>
