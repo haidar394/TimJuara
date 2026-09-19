@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter, useParams } from 'next/navigation';
+import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import confetti from 'canvas-confetti';
 import {
   getCurrentUser,
@@ -112,6 +112,7 @@ import Link from 'next/link';
 export default function TeamWorkspace() {
   const router = useRouter();
   const routeParams = useParams();
+  const searchParams = useSearchParams();
   const teamUsername = (routeParams?.username as string) || '';
 
   // Global State
@@ -238,6 +239,24 @@ export default function TeamWorkspace() {
       setIsDarkMode(isDark);
     }
   }, []);
+
+  useEffect(() => {
+    if (searchParams) {
+      const tabParam = searchParams.get('tab');
+      if (tabParam === 'tasks' || tabParam === 'research' || tabParam === 'settings' || tabParam === 'overview') {
+        setActiveTab(tabParam);
+      }
+      const taskIdParam = searchParams.get('taskId');
+      if (taskIdParam) {
+        setTimeout(() => {
+          const el = document.getElementById(`task-${taskIdParam}`);
+          if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+        }, 300);
+      }
+    }
+  }, [searchParams]);
 
   const toggleDarkMode = () => {
     const next = !isDarkMode;
@@ -1963,61 +1982,81 @@ export default function TeamWorkspace() {
                       {allUserTasks
                         .filter((t) => t.status !== 'done')
                         .slice(0, 6)
-                        .map((task) => (
-                          <div
-                            key={task.id}
-                            className="card"
-                            onClick={() => {
-                              if (task.team_username) {
-                                router.push(`/team/${task.team_username}`);
-                              }
-                            }}
-                            style={{
-                              padding: '14px 18px',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'space-between',
-                              cursor: 'pointer',
-                              flexWrap: 'wrap',
-                              gap: 12,
-                              transition: 'all 0.15s ease',
-                            }}
-                          >
-                            <div style={{ minWidth: 0, flex: 1 }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 4 }}>
-                                <span style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--text-main)' }}>
-                                  {task.title}
-                                </span>
-                                {task.team_name && (
-                                  <span className="badge badge-primary" style={{ fontSize: '0.7rem', padding: '2px 8px' }}>
-                                    {task.team_name}
+                        .map((task) => {
+                          const handleOpenTask = () => {
+                            if (task.team_username === team?.username) {
+                              setActiveTab('tasks');
+                              setTimeout(() => {
+                                const el = document.getElementById(`task-${task.id}`);
+                                if (el) {
+                                  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                }
+                              }, 150);
+                            } else if (task.team_username) {
+                              router.push(`/team/${task.team_username}?tab=tasks&taskId=${task.id}`);
+                            }
+                          };
+
+                          return (
+                            <div
+                              key={task.id}
+                              className="card"
+                              onClick={handleOpenTask}
+                              style={{
+                                padding: '14px 18px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                cursor: 'pointer',
+                                flexWrap: 'wrap',
+                                gap: 12,
+                                transition: 'all 0.15s ease',
+                              }}
+                            >
+                              <div style={{ minWidth: 0, flex: 1 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 4 }}>
+                                  <span style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--text-main)' }}>
+                                    {task.title}
                                   </span>
-                                )}
-                                {task.status === 'review' ? (
-                                  <span className="badge badge-purple" style={{ fontSize: '0.7rem' }}>
-                                    🔍 Menunggu Review
-                                  </span>
-                                ) : task.review_notes?.toLowerCase().includes('revisi') ? (
-                                  <span className="badge badge-warning" style={{ fontSize: '0.7rem' }}>
-                                    ⚠️ Perlu Revisi
-                                  </span>
-                                ) : (
-                                  <span className="badge badge-blue" style={{ fontSize: '0.7rem' }}>
-                                    Sedang Dikerjakan
-                                  </span>
+                                  {task.team_name && (
+                                    <span className="badge badge-primary" style={{ fontSize: '0.7rem', padding: '2px 8px' }}>
+                                      {task.team_name}
+                                    </span>
+                                  )}
+                                  {task.status === 'review' ? (
+                                    <span className="badge badge-purple" style={{ fontSize: '0.7rem' }}>
+                                      🔍 Menunggu Review
+                                    </span>
+                                  ) : task.review_notes?.toLowerCase().includes('revisi') ? (
+                                    <span className="badge badge-warning" style={{ fontSize: '0.7rem' }}>
+                                      ⚠️ Perlu Revisi
+                                    </span>
+                                  ) : (
+                                    <span className="badge badge-blue" style={{ fontSize: '0.7rem' }}>
+                                      Sedang Dikerjakan
+                                    </span>
+                                  )}
+                                </div>
+                                {task.deadline && (
+                                  <div style={{ fontSize: '0.775rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                                    <Calendar size={12} /> Deadline: {new Date(task.deadline).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                  </div>
                                 )}
                               </div>
-                              {task.deadline && (
-                                <div style={{ fontSize: '0.775rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 4 }}>
-                                  <Calendar size={12} /> Deadline: {new Date(task.deadline).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
-                                </div>
-                              )}
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleOpenTask();
+                                }}
+                                className="btn btn-secondary btn-sm"
+                                style={{ display: 'flex', alignItems: 'center', gap: 4 }}
+                              >
+                                Buka Tugas <ArrowRight size={13} />
+                              </button>
                             </div>
-                            <button className="btn btn-secondary btn-sm" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                              Buka Tugas <ArrowRight size={13} />
-                            </button>
-                          </div>
-                        ))}
+                          );
+                        })}
                     </div>
                   </div>
                 )}
@@ -2408,6 +2447,7 @@ export default function TeamWorkspace() {
                       return (
                         <div
                           key={task.id}
+                          id={`task-${task.id}`}
                           className="card task-card-responsive"
                           style={{
                             borderLeft: `5px solid ${borderLeftColor}`,
