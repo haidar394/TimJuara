@@ -1108,10 +1108,7 @@ export default function TeamWorkspace() {
                 padding: '6px 14px',
                 fontSize: '0.825rem',
                 fontWeight: 700,
-                background: '#ffffff',
-                borderColor: '#cbd5e1',
                 borderRadius: 'var(--radius-full)',
-                color: 'var(--text-main)',
                 boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
               }}
               title="Ganti ke tim lain"
@@ -1261,7 +1258,7 @@ export default function TeamWorkspace() {
                   >
                     {copiedCode ? <Check size={12} color="#10b981" /> : <Copy size={12} />}
                     <span className="team-code-username">@{team.username}</span>
-                    <span style={{ color: 'var(--primary)', fontWeight: 700 }}>(Salin Kode)</span>
+                    <span className="team-code-copy-label">(Salin Kode)</span>
                   </button>
                 </div>
               </div>
@@ -1544,14 +1541,11 @@ export default function TeamWorkspace() {
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                   <button
                     onClick={handleShareGroupRecap}
-                    className="btn btn-secondary btn-sm"
+                    className="btn btn-secondary btn-sm btn-rekap-wa"
                     style={{
                       display: 'inline-flex',
                       alignItems: 'center',
                       gap: 6,
-                      color: '#16a34a',
-                      borderColor: '#bbf7d0',
-                      background: '#f0fdf4',
                       fontWeight: 600,
                     }}
                     title="Kirim ringkasan semua tugas & deadline ke WhatsApp / Grup WA"
@@ -1681,14 +1675,11 @@ export default function TeamWorkspace() {
                                   href={task.task_link.startsWith('http') ? task.task_link : `https://${task.task_link}`}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  className="btn btn-secondary btn-sm"
+                                  className="btn btn-secondary btn-sm btn-task-link"
                                   style={{
                                     display: 'inline-flex',
                                     fontSize: '0.8rem',
                                     padding: '5px 12px',
-                                    borderColor: '#c7d2fe',
-                                    color: 'var(--primary)',
-                                    background: '#eef2ff',
                                     maxWidth: '100%',
                                     overflow: 'hidden',
                                     textOverflow: 'ellipsis',
@@ -1841,13 +1832,8 @@ export default function TeamWorkspace() {
                             {task.status !== 'done' && (
                               <button
                                 onClick={() => handleSendTaskWAReminder(task)}
-                                className="btn btn-secondary btn-sm"
-                                style={{
-                                  padding: '6px 9px',
-                                  color: '#16a34a',
-                                  borderColor: '#bbf7d0',
-                                  background: '#f0fdf4',
-                                }}
+                                className="btn btn-secondary btn-sm btn-task-wa"
+                                style={{ padding: '6px 9px' }}
                                 title={`Kirim pengingat WhatsApp ke ${task.assignee_profile?.full_name || 'anggota'}`}
                               >
                                 <Smartphone size={14} />
