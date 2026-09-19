@@ -768,14 +768,34 @@ export async function updateTeamAvatar(
   avatarUrl: string
 ): Promise<{ success: boolean; error: string | null }> {
   const cleanUrl = avatarUrl.trim();
-  if (isSupabaseConfigured && supabase) {
-    const { error } = await supabase
-      .from('teams')
-      .update({ avatar_url: cleanUrl })
-      .eq('id', teamId);
+  if (typeof window !== 'undefined') {
+    try {
+      localStorage.setItem(`timjuara_team_avatar_${teamId}`, cleanUrl);
+    } catch (e) {
+      console.error(e);
+    }
+  }
 
-    if (error) return { success: false, error: error.message };
-    return { success: true, error: null };
+  if (isSupabaseConfigured && supabase) {
+    try {
+      const { error } = await supabase
+        .from('teams')
+        .update({ avatar_url: cleanUrl })
+        .eq('id', teamId);
+
+      if (error) {
+        const errMsg = error.message.toLowerCase();
+        if (errMsg.includes('avatar_url') || errMsg.includes('column of \'teams\'') || errMsg.includes('schema cache')) {
+          console.warn('Kolom avatar_url belum ada di tabel Supabase teams, tersimpan di browser storage.', error.message);
+          return { success: true, error: null };
+        }
+        return { success: false, error: error.message };
+      }
+      return { success: true, error: null };
+    } catch (err: any) {
+      console.warn('Gagal update avatar_url ke Supabase, fallback aktif:', err);
+      return { success: true, error: null };
+    }
   } else {
     const db = getDemoDb();
     const t = db.teams.find(item => item.id === teamId);
@@ -922,12 +942,19 @@ export async function getUserTeamsWithDetails(userId: string): Promise<UserTeamI
       taskCounts[t.team_id] = (taskCounts[t.team_id] || 0) + 1;
     });
 
-    return teamsWithRole.map(({ team, role }) => ({
-      ...team,
-      user_role: role,
-      member_count: memberCounts[team.id] || 1,
-      task_count: taskCounts[team.id] || 0,
-    }));
+    return teamsWithRole.map(({ team, role }) => {
+      let avatar = team.avatar_url;
+      if (!avatar && typeof window !== 'undefined') {
+        avatar = localStorage.getItem(`timjuara_team_avatar_${team.id}`) || '';
+      }
+      return {
+        ...team,
+        avatar_url: avatar,
+        user_role: role,
+        member_count: memberCounts[team.id] || 1,
+        task_count: taskCounts[team.id] || 0,
+      };
+    });
   } else {
     const db = getDemoDb();
     const memberships = db.members.filter((m) => m.user_id === userId);
@@ -1029,6 +1056,13 @@ export async function getTeamByUsername(username: string): Promise<{ team: Team 
       .single();
 
     if (error || !team) return { team: null, members: [] };
+
+    if (!team.avatar_url && typeof window !== 'undefined') {
+      const localAvatar = localStorage.getItem(`timjuara_team_avatar_${team.id}`);
+      if (localAvatar) {
+        team.avatar_url = localAvatar;
+      }
+    }
 
     const { data: membersData, error: membersError } = await supabase
       .from('team_members')
@@ -1215,6 +1249,18 @@ export async function joinTeam(username: string, userId: string): Promise<{ team
 
     return { team, error: null };
   }
+}
+
+export async function joinTeamByUsername(
+  username: string,
+  userId: string
+): Promise<{ success: boolean; team: Team | null; error: string | null }> {
+  const res = await joinTeam(username, userId);
+  return {
+    success: !!res.team && !res.error,
+    team: res.team,
+    error: res.error,
+  };
 }
 
 // -------------------------------------------------------------
