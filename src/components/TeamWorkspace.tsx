@@ -3126,7 +3126,7 @@ export default function TeamWorkspace() {
                                       onClick={() => openKetuaReviewModal(task)}
                                       className="btn btn-success btn-sm"
                                     >
-                                      <Check size={14} /> Tandai Selesai (Ketua)
+                                      <Check size={14} /> Revisi / Selesaikan Tugas
                                     </button>
                                   ) : (
                                     <button
