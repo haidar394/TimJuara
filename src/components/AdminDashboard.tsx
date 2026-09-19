@@ -520,7 +520,7 @@ export default function AdminDashboard() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: '#f8fafc' }}>
+    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: isDarkMode ? 'var(--bg-page)' : '#f8fafc' }}>
       {/* Toast Notification */}
       {toastMessage && (
         <div className="toast" style={{ background: '#1e293b', color: '#fff', display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -589,7 +589,7 @@ export default function AdminDashboard() {
           {/* Stats Overview */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 18, marginBottom: 28 }}>
             <div className="card" style={{ padding: '20px 22px', display: 'flex', alignItems: 'center', gap: 16 }}>
-              <div style={{ width: 48, height: 48, borderRadius: 12, background: '#eff6ff', color: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <div style={{ width: 48, height: 48, borderRadius: 12, background: isDarkMode ? 'rgba(37, 99, 235, 0.15)' : '#eff6ff', color: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <Users size={24} />
               </div>
               <div>
@@ -599,7 +599,7 @@ export default function AdminDashboard() {
             </div>
 
             <div className="card" style={{ padding: '20px 22px', display: 'flex', alignItems: 'center', gap: 16 }}>
-              <div style={{ width: 48, height: 48, borderRadius: 12, background: '#fef3c7', color: '#d97706', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <div style={{ width: 48, height: 48, borderRadius: 12, background: isDarkMode ? 'rgba(217, 119, 6, 0.15)' : '#fef3c7', color: isDarkMode ? '#fbbf24' : '#d97706', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <Crown size={24} />
               </div>
               <div>
@@ -609,7 +609,7 @@ export default function AdminDashboard() {
             </div>
 
             <div className="card" style={{ padding: '20px 22px', display: 'flex', alignItems: 'center', gap: 16 }}>
-              <div style={{ width: 48, height: 48, borderRadius: 12, background: '#ecfdf5', color: '#059669', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <div style={{ width: 48, height: 48, borderRadius: 12, background: isDarkMode ? 'rgba(5, 150, 105, 0.15)' : '#ecfdf5', color: isDarkMode ? '#34d399' : '#059669', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <CheckCircle2 size={24} />
               </div>
               <div>
@@ -619,7 +619,7 @@ export default function AdminDashboard() {
             </div>
 
             <div className="card" style={{ padding: '20px 22px', display: 'flex', alignItems: 'center', gap: 16 }}>
-              <div style={{ width: 48, height: 48, borderRadius: 12, background: '#f5f3ff', color: '#7c3aed', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <div style={{ width: 48, height: 48, borderRadius: 12, background: isDarkMode ? 'rgba(124, 58, 237, 0.15)' : '#f5f3ff', color: isDarkMode ? '#a78bfa' : '#7c3aed', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <FolderGit2 size={24} />
               </div>
               <div>
@@ -655,9 +655,9 @@ export default function AdminDashboard() {
                   display: 'flex',
                   alignItems: 'center',
                   gap: 6,
-                  color: activeTab === 'whatsapp' ? '#ffffff' : '#16a34a',
-                  borderColor: activeTab === 'whatsapp' ? 'var(--primary)' : '#86efac',
-                  background: activeTab === 'whatsapp' ? 'var(--primary)' : '#f0fdf4',
+                  color: activeTab === 'whatsapp' ? '#ffffff' : (isDarkMode ? '#4ade80' : '#16a34a'),
+                  borderColor: activeTab === 'whatsapp' ? 'var(--primary)' : (isDarkMode ? 'rgba(34, 197, 94, 0.35)' : '#86efac'),
+                  background: activeTab === 'whatsapp' ? 'var(--primary)' : (isDarkMode ? 'rgba(34, 197, 94, 0.12)' : '#f0fdf4'),
                   fontWeight: 600,
                 }}
               >
@@ -844,7 +844,7 @@ export default function AdminDashboard() {
                               </div>
                             </td>
                             <td style={{ padding: '14px' }}>
-                              <span style={{ fontFamily: 'monospace', background: '#f1f5f9', padding: '3px 8px', borderRadius: 6, fontSize: '0.8rem', color: 'var(--primary)', fontWeight: 600 }}>
+                              <span style={{ fontFamily: 'monospace', background: isDarkMode ? 'rgba(79, 70, 229, 0.15)' : '#f1f5f9', padding: '3px 8px', borderRadius: 6, fontSize: '0.8rem', color: isDarkMode ? '#a5b4fc' : 'var(--primary)', fontWeight: 600 }}>
                                 @{t.username}
                               </span>
                             </td>
@@ -1118,9 +1118,9 @@ export default function AdminDashboard() {
                                     display: 'inline-flex',
                                     alignItems: 'center',
                                     gap: 5,
-                                    color: 'var(--primary)',
-                                    borderColor: '#93c5fd',
-                                    background: '#eff6ff',
+                                    color: isDarkMode ? '#a5b4fc' : 'var(--primary)',
+                                    borderColor: isDarkMode ? 'rgba(99, 102, 241, 0.35)' : '#93c5fd',
+                                    background: isDarkMode ? 'rgba(99, 102, 241, 0.12)' : '#eff6ff',
                                   }}
                                   title="Edit data pengguna (Nama, Email, No WA, Kata Sandi, dan Tim)"
                                 >
@@ -1156,15 +1156,15 @@ export default function AdminDashboard() {
           {/* TAB 3: BOT WHATSAPP GATEWAY (MASTER ADMIN)                                */}
           {/* ========================================================================= */}
           {activeTab === 'whatsapp' && (
-            <div className="card" style={{ padding: 28, border: '1px solid #bbf7d0', background: 'linear-gradient(to bottom, #f0fdf4 0%, #ffffff 200px)' }}>
+            <div className="card" style={{ padding: 28, border: isDarkMode ? '1px solid rgba(34, 197, 94, 0.25)' : '1px solid #bbf7d0', background: isDarkMode ? 'linear-gradient(to bottom, rgba(22, 163, 74, 0.08) 0%, var(--surface) 200px)' : 'linear-gradient(to bottom, #f0fdf4 0%, #ffffff 200px)' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 14, marginBottom: 22 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-                  <div style={{ width: 48, height: 48, borderRadius: 14, background: '#dcfce7', color: '#16a34a', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: '0 4px 12px rgba(22, 163, 74, 0.15)' }}>
+                  <div style={{ width: 48, height: 48, borderRadius: 14, background: isDarkMode ? 'rgba(22, 163, 74, 0.18)' : '#dcfce7', color: isDarkMode ? '#4ade80' : '#16a34a', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: '0 4px 12px rgba(22, 163, 74, 0.15)' }}>
                     <MessageSquare size={26} />
                   </div>
                   <div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                      <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0f172a' }}>Bot Pengingat WhatsApp Otomatis</h3>
+                      <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-main)' }}>Bot Pengingat WhatsApp Otomatis</h3>
                       <span className="badge badge-success" style={{ fontSize: '0.75rem' }}>100% Gratis</span>
                       <span className="badge badge-neutral" style={{ fontSize: '0.75rem' }}>Khusus Master Admin</span>
                     </div>
@@ -1183,9 +1183,9 @@ export default function AdminDashboard() {
                     display: 'inline-flex',
                     alignItems: 'center',
                     gap: 8,
-                    color: '#16a34a',
-                    borderColor: '#86efac',
-                    background: '#ffffff',
+                    color: isDarkMode ? '#4ade80' : '#16a34a',
+                    borderColor: isDarkMode ? 'rgba(34, 197, 94, 0.35)' : '#86efac',
+                    background: isDarkMode ? 'rgba(34, 197, 94, 0.12)' : '#ffffff',
                     fontWeight: 700,
                     padding: '8px 16px',
                   }}
@@ -1197,11 +1197,11 @@ export default function AdminDashboard() {
               </div>
 
               {/* Panduan 3 Langkah Menghubungkan WhatsApp Gratis */}
-              <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: 'var(--radius-md)', padding: '18px 20px', marginBottom: 24, boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
-                <h4 style={{ fontSize: '0.95rem', fontWeight: 700, color: '#1e293b', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <div style={{ background: isDarkMode ? 'var(--surface-secondary)' : '#ffffff', border: '1px solid var(--surface-border)', borderRadius: 'var(--radius-md)', padding: '18px 20px', marginBottom: 24, boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+                <h4 style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-main)', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
                   <span>Cara Menghubungkan WhatsApp Gratis (Fonnte):</span>
                 </h4>
-                <ol style={{ fontSize: '0.875rem', color: '#475569', paddingLeft: 18, lineHeight: 1.7, margin: 0 }}>
+                <ol style={{ fontSize: '0.875rem', color: 'var(--text-muted)', paddingLeft: 18, lineHeight: 1.7, margin: 0 }}>
                   <li>Buka situs resmi <a href="https://fonnte.com" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--primary)', fontWeight: 600, textDecoration: 'underline' }}>fonnte.com</a> dan daftar akun gratis (Free Tier: 1.000 pesan WA/bulan tanpa biaya).</li>
                   <li>Di dashboard Fonnte, buka menu <b>Device</b>, lalu <b>Scan QR Code</b> menggunakan aplikasi WhatsApp Anda (seperti saat membuka WhatsApp Web).</li>
                   <li>Salin <b>Device Token</b> yang muncul di Fonnte, lalu tempel pada kolom di bawah ini dan klik Simpan.</li>
@@ -1235,7 +1235,7 @@ export default function AdminDashboard() {
                     onChange={(e) => setWaEnabled(e.target.checked)}
                     style={{ width: 18, height: 18, accentColor: '#16a34a', cursor: 'pointer' }}
                   />
-                  <label htmlFor="waEnabledMaster" style={{ fontSize: '0.9rem', color: '#1e293b', cursor: 'pointer', fontWeight: 600 }}>
+                  <label htmlFor="waEnabledMaster" style={{ fontSize: '0.9rem', color: 'var(--text-main)', cursor: 'pointer', fontWeight: 600 }}>
                     Aktifkan pengingat deadline otomatis harian (setiap pukul 08:00 WIB untuk tugas H-1, Hari H, & Terlewat)
                   </label>
                 </div>
@@ -1253,8 +1253,8 @@ export default function AdminDashboard() {
               </form>
 
               {/* Area Uji Coba Pengiriman Pesan */}
-              <div style={{ marginTop: 28, paddingTop: 22, borderTop: '1px solid #e2e8f0' }}>
-                <h4 style={{ fontSize: '0.95rem', fontWeight: 700, color: '#1e293b', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <div style={{ marginTop: 28, paddingTop: 22, borderTop: '1px solid var(--surface-border)' }}>
+                <h4 style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-main)', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
                   <Smartphone size={16} color="#16a34a" /> Uji Coba Pengiriman WhatsApp
                 </h4>
                 <p style={{ fontSize: '0.825rem', color: 'var(--text-muted)', marginBottom: 14 }}>
@@ -1310,7 +1310,7 @@ export default function AdminDashboard() {
             style={{
               maxWidth: 480,
               width: '100%',
-              background: '#ffffff',
+              background: isDarkMode ? 'var(--surface)' : '#ffffff',
               borderRadius: 20,
               boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(226, 232, 240, 0.8)',
               padding: 26,
@@ -1324,7 +1324,7 @@ export default function AdminDashboard() {
                 position: 'absolute',
                 top: 18,
                 right: 18,
-                background: '#f1f5f9',
+                background: isDarkMode ? 'var(--surface-secondary)' : '#f1f5f9',
                 border: 'none',
                 width: 32,
                 height: 32,
@@ -1333,7 +1333,7 @@ export default function AdminDashboard() {
                 alignItems: 'center',
                 justifyContent: 'center',
                 cursor: 'pointer',
-                color: '#64748b',
+                color: 'var(--text-muted)',
                 transition: 'all 0.15s',
               }}
               title="Tutup"
@@ -1360,7 +1360,7 @@ export default function AdminDashboard() {
                 <AlertTriangle size={24} />
               </div>
               <div>
-                <h3 style={{ fontSize: '1.2rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
+                <h3 style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-main)', margin: 0 }}>
                   Hapus Tim Permanen
                 </h3>
                 <span style={{ fontSize: '0.8rem', color: '#dc2626', fontWeight: 600 }}>
@@ -1374,8 +1374,8 @@ export default function AdminDashboard() {
               style={{
                 padding: '14px 16px',
                 borderRadius: 12,
-                background: '#f8fafc',
-                border: '1px solid #e2e8f0',
+                background: isDarkMode ? 'var(--surface-secondary)' : '#f8fafc',
+                border: '1px solid var(--surface-border)',
                 marginBottom: 16,
                 display: 'flex',
                 alignItems: 'center',
@@ -1400,14 +1400,14 @@ export default function AdminDashboard() {
                 {teamToDelete.name.slice(0, 2).toUpperCase()}
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontWeight: 800, fontSize: '0.95rem', color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                <div style={{ fontWeight: 800, fontSize: '0.95rem', color: 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   {teamToDelete.name}
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 3 }}>
                   <span style={{ fontFamily: 'monospace', fontSize: '0.75rem', color: 'var(--primary)', fontWeight: 700, background: '#eef2ff', padding: '1px 6px', borderRadius: 4 }}>
                     @{teamToDelete.username}
                   </span>
-                  <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                     • {teamToDelete.member_count} Anggota • {teamToDelete.task_count} Tugas
                   </span>
                 </div>
@@ -1419,8 +1419,8 @@ export default function AdminDashboard() {
               style={{
                 padding: '12px 14px',
                 borderRadius: 10,
-                background: '#fff5f5',
-                border: '1px solid #fecaca',
+                background: isDarkMode ? 'rgba(220, 38, 38, 0.1)' : '#fff5f5',
+                border: isDarkMode ? '1px solid rgba(220, 38, 38, 0.25)' : '1px solid #fecaca',
                 display: 'flex',
                 alignItems: 'flex-start',
                 gap: 10,
@@ -1623,7 +1623,7 @@ export default function AdminDashboard() {
                 overflowX: 'auto',
                 paddingBottom: 8,
                 marginBottom: 18,
-                borderBottom: '1px solid #e2e8f0',
+                borderBottom: isDarkMode ? '1px solid #243455' : '1px solid #e2e8f0',
               }}
             >
               <button
@@ -1639,8 +1639,8 @@ export default function AdminDashboard() {
                   alignItems: 'center',
                   gap: 6,
                   border: 'none',
-                  background: activeEditTab === 'name' ? 'var(--primary)' : '#f1f5f9',
-                  color: activeEditTab === 'name' ? '#ffffff' : '#475569',
+                  background: activeEditTab === 'name' ? 'var(--primary)' : (isDarkMode ? '#1e293b' : '#f1f5f9'),
+                  color: activeEditTab === 'name' ? '#ffffff' : (isDarkMode ? '#94a3b8' : '#475569'),
                   whiteSpace: 'nowrap',
                   transition: 'all 0.15s',
                 }}
@@ -1661,8 +1661,8 @@ export default function AdminDashboard() {
                   alignItems: 'center',
                   gap: 6,
                   border: 'none',
-                  background: activeEditTab === 'phone' ? '#16a34a' : '#f1f5f9',
-                  color: activeEditTab === 'phone' ? '#ffffff' : '#475569',
+                  background: activeEditTab === 'phone' ? 'var(--primary)' : (isDarkMode ? '#1e293b' : '#f1f5f9'),
+                  color: activeEditTab === 'phone' ? '#ffffff' : (isDarkMode ? '#94a3b8' : '#475569'),
                   whiteSpace: 'nowrap',
                   transition: 'all 0.15s',
                 }}
@@ -1683,8 +1683,8 @@ export default function AdminDashboard() {
                   alignItems: 'center',
                   gap: 6,
                   border: 'none',
-                  background: activeEditTab === 'email' ? '#2563eb' : '#f1f5f9',
-                  color: activeEditTab === 'email' ? '#ffffff' : '#475569',
+                  background: activeEditTab === 'email' ? 'var(--primary)' : (isDarkMode ? '#1e293b' : '#f1f5f9'),
+                  color: activeEditTab === 'email' ? '#ffffff' : (isDarkMode ? '#94a3b8' : '#475569'),
                   whiteSpace: 'nowrap',
                   transition: 'all 0.15s',
                 }}
@@ -1705,8 +1705,8 @@ export default function AdminDashboard() {
                   alignItems: 'center',
                   gap: 6,
                   border: 'none',
-                  background: activeEditTab === 'password' ? '#d97706' : '#f1f5f9',
-                  color: activeEditTab === 'password' ? '#ffffff' : '#475569',
+                  background: activeEditTab === 'password' ? 'var(--primary)' : (isDarkMode ? '#1e293b' : '#f1f5f9'),
+                  color: activeEditTab === 'password' ? '#ffffff' : (isDarkMode ? '#94a3b8' : '#475569'),
                   whiteSpace: 'nowrap',
                   transition: 'all 0.15s',
                 }}
@@ -1727,8 +1727,8 @@ export default function AdminDashboard() {
                   alignItems: 'center',
                   gap: 6,
                   border: 'none',
-                  background: activeEditTab === 'teams' ? '#7c3aed' : '#f1f5f9',
-                  color: activeEditTab === 'teams' ? '#ffffff' : '#475569',
+                  background: activeEditTab === 'teams' ? 'var(--primary)' : (isDarkMode ? '#1e293b' : '#f1f5f9'),
+                  color: activeEditTab === 'teams' ? '#ffffff' : (isDarkMode ? '#94a3b8' : '#475569'),
                   whiteSpace: 'nowrap',
                   transition: 'all 0.15s',
                 }}
