@@ -28,6 +28,13 @@ import {
   updateTeamWhatsAppConfig,
   sendTestWhatsAppMessage,
   triggerDeadlineReminders,
+  getTaskComments,
+  addTaskComment,
+  getUserNotifications,
+  createNotification,
+  markNotificationAsRead,
+  markAllNotificationsAsRead,
+  sendRealtimeWhatsAppNotification,
 } from '@/lib/dataService';
 import {
   Profile,
@@ -38,6 +45,8 @@ import {
   Role,
   TaskStatus,
   ResourceType,
+  TaskComment,
+  AppNotification,
 } from '@/lib/types';
 import {
   Users,
@@ -75,6 +84,10 @@ import {
   Smartphone,
   BellRing,
   Share2,
+  Bell,
+  Sun,
+  Moon,
+  MessageCircle,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -116,8 +129,24 @@ export default function TeamWorkspace() {
   const [taskDesc, setTaskDesc] = useState('');
   const [taskLink, setTaskLink] = useState('');
   const [taskAssignee, setTaskAssignee] = useState('');
+  const [taskAssigneeIds, setTaskAssigneeIds] = useState<string[]>([]);
   const [taskDeadline, setTaskDeadline] = useState('');
   const [taskStatusInput, setTaskStatusInput] = useState<TaskStatus>('todo');
+
+  // Dark Mode State
+  const [isDarkMode, setIsDarkMode] = useState(false);
+
+  // In-App Notifications State
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const [showNotifPopover, setShowNotifPopover] = useState(false);
+
+  // Task Discussion Comments State
+  const [showCommentsModal, setShowCommentsModal] = useState(false);
+  const [selectedTaskForComments, setSelectedTaskForComments] = useState<Task | null>(null);
+  const [taskComments, setTaskComments] = useState<TaskComment[]>([]);
+  const [commentInput, setCommentInput] = useState('');
+  const [loadingComments, setLoadingComments] = useState(false);
+  const [sendingComment, setSendingComment] = useState(false);
 
   // Review submission state (Member -> Ketua)
   const [submitTaskLink, setSubmitTaskLink] = useState('');
@@ -151,6 +180,91 @@ export default function TeamWorkspace() {
     setTimeout(() => setToastMessage(null), 3500);
   };
 
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+      setIsDarkMode(isDark);
+    }
+  }, []);
+
+  const toggleDarkMode = () => {
+    const next = !isDarkMode;
+    setIsDarkMode(next);
+    if (next) {
+      document.documentElement.setAttribute('data-theme', 'dark');
+      document.documentElement.classList.add('dark');
+      localStorage.setItem('timjuara_theme', 'dark');
+    } else {
+      document.documentElement.setAttribute('data-theme', 'light');
+      document.documentElement.classList.remove('dark');
+      localStorage.setItem('timjuara_theme', 'light');
+    }
+  };
+
+  const loadNotifications = async (userId: string) => {
+    const data = await getUserNotifications(userId);
+    setNotifications(data);
+  };
+
+  const handleMarkAllRead = async () => {
+    if (!currentUser) return;
+    await markAllNotificationsAsRead(currentUser.id);
+    setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
+  };
+
+  const openTaskComments = async (task: Task) => {
+    setSelectedTaskForComments(task);
+    setShowCommentsModal(true);
+    setLoadingComments(true);
+    const data = await getTaskComments(task.id);
+    setTaskComments(data);
+    setLoadingComments(false);
+  };
+
+  const handleSendComment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedTaskForComments || !currentUser || !commentInput.trim()) return;
+
+    setSendingComment(true);
+    const { comment, error } = await addTaskComment(
+      selectedTaskForComments.id,
+      currentUser.id,
+      commentInput.trim()
+    );
+    setSendingComment(false);
+
+    if (comment) {
+      setTaskComments((prev) => [...prev, comment]);
+      setCommentInput('');
+
+      setTasks((prev) =>
+        prev.map((t) =>
+          t.id === selectedTaskForComments.id
+            ? { ...t, comments_count: (t.comments_count || 0) + 1 }
+            : t
+        )
+      );
+
+      const recipientIds = new Set<string>();
+      (selectedTaskForComments.assigned_to_ids || []).forEach((id) => recipientIds.add(id));
+      if (selectedTaskForComments.assigned_to) recipientIds.add(selectedTaskForComments.assigned_to);
+      if (selectedTaskForComments.created_by) recipientIds.add(selectedTaskForComments.created_by);
+      recipientIds.delete(currentUser.id);
+
+      recipientIds.forEach((rId) => {
+        createNotification(
+          rId,
+          `💬 Komentar Baru: ${selectedTaskForComments.title}`,
+          `${currentUser.full_name}: "${comment.content.slice(0, 80)}"`,
+          `/team/${team?.username}`,
+          team?.id
+        );
+      });
+    } else if (error) {
+      showToast(`Gagal mengirim komentar: ${error}`);
+    }
+  };
+
   // Load Data
   const loadWorkspaceData = async () => {
     const user = await getCurrentUser();
@@ -162,6 +276,7 @@ export default function TeamWorkspace() {
     setProfileName(user.full_name);
     setProfilePhone(user.phone_number || '');
     setProfileEmail(user.email || '');
+    loadNotifications(user.id);
 
     const { team: teamData, members: membersData } = await getTeamByUsername(teamUsername);
     if (!teamData) {
@@ -208,7 +323,7 @@ export default function TeamWorkspace() {
   };
 
   // -------------------------------------------------------------
-  // TASK ACTIONS
+  // TASK ACTIONS (Multi-PIC, Real-Time WA & In-App Notif)
   // -------------------------------------------------------------
   const handleCreateTask = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -226,12 +341,15 @@ export default function TeamWorkspace() {
       }
     }
 
+    const assignedIds = taskAssigneeIds.length > 0 ? taskAssigneeIds : [currentUser.id];
+
     const { task, error } = await createTask({
       team_id: team.id,
       title: taskTitle.trim(),
       description: taskDesc.trim(),
       task_link: taskLink.trim(),
-      assigned_to: taskAssignee || currentUser.id,
+      assigned_to: assignedIds[0],
+      assigned_to_ids: assignedIds,
       deadline: deadlineIso,
       status: taskStatusInput,
       created_by: currentUser.id,
@@ -242,10 +360,35 @@ export default function TeamWorkspace() {
       return;
     }
 
+    // Kirim notifikasi In-App & WA Real-Time ke seluruh anggota yang ditugaskan
+    const targetMembers = members.filter((m) => assignedIds.includes(m.user_id));
+    targetMembers.forEach((m) => {
+      createNotification(
+        m.user_id,
+        '📌 Tugas Baru Ditugaskan',
+        `Kamu ditugaskan untuk "${taskTitle.trim()}" di tim ${team.name}.`,
+        `/team/${team.username}`,
+        team.id
+      );
+    });
+
+    const waPhones = targetMembers
+      .map((m) => m.profile?.phone_number)
+      .filter((p): p is string => Boolean(p && p.trim()));
+
+    if (waPhones.length > 0) {
+      const deadlineText = deadlineIso
+        ? new Date(deadlineIso).toLocaleDateString('id-ID', { dateStyle: 'full' })
+        : 'Tidak ada batas waktu';
+      const waMsg = `🔔 *TUGAS BARU DITUGASKAN - TIMJUARA*\n\nHalo Rekan Tim! 👋\nKamu baru saja ditugaskan pada tugas baru di tim *${team.name}*:\n📌 *${taskTitle.trim()}*\n📅 Deadline: *${deadlineText}*\n${taskDesc.trim() ? `📝 Catatan: ${taskDesc.trim()}\n` : ''}\nBuka TimJuara: ${window.location.origin}/team/${team.username}`;
+      sendRealtimeWhatsAppNotification(waPhones, waMsg, team.wa_gateway_token);
+    }
+
     setTaskTitle('');
     setTaskDesc('');
     setTaskLink('');
     setTaskAssignee('');
+    setTaskAssigneeIds([]);
     setTaskDeadline('');
     setTaskStatusInput('todo');
     setShowAddTaskModal(false);
@@ -255,6 +398,25 @@ export default function TeamWorkspace() {
     setTasks(updated);
   };
 
+  const toggleAssignee = (userId: string) => {
+    setTaskAssigneeIds((prev) => {
+      const next = prev.includes(userId) ? prev.filter((id) => id !== userId) : [...prev, userId];
+      setTaskAssignee(next[0] || '');
+      return next;
+    });
+  };
+
+  const openAddTaskModal = () => {
+    setTaskTitle('');
+    setTaskDesc('');
+    setTaskLink('');
+    setTaskAssignee(currentUser?.id || '');
+    setTaskAssigneeIds(currentUser ? [currentUser.id] : []);
+    setTaskDeadline('');
+    setTaskStatusInput('todo');
+    setShowAddTaskModal(true);
+  };
+
   // Open Edit Task Modal
   const openEditTask = (task: Task) => {
     setSelectedTask(task);
@@ -262,6 +424,13 @@ export default function TeamWorkspace() {
     setTaskDesc(task.description || '');
     setTaskLink(task.task_link || '');
     setTaskAssignee(task.assigned_to || '');
+    setTaskAssigneeIds(
+      task.assigned_to_ids && task.assigned_to_ids.length > 0
+        ? task.assigned_to_ids
+        : task.assigned_to
+        ? [task.assigned_to]
+        : []
+    );
     setTaskDeadline(task.deadline ? task.deadline.slice(0, 10) : '');
     setTaskStatusInput(task.status);
     setShowEditTaskModal(true);
@@ -283,11 +452,18 @@ export default function TeamWorkspace() {
       }
     }
 
+    const assignedIds = taskAssigneeIds.length > 0
+      ? taskAssigneeIds
+      : taskAssignee
+      ? [taskAssignee]
+      : [];
+
     const { success, error } = await updateTask(selectedTask.id, {
       title: taskTitle.trim(),
       description: taskDesc.trim(),
       task_link: taskLink.trim(),
-      assigned_to: taskAssignee || undefined,
+      assigned_to: assignedIds[0] || undefined,
+      assigned_to_ids: assignedIds,
       deadline: deadlineIso,
       status: taskStatusInput,
     });
@@ -317,7 +493,7 @@ export default function TeamWorkspace() {
 
   const handleConfirmSubmitReview = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedTask || !currentUser) return;
+    if (!selectedTask || !currentUser || !team) return;
 
     await updateTaskStatus(
       selectedTask.id,
@@ -327,23 +503,36 @@ export default function TeamWorkspace() {
       submitTaskLink.trim()
     );
 
+    // Notifikasi In-App & WA Real-Time ke Ketua Tim
+    const ketuaMember = members.find((m) => m.role === 'ketua');
+    if (ketuaMember && ketuaMember.user_id !== currentUser.id) {
+      createNotification(
+        ketuaMember.user_id,
+        '🔍 Tugas Diajukan untuk Dicek',
+        `${currentUser.full_name} mengajukan "${selectedTask.title}" untuk dicek.`,
+        `/team/${team.username}`,
+        team.id
+      );
+
+      if (ketuaMember.profile?.phone_number) {
+        const waMsg = `📋 *PENGAJUAN TUGAS UNTUK DICEK - TIMJUARA*\n\nHalo *${ketuaMember.profile.full_name}* (Ketua)! 👋\n*${currentUser.full_name}* telah menyelesaikan dan mengajukan tugas untuk dicek:\n📌 *${selectedTask.title}*\n${submitTaskLink.trim() ? `🔗 Link Hasil: ${submitTaskLink.trim()}\n` : ''}${submitTaskNotes.trim() ? `📝 Catatan: ${submitTaskNotes.trim()}\n` : ''}\nSilakan periksa di TimJuara: ${window.location.origin}/team/${team.username}`;
+        sendRealtimeWhatsAppNotification([ketuaMember.profile.phone_number], waMsg, team.wa_gateway_token);
+      }
+    }
+
     setShowReviewModal(false);
     setSelectedTask(null);
     showToast('Tugas telah diajukan ke Ketua Tim untuk dicek! 🔍');
 
-    if (team) {
-      const updated = await getTeamTasks(team.id);
-      setTasks(updated);
-    }
+    const updated = await getTeamTasks(team.id);
+    setTasks(updated);
   };
 
   // Approve Task (Ketua -> Done)
   const handleApproveTask = async (task: Task) => {
-    if (!currentUser) return;
+    if (!currentUser || !team) return;
 
-    // Atribusikan ke anggota yang mengerjakan atau yang ditugaskan
     const completedBy = task.completed_by || task.assigned_to || currentUser.id;
-
     await updateTaskStatus(task.id, 'done', completedBy);
 
     confetti({
@@ -352,12 +541,40 @@ export default function TeamWorkspace() {
       origin: { y: 0.6 },
     });
 
+    // Notifikasi In-App & WA Real-Time ke seluruh PIC
+    const assignedIds = task.assigned_to_ids && task.assigned_to_ids.length > 0
+      ? task.assigned_to_ids
+      : task.assigned_to
+      ? [task.assigned_to]
+      : [];
+
+    const picMembers = members.filter((m) => assignedIds.includes(m.user_id));
+    picMembers.forEach((m) => {
+      if (m.user_id !== currentUser.id) {
+        createNotification(
+          m.user_id,
+          '🎉 Tugas Telah Disetujui!',
+          `Selamat! Tugas "${task.title}" telah disetujui selesai oleh Ketua.`,
+          `/team/${team.username}`,
+          team.id
+        );
+      }
+    });
+
+    const waPhones = picMembers
+      .filter((m) => m.user_id !== currentUser.id)
+      .map((m) => m.profile?.phone_number)
+      .filter((p): p is string => Boolean(p && p.trim()));
+
+    if (waPhones.length > 0) {
+      const waMsg = `🎉 *TUGAS TELAH DISETUJUI - TIMJUARA*\n\nHalo Rekan Tim! 🚀\nSelamat! Tugas *${task.title}* pada tim *${team.name}* telah disetujui selesai oleh Ketua Tim.\nTerima kasih atas kerja kerasmu! 💪\nBuka TimJuara: ${window.location.origin}/team/${team.username}`;
+      sendRealtimeWhatsAppNotification(waPhones, waMsg, team.wa_gateway_token);
+    }
+
     showToast('🎉 Tugas telah disetujui selesai oleh Ketua!');
 
-    if (team) {
-      const updated = await getTeamTasks(team.id);
-      setTasks(updated);
-    }
+    const updated = await getTeamTasks(team.id);
+    setTasks(updated);
   };
 
   // Reject / Request Revision (Ketua -> Member)
@@ -369,21 +586,46 @@ export default function TeamWorkspace() {
 
   const handleConfirmRevision = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedTask) return;
+    if (!selectedTask || !team) return;
 
     await updateTask(selectedTask.id, {
       status: 'in_progress',
       review_notes: revisionNotes.trim() ? `Catatan Revisi dari Ketua: ${revisionNotes.trim()}` : 'Perlu revisi dari Ketua.',
     });
 
+    // Notifikasi In-App & WA Real-Time ke seluruh PIC
+    const assignedIds = selectedTask.assigned_to_ids && selectedTask.assigned_to_ids.length > 0
+      ? selectedTask.assigned_to_ids
+      : selectedTask.assigned_to
+      ? [selectedTask.assigned_to]
+      : [];
+
+    const picMembers = members.filter((m) => assignedIds.includes(m.user_id));
+    picMembers.forEach((m) => {
+      createNotification(
+        m.user_id,
+        '⚠️ Permintaan Revisi Tugas',
+        `Ketua meminta revisi pada "${selectedTask.title}": "${revisionNotes.trim()}"`,
+        `/team/${team.username}`,
+        team.id
+      );
+    });
+
+    const waPhones = picMembers
+      .map((m) => m.profile?.phone_number)
+      .filter((p): p is string => Boolean(p && p.trim()));
+
+    if (waPhones.length > 0) {
+      const waMsg = `⚠️ *PERMINTAAN REVISI TUGAS - TIMJUARA*\n\nHalo Rekan Tim! 👋\nTugas *${selectedTask.title}* di tim *${team.name}* memerlukan revisi dari Ketua Tim:\n📝 Catatan Revisi: "${revisionNotes.trim()}"\n\nYuk segera diperiksa di TimJuara: ${window.location.origin}/team/${team.username}`;
+      sendRealtimeWhatsAppNotification(waPhones, waMsg, team.wa_gateway_token);
+    }
+
     setShowRevisionModal(false);
     setSelectedTask(null);
     showToast('Permintaan revisi berhasil dikirim ke anggota.');
 
-    if (team) {
-      const updated = await getTeamTasks(team.id);
-      setTasks(updated);
-    }
+    const updated = await getTeamTasks(team.id);
+    setTasks(updated);
   };
 
   // Reopen Task (Kembalikan status ke Sedang Dikerjakan)
@@ -711,8 +953,11 @@ export default function TeamWorkspace() {
       }
 
       const statusText = t.status === 'review' ? 'Menunggu Dicek' : t.status === 'in_progress' ? 'Dikerjakan' : 'Belum Mulai';
+      const picNames = t.assignee_profiles && t.assignee_profiles.length > 0
+        ? t.assignee_profiles.map((p) => p.full_name).join(', ')
+        : (t.assignee_profile?.full_name || 'Belum ditugaskan');
       text += `${idx + 1}. *${t.title}*\n`;
-      text += `   • PIC: ${t.assignee_profile?.full_name || 'Belum ditugaskan'}\n`;
+      text += `   • PIC: ${picNames}\n`;
       text += `   • Status: ${statusText}\n`;
       text += `   • Deadline: ${deadlineNote}\n`;
       if (t.task_link) text += `   • Link: ${t.task_link}\n`;
@@ -726,31 +971,36 @@ export default function TeamWorkspace() {
   };
 
   const handleSendTaskWAReminder = async (task: Task) => {
-    if (!task.assignee_profile?.phone_number) {
-      showToast(`Nomor WA ${task.assignee_profile?.full_name || 'anggota'} belum terdaftar di profilnya.`);
+    const targets = task.assignee_profiles && task.assignee_profiles.length > 0
+      ? task.assignee_profiles
+      : (task.assignee_profile ? [task.assignee_profile] : []);
+
+    const validTargets = targets.filter((p) => Boolean(p.phone_number && p.phone_number.trim()));
+
+    if (validTargets.length === 0) {
+      showToast(`Nomor WA penanggung jawab tugas belum terdaftar di profil.`);
       return;
     }
 
-    const phone = task.assignee_profile.phone_number;
     let deadlineStr = 'Tidak ada batas waktu';
     if (task.deadline) {
       deadlineStr = new Date(task.deadline).toLocaleDateString('id-ID', { dateStyle: 'full' });
     }
 
-    const message = `Halo *${task.assignee_profile.full_name}*! 👋\n\nPengingat tugas dari Tim *${team?.name}*:\n📌 *${task.title}*\n📅 Deadline: *${deadlineStr}*\nStatus: *${task.status === 'review' ? 'Menunggu Dicek' : task.status === 'in_progress' ? 'Sedang Dikerjakan' : 'Belum Selesai'}*\n\nYuk segera diselesaikan atau dicek! 💪\nBuka TimJuara: ${window.location.origin}/team/${team?.username}`;
+    for (const pic of validTargets) {
+      const message = `Halo *${pic.full_name}*! 👋\n\nPengingat tugas dari Tim *${team?.name}*:\n📌 *${task.title}*\n📅 Deadline: *${deadlineStr}*\nStatus: *${task.status === 'review' ? 'Menunggu Dicek' : task.status === 'in_progress' ? 'Sedang Dikerjakan' : 'Belum Selesai'}*\n\nYuk segera diselesaikan atau dicek! 💪\nBuka TimJuara: ${window.location.origin}/team/${team?.username}`;
 
-    showToast(`Mengirim pesan pengingat otomatis via Bot ke ${task.assignee_profile.full_name}...`);
-    const res = await sendTestWhatsAppMessage(phone, message, team?.wa_gateway_token);
-    if (res.success) {
-      showToast(`Pengingat berhasil dikirim oleh Bot ke WA ${task.assignee_profile.full_name}! 📲`);
-      return;
+      showToast(`Mengirim pengingat via Bot ke ${pic.full_name}...`);
+      const res = await sendTestWhatsAppMessage(pic.phone_number!, message, team?.wa_gateway_token);
+      if (res.success) {
+        showToast(`Pengingat berhasil dikirim oleh Bot ke WA ${pic.full_name}! 📲`);
+      } else {
+        showToast(`⚠️ Bot WA gagal (${res.error || 'belum terhubung'}). Mengalihkan ke WhatsApp manual...`);
+        const cleanPhone = pic.phone_number!.replace(/[^0-9]/g, '').replace(/^0/, '62');
+        const waUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
+        window.open(waUrl, '_blank');
+      }
     }
-
-    // Fallback: jika bot belum aktif/gagal, beri info transparan lalu buka wa.me langsung
-    showToast(`⚠️ Bot WA gagal (${res.error || 'belum terhubung'}). Mengalihkan ke WhatsApp manual...`);
-    const cleanPhone = phone.replace(/[^0-9]/g, '').replace(/^0/, '62');
-    const waUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
-    window.open(waUrl, '_blank');
   };
 
   // -------------------------------------------------------------
@@ -871,6 +1121,84 @@ export default function TeamWorkspace() {
             </Link>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              {/* Theme Toggle Mobile */}
+              <button
+                onClick={toggleDarkMode}
+                className="theme-toggle-btn"
+                style={{ width: 32, height: 32 }}
+                title={isDarkMode ? 'Mode Terang' : 'Mode Gelap'}
+              >
+                {isDarkMode ? <Sun size={15} color="#f59e0b" /> : <Moon size={15} color="#6366f1" />}
+              </button>
+
+              {/* In-App Notifications Bell Mobile */}
+              <div style={{ position: 'relative' }}>
+                <button
+                  onClick={() => setShowNotifPopover((prev) => !prev)}
+                  className="notif-btn"
+                  style={{ width: 32, height: 32 }}
+                  title="Notifikasi"
+                >
+                  <Bell size={15} />
+                  {notifications.filter((n) => !n.is_read).length > 0 && (
+                    <span className="notif-badge">
+                      {notifications.filter((n) => !n.is_read).length}
+                    </span>
+                  )}
+                </button>
+
+                {showNotifPopover && (
+                  <div className="notif-popover" style={{ position: 'fixed', top: 60, right: 16, left: 16, width: 'auto' }}>
+                    <div className="notif-header">
+                      <span>🔔 Notifikasi</span>
+                      {notifications.some((n) => !n.is_read) && (
+                        <button
+                          onClick={handleMarkAllRead}
+                          style={{ background: 'none', border: 'none', color: 'var(--primary)', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}
+                        >
+                          Tandai semua dibaca
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="notif-list">
+                      {notifications.length === 0 ? (
+                        <div style={{ padding: '24px 16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.825rem' }}>
+                          Tidak ada notifikasi baru
+                        </div>
+                      ) : (
+                        notifications.map((n) => (
+                          <div
+                            key={n.id}
+                            onClick={async () => {
+                              if (!n.is_read) {
+                                await markNotificationAsRead(n.id);
+                                setNotifications((prev) =>
+                                  prev.map((item) => (item.id === n.id ? { ...item, is_read: true } : item))
+                                );
+                              }
+                              setShowNotifPopover(false);
+                            }}
+                            className={`notif-item ${!n.is_read ? 'unread' : ''}`}
+                          >
+                            <div style={{ flex: 1 }}>
+                              <div className="notif-item-title">{n.title}</div>
+                              <div className="notif-item-msg">{n.message}</div>
+                              <div className="notif-item-time">
+                                {new Date(n.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })} • {new Date(n.created_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
+                              </div>
+                            </div>
+                            {!n.is_read && (
+                              <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--primary)', alignSelf: 'center', flexShrink: 0 }} />
+                            )}
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {currentUser?.email?.toLowerCase() === 'admin@gmail.com' && (
                 <Link
                   href="/admin"
@@ -941,6 +1269,82 @@ export default function TeamWorkspace() {
 
             {/* Desktop Actions (Hidden on Mobile) */}
             <div className="workspace-desktop-actions">
+              {/* Theme Toggle Desktop */}
+              <button
+                onClick={toggleDarkMode}
+                className="theme-toggle-btn"
+                title={isDarkMode ? 'Mode Terang' : 'Mode Gelap'}
+              >
+                {isDarkMode ? <Sun size={17} color="#f59e0b" /> : <Moon size={17} color="#6366f1" />}
+              </button>
+
+              {/* In-App Notifications Bell Desktop */}
+              <div style={{ position: 'relative' }}>
+                <button
+                  onClick={() => setShowNotifPopover((prev) => !prev)}
+                  className="notif-btn"
+                  title="Notifikasi"
+                >
+                  <Bell size={17} />
+                  {notifications.filter((n) => !n.is_read).length > 0 && (
+                    <span className="notif-badge">
+                      {notifications.filter((n) => !n.is_read).length}
+                    </span>
+                  )}
+                </button>
+
+                {showNotifPopover && (
+                  <div className="notif-popover">
+                    <div className="notif-header">
+                      <span>🔔 Notifikasi</span>
+                      {notifications.some((n) => !n.is_read) && (
+                        <button
+                          onClick={handleMarkAllRead}
+                          style={{ background: 'none', border: 'none', color: 'var(--primary)', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}
+                        >
+                          Tandai semua dibaca
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="notif-list">
+                      {notifications.length === 0 ? (
+                        <div style={{ padding: '24px 16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.825rem' }}>
+                          Tidak ada notifikasi baru
+                        </div>
+                      ) : (
+                        notifications.map((n) => (
+                          <div
+                            key={n.id}
+                            onClick={async () => {
+                              if (!n.is_read) {
+                                await markNotificationAsRead(n.id);
+                                setNotifications((prev) =>
+                                  prev.map((item) => (item.id === n.id ? { ...item, is_read: true } : item))
+                                );
+                              }
+                              setShowNotifPopover(false);
+                            }}
+                            className={`notif-item ${!n.is_read ? 'unread' : ''}`}
+                          >
+                            <div style={{ flex: 1 }}>
+                              <div className="notif-item-title">{n.title}</div>
+                              <div className="notif-item-msg">{n.message}</div>
+                              <div className="notif-item-time">
+                                {new Date(n.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })} • {new Date(n.created_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
+                              </div>
+                            </div>
+                            {!n.is_read && (
+                              <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--primary)', alignSelf: 'center', flexShrink: 0 }} />
+                            )}
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {currentUser?.email?.toLowerCase() === 'admin@gmail.com' && (
                 <Link href="/admin" className="btn btn-sm" style={{ background: '#ef4444', color: '#fff', border: 'none', display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700 }}>
                   <Crown size={14} /> Panel Admin
@@ -1154,7 +1558,7 @@ export default function TeamWorkspace() {
                   >
                     <Share2 size={15} /> Rekap ke WA
                   </button>
-                  <button onClick={() => setShowAddTaskModal(true)} className="btn btn-primary btn-add-task">
+                  <button onClick={openAddTaskModal} className="btn btn-primary btn-add-task">
                     <Plus size={16} /> Tambah Tugas Baru
                   </button>
                 </div>
@@ -1172,7 +1576,7 @@ export default function TeamWorkspace() {
                   <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginBottom: 20 }}>
                     Mulai bagi tugas kelompok dan sertakan link pengerjaan agar tercapai target tepat waktu.
                   </p>
-                  <button onClick={() => setShowAddTaskModal(true)} className="btn btn-primary">
+                  <button onClick={openAddTaskModal} className="btn btn-primary">
                     <Plus size={16} /> Buat Tugas Pertama
                   </button>
                 </div>
@@ -1300,7 +1704,27 @@ export default function TeamWorkspace() {
                             <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                                 <span style={{ color: 'var(--text-subtle)' }}>Penanggung Jawab:</span>
-                                {task.assignee_profile ? (
+                                {task.assignee_profiles && task.assignee_profiles.length > 0 ? (
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                                    <div className="pic-avatar-stack">
+                                      {task.assignee_profiles.slice(0, 3).map((p, idx) => (
+                                        <span
+                                          key={p.id}
+                                          className="pic-stack-avatar"
+                                          title={p.full_name}
+                                          style={{
+                                            background: ['#6366f1', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6'][idx % 5],
+                                          }}
+                                        >
+                                          {p.full_name.slice(0, 1).toUpperCase()}
+                                        </span>
+                                      ))}
+                                    </div>
+                                    <span style={{ fontWeight: 600, color: 'var(--text-main)' }}>
+                                      {task.assignee_profiles.map((p) => p.full_name).join(', ')}
+                                    </span>
+                                  </div>
+                                ) : task.assignee_profile ? (
                                   <span style={{ fontWeight: 600, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: 5 }}>
                                     <span style={{ width: 22, height: 22, borderRadius: '50%', background: '#6366f1', color: 'white', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.7rem' }}>
                                       {task.assignee_profile.full_name.slice(0, 1)}
@@ -1394,8 +1818,26 @@ export default function TeamWorkspace() {
                             )}
                           </div>
 
-                          {/* Secondary Buttons (WhatsApp, Edit & Delete) */}
+                          {/* Secondary Buttons (WhatsApp, Comment, Edit & Delete) */}
                           <div className="task-actions-secondary">
+                            {/* Tombol Diskusi / Komentar */}
+                            <button
+                              onClick={() => openTaskComments(task)}
+                              className="btn btn-secondary btn-sm"
+                              style={{
+                                padding: '6px 10px',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: 5,
+                                color: (task.comments_count || 0) > 0 ? 'var(--primary)' : 'inherit',
+                                borderColor: (task.comments_count || 0) > 0 ? 'var(--primary-light)' : undefined,
+                              }}
+                              title="Diskusi & Komentar Tugas"
+                            >
+                              <MessageSquare size={14} />
+                              <span style={{ fontSize: '0.75rem', fontWeight: 700 }}>{task.comments_count || 0}</span>
+                            </button>
+
                             {task.status !== 'done' && (
                               <button
                                 onClick={() => handleSendTaskWAReminder(task)}
@@ -2040,19 +2482,47 @@ export default function TeamWorkspace() {
                 </div>
 
                 <div className="form-group">
-                  <label className="form-label">Ditugaskan Kepada (Penanggung Jawab)</label>
-                  <select
-                    value={taskAssignee}
-                    onChange={(e) => setTaskAssignee(e.target.value)}
-                    className="form-select"
-                  >
-                    <option value="">-- Pilih Anggota Tim --</option>
-                    {members.map((m) => (
-                      <option key={m.user_id} value={m.user_id}>
-                        {m.profile?.full_name || 'Anggota'} ({m.role === 'ketua' ? 'Ketua' : 'Anggota'})
-                      </option>
-                    ))}
-                  </select>
+                  <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span>Ditugaskan Kepada (Bisa Lebih dari 1 PIC)</span>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                      {taskAssigneeIds.length} dipilih
+                    </span>
+                  </label>
+                  <div className="pic-selector-grid">
+                    {members.map((m) => {
+                      const isSelected = taskAssigneeIds.includes(m.user_id);
+                      return (
+                        <button
+                          key={m.user_id}
+                          type="button"
+                          onClick={() => toggleAssignee(m.user_id)}
+                          className={`pic-chip ${isSelected ? 'selected' : ''}`}
+                        >
+                          <span
+                            style={{
+                              width: 24,
+                              height: 24,
+                              borderRadius: '50%',
+                              background: isSelected ? 'var(--primary)' : '#cbd5e1',
+                              color: isSelected ? 'white' : '#334155',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: '0.7rem',
+                              fontWeight: 700,
+                              flexShrink: 0,
+                            }}
+                          >
+                            {m.profile?.full_name?.slice(0, 1).toUpperCase() || 'A'}
+                          </span>
+                          <span style={{ flex: 1, textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {m.profile?.full_name || 'Anggota'}
+                          </span>
+                          {isSelected && <Check size={14} style={{ color: 'var(--primary)', flexShrink: 0 }} />}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
 
                 <div className="form-group">
@@ -2139,19 +2609,47 @@ export default function TeamWorkspace() {
                 </div>
 
                 <div className="form-group">
-                  <label className="form-label">Penanggung Jawab</label>
-                  <select
-                    value={taskAssignee}
-                    onChange={(e) => setTaskAssignee(e.target.value)}
-                    className="form-select"
-                  >
-                    <option value="">-- Pilih Anggota Tim --</option>
-                    {members.map((m) => (
-                      <option key={m.user_id} value={m.user_id}>
-                        {m.profile?.full_name || 'Anggota'} ({m.role === 'ketua' ? 'Ketua' : 'Anggota'})
-                      </option>
-                    ))}
-                  </select>
+                  <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span>Ditugaskan Kepada (Bisa Lebih dari 1 PIC)</span>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                      {taskAssigneeIds.length} dipilih
+                    </span>
+                  </label>
+                  <div className="pic-selector-grid">
+                    {members.map((m) => {
+                      const isSelected = taskAssigneeIds.includes(m.user_id);
+                      return (
+                        <button
+                          key={m.user_id}
+                          type="button"
+                          onClick={() => toggleAssignee(m.user_id)}
+                          className={`pic-chip ${isSelected ? 'selected' : ''}`}
+                        >
+                          <span
+                            style={{
+                              width: 24,
+                              height: 24,
+                              borderRadius: '50%',
+                              background: isSelected ? 'var(--primary)' : '#cbd5e1',
+                              color: isSelected ? 'white' : '#334155',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: '0.7rem',
+                              fontWeight: 700,
+                              flexShrink: 0,
+                            }}
+                          >
+                            {m.profile?.full_name?.slice(0, 1).toUpperCase() || 'A'}
+                          </span>
+                          <span style={{ flex: 1, textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {m.profile?.full_name || 'Anggota'}
+                          </span>
+                          {isSelected && <Check size={14} style={{ color: 'var(--primary)', flexShrink: 0 }} />}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
 
                 <div className="form-group">
@@ -2282,6 +2780,101 @@ export default function TeamWorkspace() {
                 </button>
                 <button type="submit" className="btn btn-danger">
                   Kirim Catatan Revisi
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL: DISKUSI & KOMENTAR TUGAS                                           */}
+      {/* ========================================================================= */}
+      {showCommentsModal && selectedTaskForComments && (
+        <div className="modal-overlay" onClick={() => setShowCommentsModal(false)}>
+          <div className="modal-card" style={{ maxWidth: 560, display: 'flex', flexDirection: 'column', maxHeight: '85vh' }} onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header" style={{ padding: '16px 20px', borderBottom: '1px solid var(--surface-border)' }}>
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <MessageSquare size={18} color="var(--primary)" />
+                  <h3 style={{ fontSize: '1.1rem', fontWeight: 800, margin: 0 }}>Diskusi Tugas</h3>
+                </div>
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '4px 0 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {selectedTaskForComments.title}
+                </p>
+              </div>
+              <button
+                onClick={() => setShowCommentsModal(false)}
+                style={{ background: 'none', border: 'none', fontSize: '1.2rem', cursor: 'pointer', color: 'var(--text-muted)', padding: 4 }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="modal-body" style={{ flex: 1, overflowY: 'auto', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+              {loadingComments ? (
+                <div style={{ textAlign: 'center', padding: '30px 0', color: 'var(--text-muted)', fontSize: '0.875rem' }}>
+                  Memuat riwayat diskusi...
+                </div>
+              ) : taskComments.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '36px 16px', color: 'var(--text-muted)' }}>
+                  <MessageCircle size={36} style={{ margin: '0 auto 10px', opacity: 0.3 }} />
+                  <p style={{ fontWeight: 600, fontSize: '0.9rem', marginBottom: 4 }}>Belum ada diskusi pada tugas ini</p>
+                  <p style={{ fontSize: '0.8rem' }}>Mulai percakapan atau tanyakan progres pekerjaan rekan tim di bawah!</p>
+                </div>
+              ) : (
+                taskComments.map((comment) => {
+                  const isMe = currentUser?.id === comment.user_id;
+                  const commentDate = new Date(comment.created_at).toLocaleTimeString('id-ID', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    day: 'numeric',
+                    month: 'short',
+                  });
+                  return (
+                    <div
+                      key={comment.id}
+                      style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: isMe ? 'flex-end' : 'flex-start',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3, fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                        <span style={{ fontWeight: 600, color: isMe ? 'var(--primary)' : 'var(--text-main)' }}>
+                          {isMe ? 'Anda' : comment.author_profile?.full_name || 'Anggota'}
+                        </span>
+                        <span>•</span>
+                        <span>{commentDate}</span>
+                      </div>
+                      <div className={`comment-bubble ${isMe ? 'comment-bubble-me' : 'comment-bubble-other'}`}>
+                        {comment.content}
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            <form onSubmit={handleSendComment} style={{ borderTop: '1px solid var(--surface-border)', padding: '14px 20px', background: 'var(--surface-secondary)' }}>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <input
+                  type="text"
+                  placeholder="Tulis pesan atau tanggapan..."
+                  value={commentInput}
+                  onChange={(e) => setCommentInput(e.target.value)}
+                  disabled={sendingComment}
+                  className="form-input"
+                  style={{ flex: 1, padding: '9px 14px', fontSize: '0.875rem' }}
+                />
+                <button
+                  type="submit"
+                  disabled={sendingComment || !commentInput.trim()}
+                  className="btn btn-primary"
+                  style={{ padding: '9px 16px', display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                >
+                  <Send size={15} />
+                  <span>Kirim</span>
                 </button>
               </div>
             </form>

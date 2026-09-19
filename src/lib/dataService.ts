@@ -13,6 +13,8 @@ import {
   AdminTeamItem,
   AdminUserItem,
   UserTeamItem,
+  TaskComment,
+  AppNotification,
 } from './types';
 
 // Mock Seed Data untuk Pengguna yang baru pertama mencoba tanpa konfigurasi Supabase
@@ -25,6 +27,8 @@ interface DemoDatabase {
   members: TeamMember[];
   tasks: Task[];
   research: ResearchMaterial[];
+  task_comments?: TaskComment[];
+  notifications?: AppNotification[];
 }
 
 function getInitialDemoData(): DemoDatabase {
@@ -158,6 +162,9 @@ function getDemoDb(): DemoDatabase {
     });
     localStorage.setItem(DEMO_DATA_KEY, JSON.stringify(db));
   }
+
+  if (!db.task_comments) db.task_comments = [];
+  if (!db.notifications) db.notifications = [];
 
   return db;
 }
@@ -1061,34 +1068,113 @@ export async function joinTeam(username: string, userId: string): Promise<{ team
 }
 
 // -------------------------------------------------------------
-// TASKS METHODS
+// TASKS METHODS (Mendukung Multi-PIC & Counter Komentar)
 // -------------------------------------------------------------
 
 export async function getTeamTasks(teamId: string): Promise<Task[]> {
   if (isSupabaseConfigured && supabase) {
-    const { data, error } = await supabase
+    let { data, error } = await supabase
       .from('tasks')
       .select(`
-        id, team_id, title, description, task_link, assigned_to, deadline, status, completed_by, review_notes, created_by, created_at,
+        id, team_id, title, description, task_link, assigned_to, assigned_to_ids, deadline, status, completed_by, review_notes, created_by, created_at,
         profiles!tasks_assigned_to_fkey (id, full_name, avatar_url, phone_number)
       `)
       .eq('team_id', teamId)
       .order('deadline', { ascending: true, nullsFirst: false });
 
+    // Fallback cerdas jika kolom assigned_to_ids belum dieksekusi di SQL Editor
+    if (error && error.message.includes('assigned_to_ids')) {
+      const fallbackRes = await supabase
+        .from('tasks')
+        .select(`
+          id, team_id, title, description, task_link, assigned_to, deadline, status, completed_by, review_notes, created_by, created_at,
+          profiles!tasks_assigned_to_fkey (id, full_name, avatar_url, phone_number)
+        `)
+        .eq('team_id', teamId)
+        .order('deadline', { ascending: true, nullsFirst: false });
+      data = fallbackRes.data as any;
+      error = fallbackRes.error as any;
+    }
+
     if (error || !data) return [];
-    return data.map((t: any) => ({
-      ...t,
-      assignee_profile: t.profiles,
-    }));
+
+    // Ambil seluruh profil anggota tim untuk me-resolve multiple assigned_to_ids
+    const { data: membersData } = await supabase
+      .from('team_members')
+      .select('user_id, profiles (id, full_name, avatar_url, phone_number)')
+      .eq('team_id', teamId);
+
+    const profileMap: Record<string, Profile> = {};
+    (membersData || []).forEach((m: any) => {
+      if (m.profiles) {
+        profileMap[m.user_id] = m.profiles;
+      }
+    });
+
+    // Ambil hitungan komentar untuk tiap tugas
+    const commentCountMap: Record<string, number> = {};
+    try {
+      const taskIds = data.map((t: any) => t.id);
+      if (taskIds.length > 0) {
+        const { data: commData } = await supabase
+          .from('task_comments')
+          .select('task_id')
+          .in('task_id', taskIds);
+        (commData || []).forEach((c: any) => {
+          commentCountMap[c.task_id] = (commentCountMap[c.task_id] || 0) + 1;
+        });
+      }
+    } catch {
+      // Abaikan jika tabel belum dibuat
+    }
+
+    return data.map((t: any) => {
+      const assignedIds: string[] = Array.isArray(t.assigned_to_ids) && t.assigned_to_ids.length > 0
+        ? t.assigned_to_ids
+        : (t.assigned_to ? [t.assigned_to] : []);
+
+      const assigneeProfiles: Profile[] = assignedIds
+        .map(id => profileMap[id] || (id === t.assigned_to ? t.profiles : undefined))
+        .filter((p): p is Profile => Boolean(p));
+
+      return {
+        ...t,
+        assigned_to_ids: assignedIds,
+        assignee_profile: t.profiles || assigneeProfiles[0],
+        assignee_profiles: assigneeProfiles.length > 0 ? assigneeProfiles : (t.profiles ? [t.profiles] : []),
+        comments_count: commentCountMap[t.id] || 0,
+      };
+    });
   } else {
     const db = getDemoDb();
     return db.tasks
       .filter(t => t.team_id === teamId)
       .map(t => {
-        const u = db.users.find(user => user.id === t.assigned_to);
+        const assignedIds: string[] = Array.isArray(t.assigned_to_ids) && t.assigned_to_ids.length > 0
+          ? t.assigned_to_ids
+          : (t.assigned_to ? [t.assigned_to] : []);
+
+        const assigneeProfiles: Profile[] = [];
+        for (const id of assignedIds) {
+          const u = db.users.find(user => user.id === id);
+          if (u) {
+            assigneeProfiles.push({
+              id: u.id,
+              full_name: u.full_name,
+              email: u.email,
+              phone_number: u.phone_number,
+            });
+          }
+        }
+
+        const commentsCount = (db.task_comments || []).filter(c => c.task_id === t.id).length;
+
         return {
           ...t,
-          assignee_profile: u ? { id: u.id, full_name: u.full_name } : undefined,
+          assigned_to_ids: assignedIds,
+          assignee_profile: assigneeProfiles[0] || (t.assigned_to ? db.users.find(u => u.id === t.assigned_to) : undefined),
+          assignee_profiles: assigneeProfiles,
+          comments_count: commentsCount,
         };
       })
       .sort((a, b) => {
@@ -1105,11 +1191,16 @@ export async function createTask(taskData: {
   description?: string;
   task_link?: string;
   assigned_to?: string;
+  assigned_to_ids?: string[];
   deadline?: string;
   status: TaskStatus;
   created_by?: string;
   completed_by?: string;
 }): Promise<{ task: Task | null; error: string | null }> {
+  const assignedIds: string[] = Array.isArray(taskData.assigned_to_ids) && taskData.assigned_to_ids.length > 0
+    ? taskData.assigned_to_ids.filter(id => Boolean(id && id.trim()))
+    : (taskData.assigned_to && taskData.assigned_to.trim() ? [taskData.assigned_to.trim()] : []);
+
   const cleanData: any = {
     team_id: taskData.team_id,
     title: taskData.title.trim(),
@@ -1117,13 +1208,9 @@ export async function createTask(taskData: {
     task_link: taskData.task_link?.trim() || '',
     status: taskData.status || 'todo',
     review_notes: '',
+    assigned_to: assignedIds[0] || null,
+    assigned_to_ids: assignedIds,
   };
-
-  if (taskData.assigned_to && taskData.assigned_to.trim()) {
-    cleanData.assigned_to = taskData.assigned_to.trim();
-  } else {
-    cleanData.assigned_to = null;
-  }
 
   if (taskData.deadline && taskData.deadline.trim()) {
     cleanData.deadline = taskData.deadline.trim();
@@ -1150,33 +1237,13 @@ export async function createTask(taskData: {
       .select()
       .single();
 
-    // Fallback cerdas: Jika skema tabel tasks di Supabase belum memiliki kolom review (completed_by / review_notes / task_link),
-    // otomatis retry dengan menyisipkan hanya kolom-kolom inti agar penambahan tugas tidak gagal!
-    if (error && (
-      error.message.includes('completed_by') || 
-      error.message.includes('review_notes') || 
-      error.message.includes('task_link')
-    )) {
-      const fallbackData: any = {
-        team_id: cleanData.team_id,
-        title: cleanData.title,
-        description: cleanData.description,
-        status: cleanData.status,
-        assigned_to: cleanData.assigned_to,
-        deadline: cleanData.deadline,
-        created_by: cleanData.created_by,
-      };
-
-      const retryRes = await supabase
-        .from('tasks')
-        .insert(fallbackData)
-        .select()
-        .single();
-
-      if (!retryRes.error) {
-        data = retryRes.data;
-        error = null;
-      }
+    // Fallback jika kolom assigned_to_ids belum ada di tabel Supabase
+    if (error && error.message.includes('assigned_to_ids')) {
+      const fallbackData = { ...cleanData };
+      delete fallbackData.assigned_to_ids;
+      const retryRes = await supabase.from('tasks').insert(fallbackData).select().single();
+      data = retryRes.data;
+      error = retryRes.error;
     }
 
     if (error) {
@@ -1199,9 +1266,20 @@ export async function createTask(taskData: {
 
 export async function updateTask(taskId: string, updates: Partial<Task>): Promise<{ success: boolean; error: string | null }> {
   const cleanUpdates: any = { ...updates };
-  if ('assigned_to' in cleanUpdates) {
+
+  if ('assigned_to_ids' in cleanUpdates && Array.isArray(cleanUpdates.assigned_to_ids)) {
+    const ids = cleanUpdates.assigned_to_ids.filter(Boolean);
+    cleanUpdates.assigned_to_ids = ids;
+    cleanUpdates.assigned_to = ids[0] || null;
+  } else if ('assigned_to' in cleanUpdates) {
     cleanUpdates.assigned_to = cleanUpdates.assigned_to && cleanUpdates.assigned_to.trim() ? cleanUpdates.assigned_to.trim() : null;
+    if (cleanUpdates.assigned_to) {
+      cleanUpdates.assigned_to_ids = [cleanUpdates.assigned_to];
+    } else {
+      cleanUpdates.assigned_to_ids = [];
+    }
   }
+
   if ('deadline' in cleanUpdates) {
     cleanUpdates.deadline = cleanUpdates.deadline && cleanUpdates.deadline.trim() ? cleanUpdates.deadline.trim() : null;
   }
@@ -1212,14 +1290,23 @@ export async function updateTask(taskId: string, updates: Partial<Task>): Promis
     cleanUpdates.task_link = cleanUpdates.task_link?.trim() || '';
   }
   delete cleanUpdates.assignee_profile;
+  delete cleanUpdates.assignee_profiles;
   delete cleanUpdates.profiles;
   delete cleanUpdates.id;
+  delete cleanUpdates.comments_count;
 
   if (isSupabaseConfigured && supabase) {
-    const { error } = await supabase
+    let { error } = await supabase
       .from('tasks')
       .update(cleanUpdates)
       .eq('id', taskId);
+
+    if (error && error.message.includes('assigned_to_ids')) {
+      const fallbackUpdates = { ...cleanUpdates };
+      delete fallbackUpdates.assigned_to_ids;
+      const retryRes = await supabase.from('tasks').update(fallbackUpdates).eq('id', taskId);
+      error = retryRes.error;
+    }
 
     if (error) {
       console.error('Error updating task in Supabase:', error);
@@ -1252,6 +1339,239 @@ export async function updateTaskStatus(
 
   const res = await updateTask(taskId, updates);
   return res.success;
+}
+
+// -------------------------------------------------------------
+// TASK COMMENTS (Kolom Diskusi Tugas - 100% Hemat Kuota)
+// -------------------------------------------------------------
+
+export async function getTaskComments(taskId: string): Promise<TaskComment[]> {
+  if (isSupabaseConfigured && supabase) {
+    try {
+      const { data, error } = await supabase
+        .from('task_comments')
+        .select(`
+          id, task_id, user_id, content, created_at,
+          profiles (id, full_name, avatar_url)
+        `)
+        .eq('task_id', taskId)
+        .order('created_at', { ascending: true });
+
+      if (error || !data) return [];
+      return data.map((c: any) => ({
+        id: c.id,
+        task_id: c.task_id,
+        user_id: c.user_id,
+        content: c.content,
+        created_at: c.created_at,
+        author_profile: c.profiles,
+      }));
+    } catch {
+      return [];
+    }
+  } else {
+    const db = getDemoDb();
+    const comments = (db.task_comments || []).filter(c => c.task_id === taskId);
+    return comments.map(c => {
+      const u = db.users.find(user => user.id === c.user_id);
+      return {
+        ...c,
+        author_profile: u ? { id: u.id, full_name: u.full_name, email: u.email } : undefined,
+      };
+    }).sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+  }
+}
+
+export async function addTaskComment(
+  taskId: string,
+  userId: string,
+  content: string
+): Promise<{ comment: TaskComment | null; error: string | null }> {
+  const cleanContent = content.trim();
+  if (!cleanContent) return { comment: null, error: 'Komentar tidak boleh kosong.' };
+
+  if (isSupabaseConfigured && supabase) {
+    const { data, error } = await supabase
+      .from('task_comments')
+      .insert({
+        task_id: taskId,
+        user_id: userId,
+        content: cleanContent,
+      })
+      .select(`
+        id, task_id, user_id, content, created_at,
+        profiles (id, full_name, avatar_url)
+      `)
+      .single();
+
+    if (error) {
+      console.error('Error adding comment:', error);
+      return { comment: null, error: error.message };
+    }
+    return {
+      comment: {
+        id: data.id,
+        task_id: data.task_id,
+        user_id: data.user_id,
+        content: data.content,
+        created_at: data.created_at,
+        author_profile: (data as any).profiles,
+      },
+      error: null,
+    };
+  } else {
+    const db = getDemoDb();
+    if (!db.task_comments) db.task_comments = [];
+    const newComment: TaskComment = {
+      id: 'comm-' + Date.now() + Math.random().toString(36).slice(2, 6),
+      task_id: taskId,
+      user_id: userId,
+      content: cleanContent,
+      created_at: new Date().toISOString(),
+    };
+    db.task_comments.push(newComment);
+    saveDemoDb(db);
+    const u = db.users.find(user => user.id === userId);
+    return {
+      comment: {
+        ...newComment,
+        author_profile: u ? { id: u.id, full_name: u.full_name, email: u.email } : undefined,
+      },
+      error: null,
+    };
+  }
+}
+
+// -------------------------------------------------------------
+// NOTIFICATIONS (Notifikasi In-App & Lonceng Web)
+// -------------------------------------------------------------
+
+export async function getUserNotifications(userId: string): Promise<AppNotification[]> {
+  if (isSupabaseConfigured && supabase) {
+    try {
+      const { data, error } = await supabase
+        .from('notifications')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(30);
+
+      if (error || !data) return [];
+      return data;
+    } catch {
+      return [];
+    }
+  } else {
+    const db = getDemoDb();
+    return (db.notifications || [])
+      .filter(n => n.user_id === userId)
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+      .slice(0, 30);
+  }
+}
+
+export async function createNotification(
+  userId: string,
+  title: string,
+  message: string,
+  link: string = '',
+  teamId?: string
+): Promise<boolean> {
+  if (isSupabaseConfigured && supabase) {
+    try {
+      const { error } = await supabase.from('notifications').insert({
+        user_id: userId,
+        team_id: teamId || null,
+        title,
+        message,
+        link,
+        is_read: false,
+      });
+      return !error;
+    } catch {
+      return false;
+    }
+  } else {
+    const db = getDemoDb();
+    if (!db.notifications) db.notifications = [];
+    db.notifications.unshift({
+      id: 'notif-' + Date.now() + Math.random().toString(36).slice(2, 6),
+      user_id: userId,
+      team_id: teamId,
+      title,
+      message,
+      link,
+      is_read: false,
+      created_at: new Date().toISOString(),
+    });
+    saveDemoDb(db);
+    return true;
+  }
+}
+
+export async function markNotificationAsRead(notificationId: string): Promise<boolean> {
+  if (isSupabaseConfigured && supabase) {
+    try {
+      const { error } = await supabase
+        .from('notifications')
+        .update({ is_read: true })
+        .eq('id', notificationId);
+      return !error;
+    } catch {
+      return false;
+    }
+  } else {
+    const db = getDemoDb();
+    if (db.notifications) {
+      const n = db.notifications.find(item => item.id === notificationId);
+      if (n) {
+        n.is_read = true;
+        saveDemoDb(db);
+      }
+    }
+    return true;
+  }
+}
+
+export async function markAllNotificationsAsRead(userId: string): Promise<boolean> {
+  if (isSupabaseConfigured && supabase) {
+    try {
+      const { error } = await supabase
+        .from('notifications')
+        .update({ is_read: true })
+        .eq('user_id', userId)
+        .eq('is_read', false);
+      return !error;
+    } catch {
+      return false;
+    }
+  } else {
+    const db = getDemoDb();
+    if (db.notifications) {
+      db.notifications.forEach(n => {
+        if (n.user_id === userId) n.is_read = true;
+      });
+      saveDemoDb(db);
+    }
+    return true;
+  }
+}
+
+// -------------------------------------------------------------
+// REAL-TIME WHATSAPP NOTIFICATION HELPER (Async Background)
+// -------------------------------------------------------------
+
+export async function sendRealtimeWhatsAppNotification(
+  phones: string[],
+  message: string,
+  teamToken?: string
+): Promise<void> {
+  const uniquePhones = Array.from(new Set(phones.filter(p => Boolean(p && p.trim()))));
+  if (uniquePhones.length === 0) return;
+
+  for (const phone of uniquePhones) {
+    sendTestWhatsAppMessage(phone, message, teamToken).catch(() => {});
+  }
 }
 
 export async function deleteTask(taskId: string): Promise<boolean> {
@@ -1436,43 +1756,49 @@ export function calculateContributionStats(members: TeamMember[], tasks: Task[])
   const isSingleMemberTeam = members.length === 1;
 
   const contributions: MemberContribution[] = members.map(m => {
+    const isAssigned = (t: Task) => {
+      if (t.assigned_to === m.user_id) return true;
+      if (t.assigned_to_ids && Array.isArray(t.assigned_to_ids) && t.assigned_to_ids.includes(m.user_id)) return true;
+      return false;
+    };
+
     // Tugas yang selesai dihitung berdasarkan:
     // 1. t.completed_by === m.user_id
-    // 2. ATAU t.assigned_to === m.user_id
+    // 2. ATAU isAssigned(t)
     // 3. ATAU jika hanya ada 1 member di tim, tugas selesai langsung diatribusikan ke member tersebut
     // 4. ATAU t.created_by === m.user_id jika assigned_to kosong
     const completed = tasks.filter(t => {
       if (t.status !== 'done') return false;
       if (t.completed_by) return t.completed_by === m.user_id;
-      if (t.assigned_to) return t.assigned_to === m.user_id;
+      if (isAssigned(t)) return true;
       if (isSingleMemberTeam) return true;
-      return t.created_by === m.user_id;
+      return t.created_by === m.user_id && !t.assigned_to;
     }).length;
 
     const inReview = tasks.filter(t => {
       if (t.status !== 'review') return false;
       if (t.completed_by) return t.completed_by === m.user_id;
-      if (t.assigned_to) return t.assigned_to === m.user_id;
+      if (isAssigned(t)) return true;
       if (isSingleMemberTeam) return true;
       return false;
     }).length;
 
     const inProgress = tasks.filter(t => {
       if (t.status !== 'in_progress') return false;
-      if (t.assigned_to) return t.assigned_to === m.user_id;
+      if (isAssigned(t)) return true;
       if (isSingleMemberTeam) return true;
       return false;
     }).length;
 
     const todo = tasks.filter(t => {
       if (t.status !== 'todo') return false;
-      if (t.assigned_to) return t.assigned_to === m.user_id;
+      if (isAssigned(t)) return true;
       if (isSingleMemberTeam) return true;
       return false;
     }).length;
 
     const totalAssigned = tasks.filter(t => {
-      if (t.assigned_to === m.user_id) return true;
+      if (isAssigned(t)) return true;
       if (t.completed_by === m.user_id) return true;
       if (isSingleMemberTeam) return true;
       return false;

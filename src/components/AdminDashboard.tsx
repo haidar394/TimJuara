@@ -52,6 +52,8 @@ import {
   Edit,
   Eye,
   EyeOff,
+  Sun,
+  Moon,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -100,6 +102,30 @@ export default function AdminDashboard() {
   const [editSelectedTeamIds, setEditSelectedTeamIds] = useState<string[]>([]);
   const [showEditPassword, setShowEditPassword] = useState(false);
   const [isSavingUser, setIsSavingUser] = useState(false);
+
+  // Dark Mode State
+  const [isDarkMode, setIsDarkMode] = useState(false);
+
+  useEffect(() => {
+    const savedTheme = localStorage.getItem('timjuara_theme');
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    if (savedTheme === 'dark' || (!savedTheme && prefersDark)) {
+      setIsDarkMode(true);
+      document.documentElement.setAttribute('data-theme', 'dark');
+    }
+  }, []);
+
+  const toggleDarkMode = () => {
+    const next = !isDarkMode;
+    setIsDarkMode(next);
+    if (next) {
+      document.documentElement.setAttribute('data-theme', 'dark');
+      localStorage.setItem('timjuara_theme', 'dark');
+    } else {
+      document.documentElement.removeAttribute('data-theme');
+      localStorage.setItem('timjuara_theme', 'light');
+    }
+  };
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -524,6 +550,14 @@ export default function AdminDashboard() {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <button
+              onClick={toggleDarkMode}
+              className="theme-toggle-btn"
+              title={isDarkMode ? 'Beralih ke Mode Terang' : 'Beralih ke Mode Gelap'}
+              style={{ background: '#1e293b', borderColor: '#334155' }}
+            >
+              {isDarkMode ? <Sun size={17} color="#facc15" /> : <Moon size={17} color="#94a3b8" />}
+            </button>
             <Link href="/onboarding" className="btn btn-secondary btn-sm" style={{ background: '#1e293b', color: '#f1f5f9', borderColor: '#334155' }}>
               <ArrowLeft size={14} /> Beranda Tim
             </Link>

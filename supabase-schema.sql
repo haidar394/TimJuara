@@ -547,3 +547,74 @@ BEGIN
 END;
 $$;
 
+-- 8. Fitur Lanjutan: Multi-PIC Tugas, Komentar Diskusi Tugas, dan Notifikasi In-App
+-- Kolom multi-assignee pada tabel tasks
+ALTER TABLE public.tasks ADD COLUMN IF NOT EXISTS assigned_to_ids TEXT[] DEFAULT '{}';
+
+-- Tabel Komentar Diskusi Tugas (Ringan & Hemat Kuota)
+CREATE TABLE IF NOT EXISTS public.task_comments (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    task_id UUID NOT NULL REFERENCES public.tasks(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+    content TEXT NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_task_comments_task_id ON public.task_comments(task_id);
+CREATE INDEX IF NOT EXISTS idx_task_comments_created_at ON public.task_comments(created_at);
+
+ALTER TABLE public.task_comments ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Task comments viewable by authenticated users" ON public.task_comments;
+CREATE POLICY "Task comments viewable by authenticated users"
+ON public.task_comments FOR SELECT TO authenticated
+USING (true);
+
+DROP POLICY IF EXISTS "Authenticated users can post comments" ON public.task_comments;
+CREATE POLICY "Authenticated users can post comments"
+ON public.task_comments FOR INSERT TO authenticated
+WITH CHECK (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Users can delete their own comments or admin" ON public.task_comments;
+CREATE POLICY "Users can delete their own comments or admin"
+ON public.task_comments FOR DELETE TO authenticated
+USING (auth.uid() = user_id OR (auth.jwt() ->> 'email') = 'admin@gmail.com');
+
+-- Tabel Notifikasi In-App (Lonceng Web)
+CREATE TABLE IF NOT EXISTS public.notifications (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+    team_id UUID REFERENCES public.teams(id) ON DELETE CASCADE,
+    title TEXT NOT NULL,
+    message TEXT NOT NULL,
+    link TEXT DEFAULT '',
+    is_read BOOLEAN DEFAULT false,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON public.notifications(user_id);
+CREATE INDEX IF NOT EXISTS idx_notifications_is_read ON public.notifications(is_read);
+
+ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Users can view their own notifications" ON public.notifications;
+CREATE POLICY "Users can view their own notifications"
+ON public.notifications FOR SELECT TO authenticated
+USING (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "System and users can insert notifications" ON public.notifications;
+CREATE POLICY "System and users can insert notifications"
+ON public.notifications FOR INSERT TO authenticated
+WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Users can update their own notifications" ON public.notifications;
+CREATE POLICY "Users can update their own notifications"
+ON public.notifications FOR UPDATE TO authenticated
+USING (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Users can delete their own notifications" ON public.notifications;
+CREATE POLICY "Users can delete their own notifications"
+ON public.notifications FOR DELETE TO authenticated
+USING (auth.uid() = user_id);
+
+

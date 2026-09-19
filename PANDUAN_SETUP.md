@@ -219,8 +219,46 @@ Jika Anda sudah memiliki database Supabase yang berjalan sebelumnya:
      RETURN jsonb_build_object('success', true);
    END;
    $$;
+
+   -- 6. Fitur Multi-PIC, Diskusi Komentar Tugas, dan Notifikasi In-App
+   ALTER TABLE public.tasks ADD COLUMN IF NOT EXISTS assigned_to_ids TEXT[] DEFAULT '{}';
+
+   CREATE TABLE IF NOT EXISTS public.task_comments (
+       id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+       task_id UUID NOT NULL REFERENCES public.tasks(id) ON DELETE CASCADE,
+       user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+       content TEXT NOT NULL,
+       created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+   );
+   ALTER TABLE public.task_comments ENABLE ROW LEVEL SECURITY;
+   DROP POLICY IF EXISTS "Task comments viewable by authenticated users" ON public.task_comments;
+   CREATE POLICY "Task comments viewable by authenticated users" ON public.task_comments FOR SELECT TO authenticated USING (true);
+   DROP POLICY IF EXISTS "Authenticated users can post comments" ON public.task_comments;
+   CREATE POLICY "Authenticated users can post comments" ON public.task_comments FOR INSERT TO authenticated WITH CHECK (auth.uid() = user_id);
+   DROP POLICY IF EXISTS "Users can delete their own comments or admin" ON public.task_comments;
+   CREATE POLICY "Users can delete their own comments or admin" ON public.task_comments FOR DELETE TO authenticated USING (auth.uid() = user_id OR (auth.jwt() ->> 'email') = 'admin@gmail.com');
+
+   CREATE TABLE IF NOT EXISTS public.notifications (
+       id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+       user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+       team_id UUID REFERENCES public.teams(id) ON DELETE CASCADE,
+       title TEXT NOT NULL,
+       message TEXT NOT NULL,
+       link TEXT DEFAULT '',
+       is_read BOOLEAN DEFAULT false,
+       created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+   );
+   ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
+   DROP POLICY IF EXISTS "Users can view their own notifications" ON public.notifications;
+   CREATE POLICY "Users can view their own notifications" ON public.notifications FOR SELECT TO authenticated USING (auth.uid() = user_id);
+   DROP POLICY IF EXISTS "System and users can insert notifications" ON public.notifications;
+   CREATE POLICY "System and users can insert notifications" ON public.notifications FOR INSERT TO authenticated WITH CHECK (true);
+   DROP POLICY IF EXISTS "Users can update their own notifications" ON public.notifications;
+   CREATE POLICY "Users can update their own notifications" ON public.notifications FOR UPDATE TO authenticated USING (auth.uid() = user_id);
+   DROP POLICY IF EXISTS "Users can delete their own notifications" ON public.notifications;
+   CREATE POLICY "Users can delete their own notifications" ON public.notifications FOR DELETE TO authenticated USING (auth.uid() = user_id);
    ```
-3. Klik **Run**. Seluruh fitur manajemen pengguna & anggota tim untuk Master Admin kini aktif!
+3. Klik **Run**. Seluruh fitur manajemen pengguna, multi-PIC, komentar, & notifikasi kini aktif!
 
 ### Langkah 2: Dapatkan Token Fonnte Gratis (1 Menit)
 1. Buka [https://fonnte.com](https://fonnte.com) dan buat akun baru gratis.
@@ -242,13 +280,11 @@ Jika Anda sudah memiliki database Supabase yang berjalan sebelumnya:
 2. Pada bagian **Edit Profil Saya**, masukkan nomor WhatsApp di kolom **Nomor WhatsApp** (format: `08...` atau `628...`) lalu klik **Simpan Nomor WA**.
 3. Anggota dapat mengklik tombol **"📲 Tes Kirim WA"** untuk memverifikasi bahwa nomor mereka sudah terhubung dengan bot platform.
 
-### Bagaimana Jadwal Otomatis Bekerja?
+### Bagaimana Jadwal Otomatis & Notifikasi Real-Time Bekerja?
 - File [`vercel.json`](./vercel.json) telah dikonfigurasi dengan Vercel Cron yang berjalan setiap hari pukul **01:00 UTC (08:00 WIB)** memanggil endpoint `/api/whatsapp/remind`.
 - Bot akan memindai seluruh tugas dari semua tim yang berstatus belum selesai, dan secara otomatis mengirim pesan pengingat ke WhatsApp anggota yang memiliki tugas dengan deadline:
   - ⏳ **H-1** (Besok batas waktu)
   - 🚨 **Hari H** (Hari ini batas waktu)
   - ⚠️ **Terlewat** (Melewati batas waktu dan perlu segera diselesaikan)
+- **Notifikasi Real-Time**: Bot juga otomatis mengirim pesan ke WhatsApp anggota seketika saat ada **tugas baru ditugaskan**, saat ada **permintaan revisi tugas dari ketua**, dan saat anggota **mengajukan tugas untuk dicek**.
 - Master Admin juga dapat mengklik tombol **"📢 Picu Kirim Notifikasi Pengingat ke Semua Tim Sekarang"** dari panel `/admin` kapan saja untuk pengujian manual.
-
-
-

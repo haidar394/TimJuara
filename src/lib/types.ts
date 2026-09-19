@@ -39,7 +39,8 @@ export interface Task {
   title: string;
   description?: string;
   task_link?: string; // Tautan hasil tugas (Google Docs, Drive, Figma, dll)
-  assigned_to?: string;
+  assigned_to?: string; // PIC Utama (untuk kompatibilitas)
+  assigned_to_ids?: string[]; // Seluruh ID anggota yang ditugaskan (Multi-PIC)
   deadline?: string; // ISO date string
   status: TaskStatus;
   completed_by?: string; // ID anggota yang menyelesaikan tugas
@@ -47,7 +48,29 @@ export interface Task {
   created_by?: string;
   created_at: string;
   assignee_profile?: Profile;
+  assignee_profiles?: Profile[]; // Daftar seluruh profil PIC
   completed_by_profile?: Profile;
+  comments_count?: number;
+}
+
+export interface TaskComment {
+  id: string;
+  task_id: string;
+  user_id: string;
+  content: string;
+  created_at: string;
+  author_profile?: Profile;
+}
+
+export interface AppNotification {
+  id: string;
+  user_id: string;
+  team_id?: string;
+  title: string;
+  message: string;
+  link?: string;
+  is_read: boolean;
+  created_at: string;
 }
 
 export interface ResearchMaterial {
