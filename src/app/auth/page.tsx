@@ -1,9 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { signInUser, signUpUser, getUserTeams } from '@/lib/dataService';
-import { LogIn, UserPlus, ArrowRight, Shield, AlertCircle, CheckCircle } from 'lucide-react';
+import { LogIn, UserPlus, ArrowRight, Shield, AlertCircle, CheckCircle, Sun, Moon } from 'lucide-react';
 import Link from 'next/link';
 
 export default function AuthPage() {
@@ -16,6 +16,24 @@ export default function AuthPage() {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [isDarkMode, setIsDarkMode] = useState(false);
+
+  useEffect(() => {
+    const currentTheme = document.documentElement.getAttribute('data-theme');
+    setIsDarkMode(currentTheme === 'dark');
+  }, []);
+
+  const toggleTheme = () => {
+    const newTheme = isDarkMode ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', newTheme);
+    if (newTheme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+    localStorage.setItem('timjuara_theme', newTheme);
+    setIsDarkMode(!isDarkMode);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -75,18 +93,27 @@ export default function AuthPage() {
 
 
   return (
-    <div suppressHydrationWarning style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: 'radial-gradient(ellipse at 50% 20%, #e0e7ff 0%, #f8fafc 80%)' }}>
+    <div suppressHydrationWarning className="auth-page-bg" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: 'radial-gradient(ellipse at 50% 20%, #e0e7ff 0%, #f8fafc 80%)' }}>
       {/* Mini Header */}
-      <div style={{ padding: '20px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div className="auth-mini-header" style={{ padding: '20px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <div className="avatar-badge" style={{ width: 34, height: 34, background: 'linear-gradient(135deg, #4f46e5, #06b6d4)' }}>
             TJ
           </div>
           <span style={{ fontWeight: 800, fontSize: '1.1rem', color: 'var(--text-main)' }}>TimJuara</span>
         </Link>
-        <Link href="/" style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>
-          ← Kembali ke Beranda
-        </Link>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <button
+            onClick={toggleTheme}
+            className="theme-toggle-btn"
+            title={isDarkMode ? 'Mode Terang' : 'Mode Gelap'}
+          >
+            {isDarkMode ? <Sun size={18} /> : <Moon size={18} />}
+          </button>
+          <Link href="/" style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>
+            ← Kembali ke Beranda
+          </Link>
+        </div>
       </div>
 
       {/* Main Card */}
@@ -105,10 +132,11 @@ export default function AuthPage() {
           </div>
 
           {/* Tab Switcher */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', background: '#f1f5f9', padding: 4, borderRadius: 'var(--radius-md)', marginBottom: 24 }}>
+          <div className="auth-tab-switcher" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', background: '#f1f5f9', padding: 4, borderRadius: 'var(--radius-md)', marginBottom: 24 }}>
             <button
               type="button"
               onClick={() => { setIsRegister(false); setErrorMsg(null); }}
+              className={`auth-tab-btn ${!isRegister ? 'active' : ''}`}
               style={{
                 padding: '8px 0',
                 border: 'none',
@@ -116,8 +144,8 @@ export default function AuthPage() {
                 fontWeight: 600,
                 fontSize: '0.875rem',
                 cursor: 'pointer',
-                background: !isRegister ? '#ffffff' : 'transparent',
-                color: !isRegister ? 'var(--primary)' : 'var(--text-muted)',
+                background: !isRegister ? (isDarkMode ? '#1e293b' : '#ffffff') : 'transparent',
+                color: !isRegister ? (isDarkMode ? '#a5b4fc' : 'var(--primary)') : 'var(--text-muted)',
                 boxShadow: !isRegister ? 'var(--shadow-sm)' : 'none',
                 transition: 'all 0.15s ease',
               }}
@@ -128,6 +156,7 @@ export default function AuthPage() {
             <button
               type="button"
               onClick={() => { setIsRegister(true); setErrorMsg(null); }}
+              className={`auth-tab-btn ${isRegister ? 'active' : ''}`}
               style={{
                 padding: '8px 0',
                 border: 'none',
@@ -135,8 +164,8 @@ export default function AuthPage() {
                 fontWeight: 600,
                 fontSize: '0.875rem',
                 cursor: 'pointer',
-                background: isRegister ? '#ffffff' : 'transparent',
-                color: isRegister ? 'var(--primary)' : 'var(--text-muted)',
+                background: isRegister ? (isDarkMode ? '#1e293b' : '#ffffff') : 'transparent',
+                color: isRegister ? (isDarkMode ? '#a5b4fc' : 'var(--primary)') : 'var(--text-muted)',
                 boxShadow: isRegister ? 'var(--shadow-sm)' : 'none',
                 transition: 'all 0.15s ease',
               }}

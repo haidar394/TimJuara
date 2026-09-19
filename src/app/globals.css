@@ -1012,7 +1012,7 @@ button, input, select, textarea {
     justify-content: space-between;
     align-items: center;
     width: 100%;
-    border-top: 1px solid #f1f5f9;
+    border-top: 1px solid var(--surface-border-light);
     padding-top: 12px;
     margin-top: 2px;
     gap: 8px;
@@ -1414,6 +1414,127 @@ button, input, select, textarea {
   line-height: 1.4;
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+/* =====================================================================
+   GLOBAL DARK MODE: LANDING, AUTH, ONBOARDING & SHARED ELEMENTS
+   ===================================================================== */
+
+/* --- Glass Panel Dark Mode --- */
+[data-theme="dark"] .glass-panel,
+.dark .glass-panel {
+  background: rgba(19, 29, 51, 0.92) !important;
+  border-color: #243455 !important;
+}
+
+/* --- Card hover in dark mode --- */
+[data-theme="dark"] .card:hover,
+.dark .card:hover {
+  border-color: #334155 !important;
+}
+
+/* --- Landing Page Header Dark Mode --- */
+[data-theme="dark"] .landing-header,
+.dark .landing-header {
+  background: rgba(11, 17, 32, 0.92) !important;
+  border-bottom-color: #243455 !important;
+}
+
+/* --- Landing Page Footer Dark Mode --- */
+[data-theme="dark"] .landing-footer,
+.dark .landing-footer {
+  background: var(--surface) !important;
+  border-top-color: var(--surface-border) !important;
+}
+
+/* --- Landing/Feature Icon Box Dark Mode --- */
+[data-theme="dark"] .feature-icon-box,
+.dark .feature-icon-box {
+  background: rgba(79, 70, 229, 0.12) !important;
+}
+
+/* --- Auth Page Background Dark Mode --- */
+[data-theme="dark"] .auth-page-bg,
+.dark .auth-page-bg {
+  background: radial-gradient(ellipse at 50% 20%, #0f172a 0%, #080d1a 80%) !important;
+}
+
+/* --- Auth Page Tab Switcher Dark Mode --- */
+[data-theme="dark"] .auth-tab-switcher,
+.dark .auth-tab-switcher {
+  background: #0f172a !important;
+  border: 1px solid #243455 !important;
+}
+
+[data-theme="dark"] .auth-tab-btn,
+.dark .auth-tab-btn {
+  color: #94a3b8 !important;
+}
+
+[data-theme="dark"] .auth-tab-btn.active,
+.dark .auth-tab-btn.active {
+  background: #1e293b !important;
+  color: #a5b4fc !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4) !important;
+}
+
+/* --- Onboarding Page Background Dark Mode --- */
+[data-theme="dark"] .onboarding-page-bg,
+.dark .onboarding-page-bg {
+  background: radial-gradient(ellipse at 50% 10%, #0f172a 0%, #080d1a 60%) !important;
+}
+
+/* --- Onboarding Header Dark Mode --- */
+[data-theme="dark"] .onboarding-header,
+.dark .onboarding-header {
+  background: rgba(11, 17, 32, 0.92) !important;
+  border-bottom-color: #243455 !important;
+}
+
+/* --- Onboarding Role Badges Dark Mode --- */
+[data-theme="dark"] .role-badge-leader,
+.dark .role-badge-leader {
+  background: rgba(245, 158, 11, 0.18) !important;
+  color: #fbbf24 !important;
+}
+
+[data-theme="dark"] .role-badge-member,
+.dark .role-badge-member {
+  background: rgba(99, 102, 241, 0.18) !important;
+  color: #a5b4fc !important;
+}
+
+/* --- Onboarding @username chip Dark Mode --- */
+[data-theme="dark"] .team-username-chip,
+.dark .team-username-chip {
+  background: rgba(79, 70, 229, 0.15) !important;
+  color: #a5b4fc !important;
+}
+
+/* --- Onboarding Hero Badge Dark Mode --- */
+[data-theme="dark"] .onboarding-hero-badge,
+.dark .onboarding-hero-badge {
+  background: rgba(79, 70, 229, 0.18) !important;
+  color: #a5b4fc !important;
+}
+
+/* --- Onboarding Workspace Card Bottom Border Dark Mode --- */
+[data-theme="dark"] .team-card-bottom-border,
+.dark .team-card-bottom-border {
+  border-top-color: #243455 !important;
+}
+
+/* --- Onboarding Tab Card Inactive Icon Dark Mode --- */
+[data-theme="dark"] .onboarding-tab-icon-inactive,
+.dark .onboarding-tab-icon-inactive {
+  background: #1e293b !important;
+  color: #94a3b8 !important;
+}
+
+/* --- Auth Mini Header Dark Mode --- */
+[data-theme="dark"] .auth-mini-header,
+.dark .auth-mini-header {
+  /* transparent on dark since page bg is already dark */
 }
 
 

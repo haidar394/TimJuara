@@ -24,6 +24,8 @@ import {
   ArrowLeft,
   LayoutGrid,
   Calendar,
+  Sun,
+  Moon,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -49,6 +51,24 @@ function OnboardingContent() {
 
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [isDarkMode, setIsDarkMode] = useState(false);
+
+  useEffect(() => {
+    const currentTheme = document.documentElement.getAttribute('data-theme');
+    setIsDarkMode(currentTheme === 'dark');
+  }, []);
+
+  const toggleTheme = () => {
+    const newTheme = isDarkMode ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', newTheme);
+    if (newTheme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+    localStorage.setItem('timjuara_theme', newTheme);
+    setIsDarkMode(!isDarkMode);
+  };
 
   useEffect(() => {
     async function loadData() {
@@ -172,9 +192,9 @@ function OnboardingContent() {
   }
 
   return (
-    <div suppressHydrationWarning style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: 'radial-gradient(ellipse at 50% 10%, #eef2ff 0%, #f8fafc 60%)' }}>
+    <div suppressHydrationWarning className="onboarding-page-bg" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: 'radial-gradient(ellipse at 50% 10%, #eef2ff 0%, #f8fafc 60%)' }}>
       {/* Header */}
-      <header style={{ borderBottom: '1px solid var(--surface-border)', background: 'rgba(255, 255, 255, 0.9)', backdropFilter: 'blur(10px)', padding: '16px 0', position: 'sticky', top: 0, zIndex: 50 }}>
+      <header className="onboarding-header" style={{ borderBottom: '1px solid var(--surface-border)', background: 'rgba(255, 255, 255, 0.9)', backdropFilter: 'blur(10px)', padding: '16px 0', position: 'sticky', top: 0, zIndex: 50 }}>
         <div className="container" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <div className="avatar-badge" style={{ width: 38, height: 38, background: 'linear-gradient(135deg, #4f46e5, #06b6d4)', boxShadow: '0 4px 12px rgba(79, 70, 229, 0.25)' }}>
@@ -210,6 +230,13 @@ function OnboardingContent() {
               <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0 }}>{currentUser?.email || 'Akun Aktif'}</p>
             </div>
             <button
+              onClick={toggleTheme}
+              className="theme-toggle-btn"
+              title={isDarkMode ? 'Mode Terang' : 'Mode Gelap'}
+            >
+              {isDarkMode ? <Sun size={18} /> : <Moon size={18} />}
+            </button>
+            <button
               onClick={handleLogout}
               className="btn btn-secondary btn-sm"
               style={{ display: 'flex', alignItems: 'center', gap: 6 }}
@@ -232,7 +259,7 @@ function OnboardingContent() {
             <div>
               {/* Hero Banner */}
               <div style={{ textAlign: 'center', marginBottom: 32 }}>
-                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#e0e7ff', color: '#4338ca', padding: '4px 14px', borderRadius: 99, fontSize: '0.8rem', fontWeight: 700, marginBottom: 12 }}>
+                <div className="onboarding-hero-badge" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#e0e7ff', color: '#4338ca', padding: '4px 14px', borderRadius: 99, fontSize: '0.8rem', fontWeight: 700, marginBottom: 12 }}>
                   <Sparkles size={14} /> Workspace Kolaborasi
                 </div>
                 <h2 style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--text-main)', letterSpacing: '-0.02em', marginBottom: 8 }}>
@@ -367,6 +394,7 @@ function OnboardingContent() {
                             {/* Role Badge */}
                             {isLeader ? (
                               <span
+                                className="role-badge-leader"
                                 style={{
                                   background: '#fef3c7',
                                   color: '#b45309',
@@ -383,6 +411,7 @@ function OnboardingContent() {
                               </span>
                             ) : (
                               <span
+                                className="role-badge-member"
                                 style={{
                                   background: '#eff6ff',
                                   color: '#1d4ed8',
@@ -405,6 +434,7 @@ function OnboardingContent() {
                             {t.name}
                           </h3>
                           <span
+                            className="team-username-chip"
                             style={{
                               fontFamily: 'monospace',
                               fontSize: '0.75rem',
@@ -439,7 +469,7 @@ function OnboardingContent() {
                         </div>
 
                         {/* Bottom Row: Stats & Action */}
-                        <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: 14, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <div className="team-card-bottom-border" style={{ borderTop: '1px solid var(--surface-border-light)', paddingTop: 14, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                             <span className="badge badge-neutral" style={{ fontSize: '0.725rem' }} title="Jumlah Anggota">
                               <Users size={12} /> {t.member_count}
@@ -518,8 +548,8 @@ function OnboardingContent() {
                       width: 40,
                       height: 40,
                       borderRadius: 10,
-                      background: viewMode === 'create' ? 'var(--primary)' : '#e2e8f0',
-                      color: viewMode === 'create' ? '#ffffff' : '#64748b',
+                      background: viewMode === 'create' ? 'var(--primary)' : (isDarkMode ? '#1e293b' : '#e2e8f0'),
+                      color: viewMode === 'create' ? '#ffffff' : (isDarkMode ? '#94a3b8' : '#64748b'),
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
@@ -554,8 +584,8 @@ function OnboardingContent() {
                       width: 40,
                       height: 40,
                       borderRadius: 10,
-                      background: viewMode === 'join' ? 'var(--primary)' : '#e2e8f0',
-                      color: viewMode === 'join' ? '#ffffff' : '#64748b',
+                      background: viewMode === 'join' ? 'var(--primary)' : (isDarkMode ? '#1e293b' : '#e2e8f0'),
+                      color: viewMode === 'join' ? '#ffffff' : (isDarkMode ? '#94a3b8' : '#64748b'),
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
