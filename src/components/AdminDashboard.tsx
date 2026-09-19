@@ -193,6 +193,11 @@ export default function AdminDashboard() {
 
     if (res.success) {
       showToast(`Pesan uji coba berhasil dikirim ke WhatsApp ${testPhone}! 📲`);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('master_wa_token', waToken.trim());
+        localStorage.setItem('timjuara_fonnte_token', waToken.trim());
+      }
+      updateGlobalWhatsAppConfig(waToken.trim(), true).catch(() => {});
     } else {
       showToast(`Gagal mengirim WA: ${res.error || 'Periksa token Fonnte dan nomor HP'}`);
     }

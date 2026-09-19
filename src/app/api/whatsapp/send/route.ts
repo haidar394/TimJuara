@@ -11,6 +11,10 @@ export function normalizeIndonesianPhone(phone: string): string {
   return cleaned;
 }
 
+declare global {
+  var __GLOBAL_FONNTE_TOKEN__: string | undefined;
+}
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();
@@ -23,8 +27,13 @@ export async function POST(request: Request) {
       );
     }
 
-    // Gunakan token yang dikirim, atau dari system_settings (Master Admin), atau fallback ke env
-    let fonnteToken = token;
+    // Jika token valid dikirim dari client (misal Admin test atau dashboard), simpan ke memory cache
+    if (token && typeof token === 'string' && token.trim().length > 5) {
+      globalThis.__GLOBAL_FONNTE_TOKEN__ = token.trim();
+    }
+
+    // Gunakan token yang dikirim, atau dari cache memori, atau dari database/env
+    let fonnteToken = token || globalThis.__GLOBAL_FONNTE_TOKEN__;
 
     if (!fonnteToken) {
       try {

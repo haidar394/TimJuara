@@ -35,6 +35,7 @@ import {
   updateTeamWhatsAppConfig,
   sendTestWhatsAppMessage,
   triggerDeadlineReminders,
+  getGlobalWhatsAppConfig,
   getTaskComments,
   addTaskComment,
   getUserNotifications,
@@ -224,6 +225,7 @@ export default function TeamWorkspace() {
 
   // WhatsApp Test State
   const [testingWa, setTestingWa] = useState(false);
+  const [globalWaToken, setGlobalWaToken] = useState<string>('');
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -433,6 +435,13 @@ export default function TeamWorkspace() {
     // Load All Active Tasks across All Teams for Global Overview
     const allTasks = await getUserAllActiveTasks(user.id);
     setAllUserTasks(allTasks);
+
+    // Load Global WhatsApp Token
+    getGlobalWhatsAppConfig().then((cfg) => {
+      if (cfg?.wa_gateway_token) {
+        setGlobalWaToken(cfg.wa_gateway_token);
+      }
+    }).catch(() => {});
 
     setLoading(false);
   };
@@ -1210,8 +1219,15 @@ export default function TeamWorkspace() {
     }
 
     setTestingWa(true);
+    const tokenToUse =
+      team?.wa_gateway_token ||
+      globalWaToken ||
+      (typeof window !== 'undefined'
+        ? localStorage.getItem('master_wa_token') || localStorage.getItem('timjuara_fonnte_token')
+        : undefined);
+
     const testMsg = `Halo *${currentUser?.full_name || 'Rekan Tim'}*! 👋\n\nIni adalah pesan uji coba dari Bot TimJuara untuk tim *${team?.name || 'Anda'}*.\nIntegrasi WhatsApp Gateway telah berhasil terhubung! 🚀`;
-    const res = await sendTestWhatsAppMessage(profilePhone.trim(), testMsg);
+    const res = await sendTestWhatsAppMessage(profilePhone.trim(), testMsg, tokenToUse || undefined);
     setTestingWa(false);
 
     if (res.success) {
@@ -1282,11 +1298,18 @@ export default function TeamWorkspace() {
       deadlineStr = new Date(task.deadline).toLocaleDateString('id-ID', { dateStyle: 'full' });
     }
 
+    const tokenToUse =
+      team?.wa_gateway_token ||
+      globalWaToken ||
+      (typeof window !== 'undefined'
+        ? localStorage.getItem('master_wa_token') || localStorage.getItem('timjuara_fonnte_token')
+        : undefined);
+
     for (const pic of validTargets) {
       const message = `Halo *${pic.full_name}*! 👋\n\nPengingat tugas dari Tim *${team?.name}*:\n📌 *${task.title}*\n📅 Deadline: *${deadlineStr}*\nStatus: *${task.status === 'review' ? 'Menunggu Dicek' : task.status === 'in_progress' ? 'Sedang Dikerjakan' : 'Belum Selesai'}*\n\nYuk segera diselesaikan atau dicek! 💪\nBuka TimJuara: ${window.location.origin}/team/${team?.username}`;
 
       showToast(`Mengirim pengingat via Bot ke ${pic.full_name}...`);
-      const res = await sendTestWhatsAppMessage(pic.phone_number!, message, team?.wa_gateway_token);
+      const res = await sendTestWhatsAppMessage(pic.phone_number!, message, tokenToUse || undefined);
       if (res.success) {
         showToast(`Pengingat berhasil dikirim oleh Bot ke WA ${pic.full_name}! 📲`);
       } else {
