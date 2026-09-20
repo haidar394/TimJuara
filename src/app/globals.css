@@ -560,7 +560,7 @@ button, input, select, textarea {
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 50;
+  z-index: 1000;
   padding: 16px;
   animation: fadeIn 0.2s ease;
 }

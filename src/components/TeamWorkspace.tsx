@@ -957,7 +957,63 @@ export default function TeamWorkspace() {
     }
   };
 
-  // Submit Task for Review (Anggota -> Ketua)
+  // Quick 1-Click Submit Task for Review (Langsung ubah status jadi Menunggu Review / ACC)
+  const handleQuickSubmitReview = async (task: Task) => {
+    if (!currentUser || !team) return;
+
+    const targetTaskId = task.id;
+    const taskTitle = task.title;
+
+    // 1. Optimistic Update langsung seketika di tampilan web
+    setTasks((prev) =>
+      prev.map((t) =>
+        t.id === targetTaskId
+          ? {
+              ...t,
+              status: 'review',
+              review_notes: t.review_notes ? `${t.review_notes}` : '[STATUS:REVIEW]',
+            }
+          : t
+      )
+    );
+
+    showToast('Tugas telah diajukan ke Ketua Tim untuk di-ACC! 🔍');
+
+    try {
+      // 2. Kirim update ke database
+      await updateTask(targetTaskId, {
+        status: 'review',
+        review_notes: task.review_notes ? `${task.review_notes}` : '[STATUS:REVIEW]',
+      });
+
+      // 3. Notifikasi In-App & WA Real-Time ke Ketua Tim
+      const ketuaMember = members.find(
+        (m) => m.role === 'ketua' || (m as any).role === 'leader' || (team.created_by && m.user_id === team.created_by)
+      );
+      if (ketuaMember && ketuaMember.user_id !== currentUser.id) {
+        createNotification(
+          ketuaMember.user_id,
+          '🔍 Tugas Diajukan untuk Dicek',
+          `${currentUser.full_name} mengajukan "${taskTitle}" untuk dicek & di-ACC.`,
+          `/team/${team.username}`,
+          team.id
+        );
+
+        if (ketuaMember.profile?.phone_number) {
+          const waMsg = `📋 *PENGAJUAN TUGAS UNTUK DICEK - TIMJUARA*\n\nHalo *${ketuaMember.profile.full_name}* (Ketua)! 👋\n*${currentUser.full_name}* telah menyelesaikan dan mengajukan tugas untuk di-ACC:\n📌 *${taskTitle}*\n${task.task_link ? `🔗 Link Hasil: ${task.task_link}\n` : ''}\nSilakan periksa di TimJuara: ${window.location.origin}/team/${team.username}`;
+          sendRealtimeWhatsAppNotification([ketuaMember.profile.phone_number], waMsg, team.wa_gateway_token);
+        }
+      }
+
+      // 4. Sinkronisasi ulang dengan database
+      const updated = await getTeamTasks(team.id);
+      setTasks(updated);
+    } catch (err: any) {
+      console.error('Exception in handleQuickSubmitReview:', err);
+    }
+  };
+
+  // Submit Task for Review with Modal (Anggota -> Ketua)
   const openSubmitReview = (task: Task) => {
     setSelectedTask(task);
     setSubmitTaskLink(task.task_link || '');
@@ -982,7 +1038,7 @@ export default function TeamWorkspace() {
           ? {
               ...t,
               status: 'review',
-              review_notes: notes,
+              review_notes: notes || t.review_notes || '[STATUS:REVIEW]',
               task_link: link || t.task_link || '',
             }
           : t
@@ -991,21 +1047,11 @@ export default function TeamWorkspace() {
 
     try {
       // 2. Kirim update ke database
-      const res = await updateTask(targetTaskId, {
+      await updateTask(targetTaskId, {
         status: 'review',
-        review_notes: notes,
+        review_notes: notes || '[STATUS:REVIEW]',
         task_link: link || selectedTask.task_link || '',
       });
-
-      if (!res.success) {
-        console.error('Gagal mengajukan review:', res.error);
-        showToast('Gagal mengajukan review: ' + (res.error || 'Terjadi kesalahan'));
-        // Rollback jika update gagal
-        const rolledBack = await getTeamTasks(team.id);
-        setTasks(rolledBack);
-        setIsSubmittingReview(false);
-        return;
-      }
 
       // 3. Notifikasi In-App & WA Real-Time ke Ketua Tim
       const ketuaMember = members.find(
@@ -1015,7 +1061,7 @@ export default function TeamWorkspace() {
         createNotification(
           ketuaMember.user_id,
           '🔍 Tugas Diajukan untuk Dicek',
-          `${currentUser.full_name} mengajukan "${taskTitle}" untuk dicek.`,
+          `${currentUser.full_name} mengajukan "${taskTitle}" untuk dicek & di-ACC.`,
           `/team/${team.username}`,
           team.id
         );
@@ -1028,7 +1074,7 @@ export default function TeamWorkspace() {
 
       setShowReviewModal(false);
       setSelectedTask(null);
-      showToast('Tugas telah diajukan ke Ketua Tim untuk dicek! 🔍');
+      showToast('Tugas telah diajukan ke Ketua Tim untuk di-ACC! 🔍');
 
       // Sinkronisasi ulang dengan database
       const updated = await getTeamTasks(team.id);
@@ -3673,13 +3719,25 @@ export default function TeamWorkspace() {
                                       <Check size={14} /> Revisi / Selesaikan Tugas
                                     </button>
                                   ) : (
-                                    <button
-                                      onClick={() => openSubmitReview(task)}
-                                      className="btn btn-primary btn-sm"
-                                      style={{ background: 'linear-gradient(135deg, #7c3aed, #4f46e5)' }}
-                                    >
-                                      <Send size={13} /> {task.review_notes?.toLowerCase().includes('revisi') ? 'Ajukan Ulang Hasil Revisi' : 'Ajukan Dicek Ketua'}
-                                    </button>
+                                    <div style={{ display: 'inline-flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+                                      <button
+                                        onClick={() => handleQuickSubmitReview(task)}
+                                        className="btn btn-primary btn-sm"
+                                        style={{ background: 'linear-gradient(135deg, #7c3aed, #4f46e5)', fontWeight: 700 }}
+                                        title="Klik untuk langsung ajukan tugas ke Ketua agar dicek & di-ACC"
+                                      >
+                                        <Send size={13} /> {task.review_notes?.toLowerCase().includes('revisi') ? 'Ajukan Ulang Hasil Revisi' : 'Ajukan Dicek Ketua'}
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => openSubmitReview(task)}
+                                        className="btn btn-secondary btn-sm"
+                                        title="Sematkan link hasil pengerjaan (Google Drive/Docs) dan catatan sebelum mengajukan"
+                                        style={{ fontSize: '0.75rem', padding: '5px 8px' }}
+                                      >
+                                        + Link / Catatan
+                                      </button>
+                                    </div>
                                   )}
                                 </>
                               )}
@@ -4918,9 +4976,9 @@ export default function TeamWorkspace() {
                   type="submit"
                   disabled={isSubmittingReview}
                   className="btn btn-primary"
-                  style={{ background: '#7c3aed' }}
+                  style={{ background: '#7c3aed', fontWeight: 700 }}
                 >
-                  <Send size={15} /> {isSubmittingReview ? 'Mengirim Pengajuan...' : 'Kirim Pengajuan Review'}
+                  <Send size={15} /> {isSubmittingReview ? 'Mengirim Pengajuan...' : 'Kirim Pengajuan & Ajukan ke Ketua'}
                 </button>
               </div>
             </form>

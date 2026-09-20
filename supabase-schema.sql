@@ -93,6 +93,8 @@ CREATE INDEX IF NOT EXISTS idx_tasks_status ON public.tasks(status);
 ALTER TABLE public.tasks ADD COLUMN IF NOT EXISTS task_link TEXT DEFAULT '';
 ALTER TABLE public.tasks ADD COLUMN IF NOT EXISTS completed_by UUID REFERENCES public.profiles(id) ON DELETE SET NULL;
 ALTER TABLE public.tasks ADD COLUMN IF NOT EXISTS review_notes TEXT DEFAULT '';
+ALTER TABLE public.tasks DROP CONSTRAINT IF EXISTS tasks_status_check;
+ALTER TABLE public.tasks ADD CONSTRAINT tasks_status_check CHECK (status IN ('todo', 'in_progress', 'review', 'done'));
 
 
 -- 6. Tabel Materi & Hasil Riset (100% Hemat Kuota via Google Drive / Link)
