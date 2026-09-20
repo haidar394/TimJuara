@@ -2323,7 +2323,9 @@ export default function TeamWorkspace() {
                     ? `${team?.name} • Materi & Riset`
                     : `${team?.name} • Pengaturan`}
                 </h1>
-                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>@{team?.username}</span>
+                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block', maxWidth: 180 }}>
+                  @{team?.username}
+                </span>
               </div>
             </div>
 
@@ -2484,7 +2486,7 @@ export default function TeamWorkspace() {
             {activeTab === 'overview' && (
               <div className="animate-fade-in">
                 {/* Hero Banner Overview */}
-                <div style={{ marginBottom: 26, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
+                <div className="overview-header">
                   <div>
                     <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: isDarkMode ? 'rgba(99, 102, 241, 0.2)' : '#e0e7ff', color: isDarkMode ? '#a5b4fc' : '#4338ca', padding: '4px 14px', borderRadius: 99, fontSize: '0.8rem', fontWeight: 700, marginBottom: 8 }}>
                       <Sparkles size={14} /> Overview Seluruh Tim
@@ -2497,7 +2499,7 @@ export default function TeamWorkspace() {
                     </p>
                   </div>
 
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div className="overview-header-actions">
                     <button
                       type="button"
                       onClick={() => setShowCreateTeamModal(true)}
@@ -2520,14 +2522,8 @@ export default function TeamWorkspace() {
                 {/* Banner Status Bot Otomatis Jam 08:00 WIB untuk Ketua */}
                 {isKetua && (
                   <div
+                    className="bot-automation-banner"
                     style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      flexWrap: 'wrap',
-                      gap: 12,
-                      padding: '12px 18px',
-                      borderRadius: 14,
                       background: isDarkMode ? 'rgba(34, 197, 94, 0.1)' : '#f0fdf4',
                       border: isDarkMode ? '1px solid rgba(34, 197, 94, 0.25)' : '1px solid #bbf7d0',
                       marginBottom: 20,
@@ -2573,47 +2569,47 @@ export default function TeamWorkspace() {
                 )}
 
                 {/* 4 Metric Summary Cards */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 16, marginBottom: 28 }}>
-                  <div className="card" style={{ padding: '18px 20px', display: 'flex', alignItems: 'center', gap: 14 }}>
-                    <div style={{ width: 44, height: 44, borderRadius: 12, background: isDarkMode ? 'rgba(79, 70, 229, 0.2)' : '#e0e7ff', color: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <div className="overview-metrics-grid">
+                  <div className="card overview-metric-card">
+                    <div className="metric-icon" style={{ width: 44, height: 44, borderRadius: 12, background: isDarkMode ? 'rgba(79, 70, 229, 0.2)' : '#e0e7ff', color: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                       <Users size={22} />
                     </div>
                     <div>
-                      <div style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--text-main)' }}>{userTeams.length}</div>
+                      <div className="metric-value" style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--text-main)' }}>{userTeams.length}</div>
                       <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Tim Diikuti</div>
                     </div>
                   </div>
 
-                  <div className="card" style={{ padding: '18px 20px', display: 'flex', alignItems: 'center', gap: 14 }}>
-                    <div style={{ width: 44, height: 44, borderRadius: 12, background: isDarkMode ? 'rgba(59, 130, 246, 0.2)' : '#eff6ff', color: '#3b82f6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <div className="card overview-metric-card">
+                    <div className="metric-icon" style={{ width: 44, height: 44, borderRadius: 12, background: isDarkMode ? 'rgba(59, 130, 246, 0.2)' : '#eff6ff', color: '#3b82f6', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                       <Clock size={22} />
                     </div>
                     <div>
-                      <div style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--text-main)' }}>
+                      <div className="metric-value" style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--text-main)' }}>
                         {allUserTasks.filter((t) => t.status === 'in_progress').length}
                       </div>
                       <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Tugas Dikerjakan</div>
                     </div>
                   </div>
 
-                  <div className="card" style={{ padding: '18px 20px', display: 'flex', alignItems: 'center', gap: 14 }}>
-                    <div style={{ width: 44, height: 44, borderRadius: 12, background: isDarkMode ? 'rgba(245, 158, 11, 0.2)' : '#fef3c7', color: '#f59e0b', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <div className="card overview-metric-card">
+                    <div className="metric-icon" style={{ width: 44, height: 44, borderRadius: 12, background: isDarkMode ? 'rgba(245, 158, 11, 0.2)' : '#fef3c7', color: '#f59e0b', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                       <RotateCcw size={22} />
                     </div>
                     <div>
-                      <div style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--text-main)' }}>
+                      <div className="metric-value" style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--text-main)' }}>
                         {allUserTasks.filter((t) => (t.status === 'review' || t.review_notes?.toLowerCase().includes('revisi')) && t.status !== 'done').length}
                       </div>
                       <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Review / Revisi</div>
                     </div>
                   </div>
 
-                  <div className="card" style={{ padding: '18px 20px', display: 'flex', alignItems: 'center', gap: 14 }}>
-                    <div style={{ width: 44, height: 44, borderRadius: 12, background: isDarkMode ? 'rgba(16, 185, 129, 0.2)' : '#ecfdf5', color: '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <div className="card overview-metric-card">
+                    <div className="metric-icon" style={{ width: 44, height: 44, borderRadius: 12, background: isDarkMode ? 'rgba(16, 185, 129, 0.2)' : '#ecfdf5', color: '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                       <CheckCircle2 size={22} />
                     </div>
                     <div>
-                      <div style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--text-main)' }}>
+                      <div className="metric-value" style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--text-main)' }}>
                         {allUserTasks.filter((t) => t.status === 'done').length}
                       </div>
                       <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Tugas Selesai</div>
@@ -2625,7 +2621,7 @@ export default function TeamWorkspace() {
                 {/* WIDGET AI 1: AI RINGKASAN HARIAN & PREDIKSI RISIKO                        */}
                 {/* ========================================================================= */}
                 <div className="card ai-card" style={{ padding: '22px 24px', marginBottom: 28 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
+                  <div className="ai-card-header">
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                       <div className="ai-badge">
                         <Sparkles size={12} /> TimJuara AI
@@ -2781,7 +2777,7 @@ export default function TeamWorkspace() {
                       </span>
                     </div>
 
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+                    <div className="personal-focus-content">
                       <div>
                         <div style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--primary)', marginBottom: 4 }}>
                           {aiPersonalFocus.priorityTaskTitle}
@@ -3219,26 +3215,26 @@ export default function TeamWorkspace() {
             {activeTab === 'tasks' && (
               <div className="animate-fade-in">
                 {/* Team Info Banner */}
-                <div className="card" style={{ padding: '20px 24px', marginBottom: 20, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16, background: 'var(--surface)' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 16, minWidth: 0, flex: 1 }}>
-                    <div style={{ flexShrink: 0 }}>
+                <div className="card team-banner-card">
+                  <div className="team-banner-main">
+                    <div className="team-banner-avatar-wrap">
                       {team?.avatar_url ? (
                         <img
                           src={team.avatar_url}
                           alt={team.name}
-                          className="avatar-photo"
-                          style={{ width: 56, height: 56, border: '2px solid var(--primary)', objectFit: 'cover' }}
+                          className="avatar-photo team-banner-avatar"
+                          style={{ border: '2px solid var(--primary)', objectFit: 'cover' }}
                         />
                       ) : (
-                        <div className="team-avatar-header" style={{ width: 56, height: 56, fontSize: '1.3rem' }}>
+                        <div className="team-avatar-header team-banner-avatar">
                           {team?.name.slice(0, 2).toUpperCase()}
                         </div>
                       )}
                     </div>
 
-                    <div style={{ minWidth: 0, flex: 1 }}>
+                    <div className="team-banner-info">
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                        <h2 style={{ fontSize: '1.25rem', fontWeight: 800, margin: 0, wordBreak: 'break-word' }}>
+                        <h2 className="team-banner-title">
                           {team?.name}
                         </h2>
                         {isKetua ? (
@@ -3256,7 +3252,7 @@ export default function TeamWorkspace() {
                           {team.description}
                         </p>
                       )}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 6, flexWrap: 'wrap', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                      <div className="team-banner-meta">
                         <span>@{team?.username}</span>
                         <span>•</span>
                         <span>{members.length} Anggota</span>
@@ -3267,7 +3263,7 @@ export default function TeamWorkspace() {
                   </div>
 
                   {/* Tombol Aksi Cepat: Salin Kode & Undangan */}
-                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                  <div className="team-banner-actions">
                     <button onClick={handleCopyCode} className="btn btn-secondary btn-sm" title="Salin kode username tim">
                       <Copy size={14} /> Salin Kode
                     </button>
@@ -3278,8 +3274,8 @@ export default function TeamWorkspace() {
                 </div>
 
                 {/* Kemajuan Progres Tim Aktif (Solid Bar, Satu Warna var(--primary), Tanpa Gradasi) */}
-                <div className="card" style={{ padding: '18px 22px', marginBottom: 20, background: 'var(--surface)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginBottom: 12 }}>
+                <div className="card team-progress-card">
+                  <div className="team-progress-header">
                     <div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                         <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-main)', margin: 0 }}>
@@ -3390,7 +3386,7 @@ export default function TeamWorkspace() {
                     </button>
                   </div>
 
-                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  <div className="task-toolbar-actions">
                     <button
                       onClick={team?.wa_group_id ? handleSendBotGroupRecap : handleShareGroupRecap}
                       disabled={isSendingGroupRecap}
@@ -3883,7 +3879,7 @@ export default function TeamWorkspace() {
           {activeTab === 'research' && (
             <div className="animate-fade-in">
               {/* Toolbar */}
-              <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginBottom: 20 }}>
+              <div className="research-toolbar" style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginBottom: 20 }}>
                 <button onClick={() => setShowAddResearchModal(true)} className="btn btn-primary">
                   <Plus size={16} /> Tambah Link Materi / Riset
                 </button>
@@ -3985,7 +3981,7 @@ export default function TeamWorkspace() {
             <div className="animate-fade-in">
               {/* Card Foto Profil Tim (Dapat diedit seluruh anggota tim) */}
               <div className="card" style={{ padding: '20px 24px', marginBottom: 24, background: 'var(--surface)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
+                <div className="settings-avatar-card-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 16, minWidth: 260, flex: 1 }}>
                     <div
                       style={{ position: 'relative', cursor: 'pointer' }}
@@ -4047,7 +4043,7 @@ export default function TeamWorkspace() {
                       </p>
                     </div>
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  <div className="settings-avatar-actions">
                     <button
                       type="button"
                       onClick={() => setShowTeamAvatarModal(true)}
