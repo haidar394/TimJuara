@@ -1017,7 +1017,8 @@ export default function TeamWorkspace() {
   const openSubmitReview = (task: Task) => {
     setSelectedTask(task);
     setSubmitTaskLink(task.task_link || '');
-    setSubmitTaskNotes('');
+    const cleanNotes = (task.review_notes || '').replace(/\[STATUS:REVIEW\]\s*/g, '').trim();
+    setSubmitTaskNotes(cleanNotes);
     setShowReviewModal(true);
   };
 
@@ -1943,9 +1944,6 @@ export default function TeamWorkspace() {
   const getDeadlineBadge = (deadlineStr?: string, status?: TaskStatus) => {
     if (status === 'done') {
       return <span className="badge badge-success"><CheckCircle2 size={12} /> Selesai</span>;
-    }
-    if (status === 'review') {
-      return <span className="badge badge-purple"><Clock size={12} /> Menunggu Review / ACC Ketua</span>;
     }
     if (!deadlineStr) {
       return <span className="badge badge-neutral"><Clock size={12} /> Tanpa Deadline</span>;
@@ -3543,7 +3541,7 @@ export default function TeamWorkspace() {
                                       borderRadius: 6,
                                     }}
                                   >
-                                    🔍 Menunggu Review Ketua
+                                    🔍 Menunggu Review / ACC Ketua
                                   </span>
                                 ) : isInProgress && task.review_notes?.toLowerCase().includes('revisi') ? (
                                   <span
@@ -3573,39 +3571,44 @@ export default function TeamWorkspace() {
                               )}
 
                               {/* Review Notes from Member / Revision Notes from Leader */}
-                              {task.review_notes && (
-                                <div
-                                  style={{
-                                    background: task.review_notes.toLowerCase().includes('revisi')
-                                      ? isDarkMode ? 'rgba(239, 68, 68, 0.12)' : '#fef2f2'
-                                      : isReview
-                                      ? isDarkMode ? 'rgba(168, 85, 247, 0.12)' : '#f5f3ff'
-                                      : isDarkMode ? 'rgba(245, 158, 11, 0.12)' : '#fffbeb',
-                                    border: `1px solid ${
-                                      task.review_notes.toLowerCase().includes('revisi')
-                                        ? isDarkMode ? 'rgba(239, 68, 68, 0.35)' : '#fecaca'
+                              {(() => {
+                                const cleanNotes = (task.review_notes || '').replace(/\[STATUS:REVIEW\]\s*/g, '').trim();
+                                if (!cleanNotes) return null;
+                                const isRevision = cleanNotes.toLowerCase().includes('revisi');
+                                return (
+                                  <div
+                                    style={{
+                                      background: isRevision
+                                        ? isDarkMode ? 'rgba(239, 68, 68, 0.12)' : '#fef2f2'
                                         : isReview
-                                        ? isDarkMode ? 'rgba(168, 85, 247, 0.3)' : '#ddd6fe'
-                                        : isDarkMode ? 'rgba(245, 158, 11, 0.3)' : '#fde68a'
-                                    }`,
-                                    borderRadius: 8,
-                                    padding: '8px 12px',
-                                    marginBottom: 12,
-                                    fontSize: '0.825rem',
-                                    color: task.review_notes.toLowerCase().includes('revisi')
-                                      ? isDarkMode ? '#fca5a5' : '#b91c1c'
-                                      : isReview
-                                      ? isDarkMode ? '#d8b4fe' : '#5b21b6'
-                                      : isDarkMode ? '#fcd34d' : '#92400e',
-                                    wordBreak: 'break-word',
-                                    overflowWrap: 'anywhere',
-                                  }}
-                                >
-                                  {task.review_notes.toLowerCase().includes('revisi') ? '⚠️ ' : '💬 '}
-                                  <b>{task.review_notes.toLowerCase().includes('revisi') ? 'Catatan Revisi dari Ketua:' : 'Catatan:'}</b>{' '}
-                                  {task.review_notes.replace(/^Catatan Revisi dari Ketua:\s*/i, '')}
-                                </div>
-                              )}
+                                        ? isDarkMode ? 'rgba(168, 85, 247, 0.12)' : '#f5f3ff'
+                                        : isDarkMode ? 'rgba(245, 158, 11, 0.12)' : '#fffbeb',
+                                      border: `1px solid ${
+                                        isRevision
+                                          ? isDarkMode ? 'rgba(239, 68, 68, 0.35)' : '#fecaca'
+                                          : isReview
+                                          ? isDarkMode ? 'rgba(168, 85, 247, 0.3)' : '#ddd6fe'
+                                          : isDarkMode ? 'rgba(245, 158, 11, 0.3)' : '#fde68a'
+                                      }`,
+                                      borderRadius: 8,
+                                      padding: '8px 12px',
+                                      marginBottom: 12,
+                                      fontSize: '0.825rem',
+                                      color: isRevision
+                                        ? isDarkMode ? '#fca5a5' : '#b91c1c'
+                                        : isReview
+                                        ? isDarkMode ? '#d8b4fe' : '#5b21b6'
+                                        : isDarkMode ? '#fcd34d' : '#92400e',
+                                      wordBreak: 'break-word',
+                                      overflowWrap: 'anywhere',
+                                    }}
+                                  >
+                                    {isRevision ? '⚠️ ' : '💬 '}
+                                    <b>{isRevision ? 'Catatan Revisi dari Ketua:' : 'Catatan untuk Ketua:'}</b>{' '}
+                                    {cleanNotes.replace(/^Catatan Revisi dari Ketua:\s*/i, '')}
+                                  </div>
+                                );
+                              })()}
 
                               {/* Task Link (Tautan Hasil Tugas) */}
                               {task.task_link && (
@@ -3763,17 +3766,14 @@ export default function TeamWorkspace() {
                                     </div>
                                   ) : (
                                     <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                                      <span className="badge badge-purple" style={{ padding: '6px 12px', fontSize: '0.8rem', fontWeight: 700 }}>
-                                        🔍 Menunggu Review / ACC Ketua
-                                      </span>
                                       <button
                                         type="button"
                                         onClick={() => openSubmitReview(task)}
                                         className="btn btn-secondary btn-sm"
-                                        style={{ padding: '5px 8px', fontSize: '0.75rem' }}
+                                        style={{ padding: '5px 10px', fontSize: '0.78rem', display: 'inline-flex', alignItems: 'center', gap: 5 }}
                                         title="Perbarui link hasil kerja atau catatan untuk Ketua"
                                       >
-                                        Edit Pengajuan
+                                        <Edit size={13} /> Edit Pengajuan (Tautan / Catatan)
                                       </button>
                                     </div>
                                   )}
@@ -5111,21 +5111,25 @@ export default function TeamWorkspace() {
               </div>
 
               {/* Catatan Terakhir dari Anggota/Sebelumnya */}
-              {ketuaReviewTask.review_notes && (
-                <div
-                  style={{
-                    background: isDarkMode ? 'rgba(168, 85, 247, 0.1)' : '#f5f3ff',
-                    border: `1px solid ${isDarkMode ? 'rgba(168, 85, 247, 0.25)' : '#ddd6fe'}`,
-                    borderRadius: 8,
-                    padding: '10px 12px',
-                    fontSize: '0.825rem',
-                    color: isDarkMode ? '#d8b4fe' : '#5b21b6',
-                  }}
-                >
-                  💬 <b>Catatan Sebelumnya:</b>
-                  <div style={{ marginTop: 4, whiteSpace: 'pre-wrap' }}>{ketuaReviewTask.review_notes}</div>
-                </div>
-              )}
+              {(() => {
+                const cleanNotes = (ketuaReviewTask.review_notes || '').replace(/\[STATUS:REVIEW\]\s*/g, '').trim();
+                if (!cleanNotes) return null;
+                return (
+                  <div
+                    style={{
+                      background: isDarkMode ? 'rgba(168, 85, 247, 0.1)' : '#f5f3ff',
+                      border: `1px solid ${isDarkMode ? 'rgba(168, 85, 247, 0.25)' : '#ddd6fe'}`,
+                      borderRadius: 8,
+                      padding: '10px 12px',
+                      fontSize: '0.825rem',
+                      color: isDarkMode ? '#d8b4fe' : '#5b21b6',
+                    }}
+                  >
+                    💬 <b>Catatan Sebelumnya:</b>
+                    <div style={{ marginTop: 4, whiteSpace: 'pre-wrap' }}>{cleanNotes}</div>
+                  </div>
+                );
+              })()}
 
               {/* Riwayat Komentar Singkat */}
               <div>
