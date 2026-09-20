@@ -108,7 +108,7 @@ async function handleReminders(request: Request) {
     if (!globalWaEnabled) {
       return NextResponse.json({
         success: false,
-        message: 'Pengingat WhatsApp otomatis sedang dinonaktifkan oleh Master Admin.',
+        message: 'Pengingat WhatsApp otomatis saat ini dinonaktifkan oleh pengaturan sistem.',
         sentCount: 0,
         skippedCount: 0,
       });
@@ -146,7 +146,7 @@ async function handleReminders(request: Request) {
           assignee: profileInfo?.full_name || 'Tidak diketahui',
           phone: profileInfo?.phone_number || '',
           status: 'skipped',
-          reason: 'Token API Fonnte belum dikonfigurasi di Panel Master Admin',
+          reason: 'Token WhatsApp gateway belum dikonfigurasi',
         });
         continue;
       }

@@ -2048,7 +2048,7 @@ export default function TeamWorkspace() {
               <span style={{ fontWeight: 800, fontSize: '1.1rem', color: 'var(--text-main)' }}>TimJuara</span>
             </div>
 
-            {currentUser?.email?.toLowerCase() === 'admin@gmail.com' && (
+            {isMasterAdmin(currentUser) && (
               <Link href="/admin" className="badge" style={{ background: '#ef4444', color: '#fff', fontSize: '0.65rem', padding: '3px 6px', display: 'flex', alignItems: 'center', gap: 4 }}>
                 <Crown size={10} /> Admin
               </Link>

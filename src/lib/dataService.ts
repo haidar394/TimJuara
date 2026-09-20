@@ -32,7 +32,6 @@ interface DemoDatabase {
 }
 
 function getInitialDemoData(): DemoDatabase {
-  const adminId = 'user-master-admin';
   const leaderId = 'user-leader-1';
   const member1Id = 'user-member-2';
   const member2Id = 'user-member-3';
@@ -40,7 +39,6 @@ function getInitialDemoData(): DemoDatabase {
 
   return {
     users: [
-      { id: adminId, email: 'admin@gmail.com', full_name: 'Master Admin TimJuara', password: 'masteradmin' },
       { id: leaderId, email: 'budi@timku.com', full_name: 'Budi Santoso (Ketua)', password: 'password123' },
       { id: member1Id, email: 'siti@timku.com', full_name: 'Siti Rahma', password: 'password123' },
       { id: member2Id, email: 'dimas@timku.com', full_name: 'Dimas Pratama', password: 'password123' },
@@ -150,17 +148,6 @@ function getDemoDb(): DemoDatabase {
     db = JSON.parse(raw);
   } catch {
     db = getInitialDemoData();
-  }
-
-  // Pastikan akun Master Admin selalu tersedia
-  if (!db.users.some(u => u.email.toLowerCase() === 'admin@gmail.com')) {
-    db.users.unshift({
-      id: 'user-master-admin',
-      email: 'admin@gmail.com',
-      full_name: 'Master Admin TimJuara',
-      password: 'masteradmin',
-    });
-    localStorage.setItem(DEMO_DATA_KEY, JSON.stringify(db));
   }
 
   if (!db.task_comments) db.task_comments = [];
@@ -296,23 +283,7 @@ export async function signInUser(email: string, password: string): Promise<{ use
   const cleanEmail = email.trim().toLowerCase();
 
   if (isSupabaseConfigured && supabase) {
-    let { data, error } = await supabase.auth.signInWithPassword({ email: cleanEmail, password });
-
-    // Jika master admin belum terdaftar di Supabase, buatkan otomatis
-    if (error && cleanEmail === 'admin@gmail.com' && password === 'masteradmin') {
-      const signUpRes = await supabase.auth.signUp({
-        email: cleanEmail,
-        password,
-        options: { data: { full_name: 'Master Admin TimJuara' } },
-      });
-      if (!signUpRes.error) {
-        const retry = await supabase.auth.signInWithPassword({ email: cleanEmail, password });
-        if (retry.data?.user) {
-          data = retry.data;
-          error = null;
-        }
-      }
-    }
+    const { data, error } = await supabase.auth.signInWithPassword({ email: cleanEmail, password });
 
     if (error) {
       const errMsg = error.message.toLowerCase();
@@ -326,12 +297,6 @@ export async function signInUser(email: string, password: string): Promise<{ use
         return {
           user: null,
           error: 'Email belum dikonfirmasi di Supabase. Silakan buka Supabase Dashboard -> Authentication -> Providers -> Email, lalu matikan toggle "Confirm email" (OFF) agar pendaftaran langsung aktif tanpa verifikasi email.',
-        };
-      }
-      if (cleanEmail === 'admin@gmail.com') {
-        return {
-          user: null,
-          error: 'Akun Master Admin di Supabase belum aktif atau password salah. Di dashboard Supabase (Authentication -> Users), pastikan user admin@gmail.com dibuat dengan centang "Auto Confirm User", atau jalankan skrip SQL Master Admin dari supabase-schema.sql.',
         };
       }
       return { user: null, error: error.message };
@@ -990,7 +955,7 @@ export async function sendTeamGroupWhatsAppMessage(
   if (!groupId) {
     return {
       success: false,
-      error: `Tim ${team.name} belum menghubungkan ID Grup WhatsApp. Atur ID grup di Master Admin atau Pengaturan Tim.`,
+      error: `Tim ${team.name} belum menghubungkan ID Grup WhatsApp. Silakan atur ID grup di Pengaturan Tim.`,
     };
   }
 
@@ -2478,12 +2443,13 @@ export function calculateContributionStats(members: TeamMember[], tasks: Task[])
 }
 
 // -------------------------------------------------------------
-// MASTER ADMIN METHODS (admin@gmail.com)
+// ADMINISTRATOR UTILITIES
 // -------------------------------------------------------------
 
 export function isMasterAdmin(user: Profile | null): boolean {
   if (!user || !user.email) return false;
-  return user.email.trim().toLowerCase() === 'admin@gmail.com';
+  const adminEmail = process.env.NEXT_PUBLIC_ADMIN_EMAIL?.trim().toLowerCase() || 'admin@gmail.com';
+  return user.email.trim().toLowerCase() === adminEmail;
 }
 
 export async function getAdminStats(): Promise<AdminStats> {
@@ -2825,7 +2791,7 @@ export async function deleteTeamByAdmin(teamId: string): Promise<{ success: bool
 }
 
 export async function deleteUserByAdmin(userId: string): Promise<{ success: boolean; error: string | null }> {
-  const adminEmail = 'admin@gmail.com';
+  const adminEmail = process.env.NEXT_PUBLIC_ADMIN_EMAIL?.trim().toLowerCase() || 'admin@gmail.com';
 
   if (isSupabaseConfigured && supabase) {
     // Cek agar tidak menghapus master admin
@@ -2879,7 +2845,7 @@ export async function deleteMultipleTeamsByAdmin(teamIds: string[]): Promise<{ s
 }
 
 export async function deleteMultipleUsersByAdmin(userIds: string[]): Promise<{ success: boolean; count: number; error: string | null }> {
-  const adminEmail = 'admin@gmail.com';
+  const adminEmail = process.env.NEXT_PUBLIC_ADMIN_EMAIL?.trim().toLowerCase() || 'admin@gmail.com';
   if (userIds.length === 0) return { success: true, count: 0, error: null };
 
   if (isSupabaseConfigured && supabase) {

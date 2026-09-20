@@ -10,6 +10,7 @@ import {
   signOutUser,
   getUserAllActiveTasks,
   UserPersonalTask,
+  isMasterAdmin,
 } from '@/lib/dataService';
 import { Profile, UserTeamItem } from '@/lib/types';
 import {
@@ -222,7 +223,7 @@ function OnboardingContent() {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-            {currentUser?.email?.toLowerCase() === 'admin@gmail.com' && (
+            {isMasterAdmin(currentUser) && (
               <Link
                 href="/admin"
                 className="btn btn-sm"

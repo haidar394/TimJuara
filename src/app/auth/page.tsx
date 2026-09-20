@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { signInUser, signUpUser, getUserTeams } from '@/lib/dataService';
+import { signInUser, signUpUser, getUserTeams, isMasterAdmin } from '@/lib/dataService';
 import { LogIn, UserPlus, ArrowRight, Shield, AlertCircle, CheckCircle, Sun, Moon } from 'lucide-react';
 import Link from 'next/link';
 
@@ -81,7 +81,7 @@ export default function AuthPage() {
           return;
         }
         if (user) {
-          if (user.email?.toLowerCase() === 'admin@gmail.com') {
+          if (isMasterAdmin(user)) {
             router.push('/admin');
             return;
           }

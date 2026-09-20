@@ -67,7 +67,7 @@ async function fetchFonnteGroups(customToken?: string, shouldRefresh?: boolean) 
     return NextResponse.json(
       {
         success: false,
-        error: 'Token API Fonnte belum dikonfigurasi. Hubungkan device di Master Admin (/admin).',
+        error: 'Token WhatsApp gateway belum dikonfigurasi. Silakan hubungkan WhatsApp gateway terlebih dahulu.',
       },
       { status: 400 }
     );

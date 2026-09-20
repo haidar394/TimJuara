@@ -656,9 +656,9 @@ export default function AdminDashboard() {
     );
   };
 
-  // Selection helpers for Users (Master Admin admin@gmail.com is protected and cannot be deleted)
+  // Selection helpers for Users (Administrator accounts are protected and cannot be deleted)
   const selectableUsers = filteredUsers.filter(
-    (u) => u.email?.toLowerCase() !== 'admin@gmail.com'
+    (u) => !isMasterAdmin(u)
   );
   const allUsersSelected =
     selectableUsers.length > 0 && selectableUsers.every((u) => selectedUserIds.includes(u.id));
@@ -1266,7 +1266,7 @@ export default function AdminDashboard() {
                     </thead>
                     <tbody>
                       {filteredUsers.map((u) => {
-                        const isAdminUser = u.email?.toLowerCase() === 'admin@gmail.com';
+                        const isAdminUser = isMasterAdmin(u);
                         const isSelected = selectedUserIds.includes(u.id);
 
                         return (

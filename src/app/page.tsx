@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { getCurrentUser, getUserTeams } from '@/lib/dataService';
+import { getCurrentUser, getUserTeams, isMasterAdmin } from '@/lib/dataService';
 import { Users, CheckCircle2, Trophy, FolderGit2, ArrowRight, Sparkles, Sun, Moon } from 'lucide-react';
 import Link from 'next/link';
 
@@ -25,15 +25,15 @@ export default function HomePage() {
     } else {
       document.documentElement.classList.remove('dark');
     }
-    localStorage.setItem('timjuara_theme', newTheme);
     setIsDarkMode(!isDarkMode);
+    localStorage.setItem('timjuara_theme', newTheme);
   };
 
   useEffect(() => {
     async function checkAuth() {
       const user = await getCurrentUser();
       if (user) {
-        if (user.email?.toLowerCase() === 'admin@gmail.com') {
+        if (isMasterAdmin(user)) {
           router.replace('/admin');
           return;
         }

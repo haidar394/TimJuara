@@ -85,7 +85,7 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           success: false,
-          error: 'Token API Fonnte belum dikonfigurasi. Masukkan token di Panel Master Admin (/admin).',
+          error: 'Token WhatsApp gateway belum dikonfigurasi. Silakan periksa pengaturan WhatsApp tim atau hubungi pengelola.',
         },
         { status: 400 }
       );
@@ -119,13 +119,13 @@ export async function POST(request: Request) {
         rawReason.includes('not ready') ||
         rawReason.includes('disconnected')
       ) {
-        friendlyError = 'WhatsApp di Fonnte terputus (Device Disconnected). Silakan buka fonnte.com -> Menu Device -> Connect/Scan QR ulang.';
+        friendlyError = 'WhatsApp gateway terputus. Silakan hubungkan ulang perangkat pada provider WhatsApp.';
       } else if (
         rawReason.includes('invalid token') ||
         rawReason.includes('token not found') ||
         rawReason.includes('unauthorized')
       ) {
-        friendlyError = 'Token Fonnte tidak valid. Periksa kembali Device Token di Panel Master Admin (/admin) atau di fonnte.com.';
+        friendlyError = 'Token WhatsApp gateway tidak valid. Silakan periksa kembali token perangkat yang digunakan.';
       } else if (
         rawReason.includes('quota') ||
         rawReason.includes('limit') ||
