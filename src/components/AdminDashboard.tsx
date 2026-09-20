@@ -1565,7 +1565,7 @@ export default function AdminDashboard() {
                       <span className="badge badge-neutral" style={{ fontSize: '0.75rem' }}>Gratis</span>
                     </div>
                     <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)', marginTop: 2, margin: 0 }}>
-                      Kecerdasan buatan untuk <b>Daily Standup Ringkasan Tim</b>, <b>Deteksi Risiko & Hambatan</b>, <b>Fokus Kamu Hari Ini</b>, dan <b>Pecah Tugas Otomatis</b>.
+                      Kecerdasan buatan untuk <b>Ringkasan Harian Seluruh Tim</b>, <b>Deteksi Risiko & Hambatan</b>, <b>Fokus Kamu Hari Ini</b>, dan <b>Pecah Tugas Otomatis</b>.
                     </p>
                   </div>
                 </div>

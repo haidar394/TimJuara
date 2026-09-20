@@ -495,8 +495,14 @@ export default function TeamWorkspace() {
     const allTasks = await getUserAllActiveTasks(user.id);
     setAllUserTasks(allTasks);
 
-    // Load AI Digest & Personal Focus
-    loadAiDigest(teamData.name, taskList, membersData);
+    // Load AI Digest (Ringkasan Seluruh Tim yang Diikuti) & Personal Focus
+    loadAiDigest(
+      myTeams && myTeams.length > 0 ? `Seluruh Tim (${myTeams.length} Tim)` : teamData.name,
+      allTasks.length > 0 ? (allTasks as any) : taskList,
+      membersData,
+      false,
+      myTeams
+    );
     loadAiPersonalFocus(user.full_name || 'Rekan Tim', allTasks, teamData.name);
 
     // Auto-heartbeat: cek & jalankan otomasi bot deadline harian jika sudah melewati jam 08:00 WIB
@@ -533,12 +539,18 @@ export default function TeamWorkspace() {
   // ==========================================
   // TIMJUARA AI HANDLERS
   // ==========================================
-  const loadAiDigest = async (tName?: string, tTasks?: Task[], tMembers?: TeamMember[], force: boolean = false) => {
-    const currentTeamName = tName || team?.name;
-    if (!currentTeamName) return;
-    const currentTasks = tTasks || tasks;
+  const loadAiDigest = async (
+    tName?: string,
+    tTasks?: any[],
+    tMembers?: TeamMember[],
+    force: boolean = false,
+    teamsList?: UserTeamItem[]
+  ) => {
+    const activeUserTeams = teamsList || userTeams;
+    const currentTeamName = tName || (activeUserTeams.length > 0 ? `Seluruh Tim (${activeUserTeams.length} Tim)` : team?.name || 'Seluruh Tim');
+    const currentTasks = tTasks || (allUserTasks.length > 0 ? allUserTasks : tasks);
     const currentMembers = tMembers || members;
-    const cacheKey = `timjuara_ai_digest_${team?.id || currentTeamName}`;
+    const cacheKey = `timjuara_ai_digest_allteams_v2_${currentUser?.id || team?.id || 'default'}`;
 
     if (!force && typeof window !== 'undefined') {
       const cached = sessionStorage.getItem(cacheKey);
@@ -552,7 +564,7 @@ export default function TeamWorkspace() {
 
     setLoadingAiDigest(true);
     try {
-      const res = await getAITeamDigest(currentTeamName, currentTasks, currentMembers);
+      const res = await getAITeamDigest(currentTeamName, currentTasks, currentMembers, activeUserTeams);
       if (res.success && res.data) {
         setAiDigest(res.data);
         if (typeof window !== 'undefined') {
@@ -2590,7 +2602,7 @@ export default function TeamWorkspace() {
                     </div>
                     <div>
                       <div style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--text-main)' }}>
-                        {allUserTasks.filter((t) => t.status === 'review' || t.review_notes?.toLowerCase().includes('revisi')).length}
+                        {allUserTasks.filter((t) => (t.status === 'review' || t.review_notes?.toLowerCase().includes('revisi')) && t.status !== 'done').length}
                       </div>
                       <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Review / Revisi</div>
                     </div>
@@ -2610,7 +2622,7 @@ export default function TeamWorkspace() {
                 </div>
 
                 {/* ========================================================================= */}
-                {/* WIDGET AI 1: AI DAILY STANDUP & RISK PREDICTOR                            */}
+                {/* WIDGET AI 1: AI RINGKASAN HARIAN & PREDIKSI RISIKO                        */}
                 {/* ========================================================================= */}
                 <div className="card ai-card" style={{ padding: '22px 24px', marginBottom: 28 }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
@@ -2619,7 +2631,7 @@ export default function TeamWorkspace() {
                         <Sparkles size={12} /> TimJuara AI
                       </div>
                       <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-main)', margin: 0 }}>
-                        Daily Standup & Risk Predictor
+                        Ringkasan Harian & Prediksi Risiko
                       </h3>
                     </div>
 

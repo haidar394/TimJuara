@@ -2956,7 +2956,8 @@ export interface AITaskBreakdown {
 export async function getAITeamDigest(
   teamName: string,
   tasks: any[],
-  members: any[]
+  members: any[],
+  userTeams?: any[]
 ): Promise<{ success: boolean; data?: AITeamDigest; error?: string }> {
   try {
     const res = await fetch('/api/ai', {
@@ -2967,6 +2968,7 @@ export async function getAITeamDigest(
         teamName,
         tasks,
         members,
+        userTeams,
       }),
     });
 

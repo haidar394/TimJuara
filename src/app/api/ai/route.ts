@@ -76,13 +76,20 @@ async function callGeminiApi(prompt: string, apiKey: string): Promise<string | n
   return null;
 }
 
-// Fallback Heuristik Cerdas untuk Standup Overview Tim
-function generateHeuristicStandup(teamName: string, tasks: any[], members: any[]) {
+// Fallback Heuristik Cerdas untuk Standup Overview Seluruh Tim
+function generateHeuristicStandup(teamName: string, tasks: any[], members: any[], userTeamsList?: any[]) {
   const total = tasks.length;
   const doneTasks = tasks.filter((t) => t.status === 'done');
-  const reviewTasks = tasks.filter((t) => t.status === 'review' || t.review_notes?.toLowerCase().includes('revisi'));
-  const inProgress = tasks.filter((t) => t.status === 'in_progress');
-  const todoTasks = tasks.filter((t) => t.status === 'todo');
+
+  // PENTING: Hanya tugas yang BELUM SELESAI (status !== 'done') yang boleh dihitung sebagai butuh review/revisi
+  const reviewTasks = tasks.filter((t) => {
+    if (t.status === 'done') return false;
+    const isMarkedReview = t.review_notes && t.review_notes.includes('[STATUS:REVIEW]');
+    return t.status === 'review' || isMarkedReview || Boolean(t.review_notes?.toLowerCase().includes('revisi'));
+  });
+
+  const inProgress = tasks.filter((t) => t.status === 'in_progress' && t.status !== 'done');
+  const todoTasks = tasks.filter((t) => t.status === 'todo' && t.status !== 'done');
 
   const now = new Date();
   const overdueOrNear = tasks.filter((t) => {
@@ -99,17 +106,18 @@ function generateHeuristicStandup(teamName: string, tasks: any[], members: any[]
   if (overdueOrNear.length > 2 || (total > 3 && completionRate < 25)) {
     health = 'critical';
     healthLabel = 'Kritis / Butuh Intervensi';
-  } else if (overdueOrNear.length > 0 || reviewTasks.length > 1) {
+  } else if (overdueOrNear.length > 0 || reviewTasks.length > 0) {
     health = 'warning';
     healthLabel = 'Perlu Perhatian';
   }
 
   const bottlenecks: string[] = [];
   if (reviewTasks.length > 0) {
-    bottlenecks.push(`${reviewTasks.length} tugas memerlukan pengecekan atau revisi dari Ketua Tim.`);
+    const revTitles = reviewTasks.slice(0, 2).map((t) => `"${t.title}"${t.team_name ? ` (${t.team_name})` : ''}`).join(' dan ');
+    bottlenecks.push(`${reviewTasks.length} tugas memerlukan pengecekan atau revisi dari Ketua Tim: ${revTitles}.`);
   }
   if (overdueOrNear.length > 0) {
-    const titles = overdueOrNear.slice(0, 2).map((t) => `"${t.title}"`).join(' dan ');
+    const titles = overdueOrNear.slice(0, 2).map((t) => `"${t.title}"${t.team_name ? ` (${t.team_name})` : ''}`).join(' dan ');
     bottlenecks.push(`Tugas ${titles} memiliki batas waktu kurang dari 48 jam atau melewati deadline.`);
   }
   if (todoTasks.length > inProgress.length && todoTasks.length > 2) {
@@ -117,15 +125,32 @@ function generateHeuristicStandup(teamName: string, tasks: any[], members: any[]
   }
 
   const highlights: string[] = [];
+  const teamsCount = userTeamsList && userTeamsList.length > 0 ? userTeamsList.length : undefined;
+
   if (doneTasks.length > 0) {
-    highlights.push(`${doneTasks.length} dari ${total} tugas berhasil diselesaikan (${completionRate}% selesai).`);
-    const recentDone = doneTasks.slice(0, 2).map((t) => `"${t.title}"`).join(', ');
+    highlights.push(
+      teamsCount
+        ? `${doneTasks.length} dari ${total} tugas di ${teamsCount} tim berhasil diselesaikan (${completionRate}% selesai).`
+        : `${doneTasks.length} dari ${total} tugas berhasil diselesaikan (${completionRate}% selesai).`
+    );
+    const recentDone = doneTasks.slice(0, 2).map((t) => `"${t.title}"${t.team_name ? ` (${t.team_name})` : ''}`).join(', ');
     highlights.push(`Tugas selesai terbaru: ${recentDone}.`);
   } else {
-    highlights.push(`Workspace tim aktif dengan ${total} total tugas terdaftar.`);
+    highlights.push(
+      teamsCount
+        ? `Aktif memantau ${teamsCount} tim dengan total ${total} tugas terdaftar.`
+        : `Workspace tim aktif dengan ${total} total tugas terdaftar.`
+    );
   }
 
-  let summary = `Tim ${teamName} saat ini berada pada kondisi ${healthLabel} dengan progres penyelesaian ${completionRate}%. `;
+  let summary = '';
+  if (userTeamsList && userTeamsList.length > 0) {
+    const teamNames = userTeamsList.slice(0, 3).map((t: any) => t.name).join(', ') + (userTeamsList.length > 3 ? ` dan ${userTeamsList.length - 3} tim lainnya` : '');
+    summary = `Secara keseluruhan di ${userTeamsList.length} tim yang Anda ikuti (${teamNames}), kondisi saat ini ${healthLabel} dengan progres penyelesaian ${completionRate}%. `;
+  } else {
+    summary = `Tim ${teamName} saat ini berada pada kondisi ${healthLabel} dengan progres penyelesaian ${completionRate}%. `;
+  }
+
   if (overdueOrNear.length > 0) {
     summary += `Fokus paling mendesak hari ini adalah menyelesaikan ${overdueOrNear.length} tugas yang mendekati batas waktu agar tidak menghambat ritme tim.`;
   } else if (inProgress.length > 0) {
@@ -143,7 +168,7 @@ function generateHeuristicStandup(teamName: string, tasks: any[], members: any[]
     healthLabel,
     completionRate,
     summary,
-    bottlenecks: bottlenecks.length > 0 ? bottlenecks : ['Tidak ada bottleneck kritis terdeteksi saat ini.'],
+    bottlenecks: bottlenecks.length > 0 ? bottlenecks : ['Semua tugas berjalan lancar tanpa hambatan atau bottleneck kritis.'],
     highlights,
     advice,
   };
@@ -377,36 +402,46 @@ export async function POST(req: Request) {
     if (action === 'overview_standup') {
       const taskList = Array.isArray(tasks) ? tasks : [];
       const memberList = Array.isArray(members) ? members : [];
-      const currentTeam = teamName || 'Tim Lomba';
+      const teamsList = Array.isArray(body.userTeams) ? body.userTeams : [];
+      const currentTeam = teamName || (teamsList.length > 0 ? `Seluruh Tim (${teamsList.length} Tim)` : 'Seluruh Tim');
 
       // Coba panggil Gemini jika key tersedia
       if (geminiKey) {
+        const teamsContext = teamsList.length > 0
+          ? `Pengguna saat ini tergabung dalam ${teamsList.length} tim berikut: ${teamsList.map((t: any) => t.name).join(', ')}.\n`
+          : `Nama Tim / Workspace: "${currentTeam}"\n`;
+
         const prompt = `
 Kamu adalah Asisten AI TimJuara, platform manajemen kerja tim lomba dan kelompok mahasiswa.
-Analisis data tim lomba berikut:
-Nama Tim: "${currentTeam}"
-Jumlah Anggota: ${memberList.length}
-Daftar Tugas (${taskList.length} tugas):
+Analisis data progres kerja dari SELURUH TIM yang diikuti oleh akun pengguna ini:
+${teamsContext}Total Tugas Lintas Tim (${taskList.length} tugas):
 ${JSON.stringify(
   taskList.map((t) => ({
     title: t.title,
+    team: t.team_name || currentTeam,
     status: t.status,
     deadline: t.deadline,
-    isRevision: Boolean(t.review_notes?.toLowerCase().includes('revisi')),
-  })).slice(0, 30),
+    isRevision: Boolean(t.review_notes?.toLowerCase().includes('revisi')) && t.status !== 'done',
+  })).slice(0, 35),
   null,
   2
 )}
+
+Instruksi Analisis PENTING:
+1. Ringkasan ("summary") WAJIB mencakup gambaran umum dari SELURUH TIM yang diikuti oleh pengguna (misal: "Secara keseluruhan di ${teamsList.length || 'seluruh'} tim yang Anda ikuti..."), bukan hanya satu tim.
+2. Tugas yang berstatus 'done' berarti SUDAH SELESAI dan TIDAK BOLEH dianggap sebagai hambatan ataupun butuh revisi.
+3. Hanya anggap tugas sebagai hambatan (bottleneck) jika statusnya 'review' (menunggu acc ketua) atau mendekati/melewati batas waktu (dan statusnya belum 'done').
+4. Buat bahasa Indonesia yang elegan, memotivasi, dan jelas.
 
 Berikan output HANYA DALAM FORMAT JSON VALID tanpa markdown code block, dengan struktur persis berikut:
 {
   "health": "healthy" | "warning" | "critical",
   "healthLabel": "Sangat Sehat" | "Perlu Perhatian" | "Kritis",
   "completionRate": 75,
-  "summary": "Ringkasan progres 2-3 kalimat berbahasa Indonesia yang memotivasi dan jelas.",
+  "summary": "Ringkasan progres 2-3 kalimat berbahasa Indonesia tentang seluruh tim yang diikuti pengguna yang memotivasi dan jelas.",
   "bottlenecks": ["Poin hambatan 1", "Poin hambatan 2"],
   "highlights": ["Pencapaian 1", "Pencapaian 2"],
-  "advice": "Satu saran praktis dan terpenting untuk tim hari ini."
+  "advice": "Satu saran praktis dan terpenting untuk koordinasi seluruh tim hari ini."
 }
         `.trim();
 
@@ -423,7 +458,7 @@ Berikan output HANYA DALAM FORMAT JSON VALID tanpa markdown code block, dengan s
       }
 
       // Fallback Cerdas
-      const heuristicData = generateHeuristicStandup(currentTeam, taskList, memberList);
+      const heuristicData = generateHeuristicStandup(currentTeam, taskList, memberList, teamsList);
       return NextResponse.json({ success: true, source: 'heuristic', data: heuristicData });
     }
 
