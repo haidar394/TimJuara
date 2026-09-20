@@ -3,7 +3,7 @@
 # 🏆 TimJuara
 ### Platform Kolaborasi Tim Lomba & Manajemen Kerja Kelompok Terpadu
 
-[![Website](https://img.shields.io/badge/Website-timjuara.vercel.app-6366f1?style=for-the-badge&logo=vercel&logoColor=white)](https://timjuara.vercel.app)
+[![Website](https://img.shields.io/badge/Live_Demo-timjuara.vercel.app-6366f1?style=for-the-badge&logo=vercel&logoColor=white)](https://timjuara.vercel.app)
 [![Next.js](https://img.shields.io/badge/Next.js-16.3-black?style=for-the-badge&logo=next.js&logoColor=white)](https://nextjs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Supabase](https://img.shields.io/badge/Supabase-Database-3ecf8e?style=for-the-badge&logo=supabase&logoColor=white)](https://supabase.com/)
@@ -13,7 +13,11 @@
   <b>Solusi modern untuk mahasiswa, pelajar, dan tim kompetisi/hackathon agar dapat berkolaborasi secara rapi, transparan, dan bebas dari drama "beban kelompok".</b>
 </p>
 
-[🌐 **Kunjungi Website Live: timjuara.vercel.app**](https://timjuara.vercel.app)
+### 🚀 [**Buka Website TimJuara Sekarang (Gratis): timjuara.vercel.app**](https://timjuara.vercel.app)
+
+<br/>
+
+![Landing Page TimJuara](public/screenshots/landing.png)
 
 </div>
 
@@ -23,7 +27,7 @@
 
 Dalam kerja kelompok kuliah maupun persiapan kompetisi (PKM, Hackathon, Business Plan, Riset), seringkali muncul kendala klasik:
 - ❌ **Deadline Terlewat**: Anggota lupa tenggat waktu pengumpulan tugas.
-- ❌ **Tautan Tercecer**: File Google Drive, Docs, Figma, atau form pengumpulan hilang di tumpukan chat grup.
+- ❌ **Tautan Tercecer**: File Google Drive, Docs, Figma, atau formulir pengumpulan hilang di tumpukan chat grup.
 - ❌ **Ketidakjelasan Kontribusi (*Free Rider*)**: Sulit memantau siapa yang benar-benar aktif bekerja dan siapa yang pasif.
 - ❌ **Alur Revisi Tidak Rapi**: Tidak ada catatan resmi mengenai apa yang perlu diperbaiki sebelum tugas diserahkan.
 
@@ -31,31 +35,52 @@ Dalam kerja kelompok kuliah maupun persiapan kompetisi (PKM, Hackathon, Business
 
 ---
 
-## 📸 Tampilan Antarmuka (Screenshots)
+## 📸 Galeri Fitur & Antarmuka Aplikasi
 
 ### 1. 📊 Overview Seluruh Tim & Ringkasan Harian AI
-> Dasbor utama akun yang merangkum seluruh tim yang diikuti, metrik tugas aktif, dan evaluasi cerdas harian bertenaga AI.
+> Dasbor utama akun yang merangkum seluruh tim yang diikuti, metrik tugas aktif, dan evaluasi cerdas harian bertenaga AI untuk memprediksi hambatan tim.
 
-![Overview Seluruh Tim](public/screenshots/overview.png)
-
----
-
-### 2. 📋 Manajemen Tugas & Alur Kerja Kolaboratif
-> Ruang kerja tim untuk membagi tugas, menetapkan penanggung jawab (PIC), menyematkan tautan hasil kerja, dan memantau status pengerjaan.
-
-![Manajemen Tugas & Deadline](public/screenshots/tasks.png)
+![Overview Seluruh Tim & AI Standup](public/screenshots/overview.png)
 
 ---
 
-### 3. 🏆 Papan Peringkat Kontribusi (Leaderboard) & Mode Gelap
-> Statistik transparan dan objektif yang menghitung kontribusi nyata setiap anggota, dilengkapi dukungan tema gelap (*Dark Mode*) yang elegan.
+### 2. 🎯 Fokus Personal Hari Ini & Pelacak Deadline Adaptif
+> Rekomendasi tugas terpenting yang dipersonalisasi untuk akun Anda hari ini, dilengkapi pelacak batas waktu dengan label prioritas visual (*Terlewat*, *Hari Ini*, *2 Hari Lagi*).
 
-![Statistik Kontribusi & Dark Mode](public/screenshots/leaderboard.png)
+![Fokus Personal & Deadline Adaptif](public/screenshots/personal_focus.png)
 
 ---
 
-### 4. 📱 Tampilan Responsif di Perangkat Mobile
-> Desain adaptif yang nyaman digunakan langsung dari smartphone anggota tim kapan pun dan di mana pun.
+### 3. 📋 Manajemen Tugas Tim & Alur Kerja Kolaboratif
+> Ruang kerja tim untuk membagi tugas, menetapkan penanggung jawab (PIC), menyematkan tautan hasil kerja, memantau kemajuan tim, dan mengirim rekap ke grup WhatsApp dalam satu klik.
+
+![Manajemen Tugas Tim](public/screenshots/tasks.png)
+
+---
+
+### 4. 🗂️ Koleksi Ruang Kerja Multi-Tim
+> Kelola berbagai tim lomba, proyek kuliah, atau kepanitiaan sekaligus dalam satu akun tanpa perlu keluar-masuk akun berbeda.
+
+![Koleksi Ruang Kerja Multi-Tim](public/screenshots/multi_team.png)
+
+---
+
+### 5. 📁 Repositori Materi & Riset Terpadu
+> Satukan seluruh berkas Google Drive, referensi literatur, panduan lomba, dan desain Figma tim Anda dalam satu tab khusus yang rapi dan hemat kuota.
+
+![Materi dan Riset](public/screenshots/materials.png)
+
+---
+
+### 6. ⚙️ Pengaturan Tim & Integrasi Grup WhatsApp
+> Atur foto tim, undang anggota dengan kode unik `@username-tim`, dan hubungkan grup WhatsApp agar bot otomatis mengumumkan penugasan dan kelulusan tugas.
+
+![Pengaturan Tim & Notifikasi WhatsApp](public/screenshots/team_settings.png)
+
+---
+
+### 7. 📱 Tampilan Responsif di Smartphone (Mobile)
+> Antarmuka adaptif yang responsif dan nyaman digunakan langsung dari layar handphone kapan pun dan di mana pun.
 
 <div align="center">
   <img src="public/screenshots/mobile.png" alt="Tampilan Mobile TimJuara" width="320" style="border-radius: 16px; box-shadow: 0 8px 30px rgba(0,0,0,0.12);" />
@@ -67,18 +92,18 @@ Dalam kerja kelompok kuliah maupun persiapan kompetisi (PKM, Hackathon, Business
 
 ### 🤖 1. Asisten Cerdas TimJuara AI
 - **Ringkasan Harian & Prediksi Risiko**: Menganalisis kondisi seluruh tim yang Anda ikuti secara holistik, menyajikan tingkat kelengkapan, progres terkini, dan rekomendasi aksi praktis setiap hari.
-- **Deteksi Hambatan Dini (*Bottleneck Detector*)**: Secara otomatis mendeteksi tugas-tugas kritis yang mendekati batas waktu atau membutuhkan atensi segera.
+- **Deteksi Hambatan Dini (*Bottleneck Detector*)**: Mendeteksi otomatis tugas-tugas kritis yang mendekati batas waktu atau membutuhkan atensi segera.
 - **Fokus Utama Kamu Hari Ini**: Rekomendasi personal yang memprioritaskan 1 tugas paling mendesak bagi anggota yang sedang login.
 - **Pemecah Tugas Otomatis (*AI Task Breakdown*)**: Membantu memecah tugas besar menjadi 3–5 subtugas terstruktur beserta estimasi target waktu dan saran penanggung jawab hanya dalam hitungan detik.
 
 ### 📲 2. Otomasi Bot WhatsApp Terintegrasi
-- **Pengingat Deadline Harian**: Bot otomatis memindai dan mengirimkan pengingat deadline ke nomor WhatsApp pribadi anggota dan grup WhatsApp tim setiap pagi.
+- **Pengingat Deadline Harian**: Bot otomatis memindai dan mengirimkan pengingat deadline ke nomor WhatsApp pribadi anggota dan grup WhatsApp tim setiap pagi jam **08:00 WIB**.
 - **Notifikasi Persetujuan Tugas**: Ketika Ketua Tim menyetujui tugas yang diselesaikan anggota, pengumuman otomatis langsung dikirimkan ke grup WhatsApp tim.
 - **Kirim Rekapitulasi Cepat**: Bagikan rekap tugas dan batas waktu tim ke grup WhatsApp hanya dengan satu kali klik.
 
-### 🔍 3. Alur Verifikasi & ACC Ketua Tim
-- **Pengajuan Berkas Kerja**: Anggota dapat menyematkan tautan langsung ke Google Docs, Google Drive, Slide, atau Figma pengerjaan mereka saat mengajukan tugas.
-- **Hak Verifikasi Ketua**: Ketua Tim dapat memverifikasi kualitas pekerjaan sebelum menyetujui tugas (*disertai efek selebrasi confetti*) atau memberikan catatan revisi jika ada bagian yang perlu disempurnakan.
+### 🔍 3. Alur Verifikasi & Review Ketua Tim
+- **Pengajuan Berkas Kerja**: Anggota dapat menyematkan tautan langsung ke Google Docs, Google Drive, Slide, atau Figma saat mengajukan tugas.
+- **Hak Verifikasi Ketua**: Ketua Tim dapat memeriksa hasil kerja sebelum menyetujui tugas (*disertai efek selebrasi confetti*) atau memberikan catatan revisi jika ada bagian yang perlu disempurnakan.
 
 ### 🏆 4. Leaderboard Kontribusi Transparan
 - Sistem penilaian otomatis yang menghitung persentase kontribusi kerja dari setiap anggota tim.
@@ -86,9 +111,9 @@ Dalam kerja kelompok kuliah maupun persiapan kompetisi (PKM, Hackathon, Business
 
 ### 📁 5. Repositori Materi & Riset Terpadu
 - Mengorganisir tautan riset, literatur, dokumen panduan lomba, slide presentasi, dan folder drive dalam satu tab khusus yang rapi.
-- Hemat kuota dan ringan karena memanfaatkan integrasi tautan langsung (*cloud drive*).
+- Bebas kuota server karena memanfaatkan integrasi tautan langsung (*cloud drive*).
 
-### 👥 6. Dukungan Multi-Tim dalam Satu Akun
+### 👥 6. Akses Multi-Tim dalam Satu Akun
 - Pengguna dapat membuat atau bergabung ke banyak tim sekaligus tanpa perlu membuat akun baru.
 - Bergabung ke tim rekan sangat mudah hanya dengan memasukkan kode unik `@username-tim`.
 
@@ -110,54 +135,27 @@ Platform ini dibangun menggunakan fondasi teknologi modern untuk performa tinggi
 
 ---
 
-## 🚀 Panduan Memulai (Menjalankan Secara Lokal)
+## 🚀 Cara Mudah Memulai (Langsung Akses di Web)
 
-Jika Anda ingin menjalankan atau mengembangkan proyek ini di lingkungan lokal:
+Tidak perlu instalasi apa pun di komputer Anda. Anda bisa langsung mencoba platform ini dalam hitungan detik:
 
-### 1. Kloning Repositori
-```bash
-git clone https://github.com/haidar394/TimJuara.git
-cd TimJuara
-```
+1. 🌐 **Buka Website**: Kunjungi [**timjuara.vercel.app**](https://timjuara.vercel.app).
+2. 📝 **Buat Akun Gratis**: Masukkan nama lengkap, nomor WhatsApp (agar bot bisa mengingatkan deadline Anda), email, dan kata sandi.
+3. 👥 **Buat atau Gabung Tim**:
+   - Klik **"Buat Tim Baru"** jika Anda ingin menjadi ketua dan membuat ruang kerja untuk tim lomba/kelompok Anda.
+   - Atau klik **"Gabung Tim"** lalu masukkan kode unik `@username-tim` yang dibagikan oleh rekan Anda.
+4. 🚀 **Mulai Berkolaborasi**: Bagikan tugas, set deadline, sematkan link dokumen hasil kerja, dan nikmati kolaborasi tim yang bebas dari drama!
 
-### 2. Instalasi Dependensi
-```bash
-npm install
-```
-
-### 3. Konfigurasi Lingkungan (Opsional)
-Salin file template konfigurasi lingkungan:
-```bash
-cp .env.example .env.local
-```
-Tambahkan variabel lingkungan Supabase dan API pendukung Anda di `.env.local`:
-```env
-NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
-```
-
-> **Catatan**: Jika file `.env.local` tidak diisi, TimJuara memiliki mode demo cerdas lokal sehingga antarmuka tetap dapat diuji secara mandiri.
-
-### 4. Jalankan Server Pengembangan
-```bash
-npm run dev
-```
-Buka peramban Anda di [http://localhost:3000](http://localhost:3000) untuk melihat aplikasi berjalan.
-
-### 5. Build untuk Produksi
-```bash
-npm run build
-npm run start
-```
-
----
-
-## 📄 Lisensi
-Didistribusikan di bawah lisensi MIT. Lihat file `LICENSE` untuk informasi lebih lanjut.
-
----
+<br/>
 
 <div align="center">
-  <sub>Dikembangkan dengan dedikasi untuk mendukung kolaborasi dan prestasi tim di Indonesia. 🚀</sub><br>
-  <b><a href="https://timjuara.vercel.app">Mulai Kelola Tim Anda di TimJuara →</a></b>
+
+### [👉 **Klik di Sini untuk Mulai Menggunakan TimJuara Secara Gratis**](https://timjuara.vercel.app)
+
+<br/>
+
+---
+
+<sub>Dikembangkan dengan dedikasi untuk mendukung kolaborasi dan prestasi tim di Indonesia. 🇮🇩</sub>
+
 </div>
