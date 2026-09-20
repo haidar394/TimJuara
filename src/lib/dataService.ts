@@ -1719,11 +1719,24 @@ export async function updateTask(taskId: string, updates: Partial<Task>): Promis
       .update(cleanUpdates)
       .eq('id', taskId);
 
-    if (error && error.message.includes('assigned_to_ids')) {
+    // Fallback bertingkat jika database belum memiliki kolom tertentu atau error foreign key
+    if (error) {
+      console.warn('Supabase updateTask error:', error.message, 'Mencoba fallback bertingkat...');
       const fallbackUpdates = { ...cleanUpdates };
-      delete fallbackUpdates.assigned_to_ids;
+
+      if (error.message.includes('assigned_to_ids')) delete fallbackUpdates.assigned_to_ids;
+      if (error.message.includes('review_notes')) delete fallbackUpdates.review_notes;
+      if (error.message.includes('task_link')) delete fallbackUpdates.task_link;
+      if (error.message.includes('completed_by') || error.message.toLowerCase().includes('foreign key')) delete fallbackUpdates.completed_by;
+
       const retryRes = await supabase.from('tasks').update(fallbackUpdates).eq('id', taskId);
       error = retryRes.error;
+
+      // Ultimate Fallback: Jika masih error tapi ada perubahan status, pastikan minimal status berhasil diupdate!
+      if (error && fallbackUpdates.status) {
+        const statusOnlyRes = await supabase.from('tasks').update({ status: fallbackUpdates.status }).eq('id', taskId);
+        error = statusOnlyRes.error;
+      }
     }
 
     if (error) {
@@ -1751,7 +1764,10 @@ export async function updateTaskStatus(
   taskLink?: string
 ): Promise<boolean> {
   const updates: Partial<Task> = { status };
-  if (completedBy) updates.completed_by = completedBy;
+  // Hanya simpan completed_by jika tugas benar-benar ditandai 'done'
+  if (status === 'done' && completedBy) {
+    updates.completed_by = completedBy;
+  }
   if (reviewNotes !== undefined) updates.review_notes = reviewNotes;
   if (taskLink !== undefined) updates.task_link = taskLink;
 

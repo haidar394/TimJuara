@@ -325,7 +325,7 @@ _Notifikasi otomatis aplikasi TimJuara_`;
           .from('team_members')
           .select('user_id, role')
           .eq('team_id', teamId)
-          .eq('role', 'leader');
+          .in('role', ['ketua', 'leader']);
 
         if (leaderMembers && leaderMembers.length > 0) {
           const todayDateStr = new Date().toLocaleDateString('id-ID', { dateStyle: 'medium' });

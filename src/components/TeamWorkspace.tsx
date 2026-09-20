@@ -234,6 +234,7 @@ export default function TeamWorkspace() {
   // Review submission state (Member -> Ketua)
   const [submitTaskLink, setSubmitTaskLink] = useState('');
   const [submitTaskNotes, setSubmitTaskNotes] = useState('');
+  const [isSubmittingReview, setIsSubmittingReview] = useState(false);
 
   // Revision request state (Ketua -> Member)
   const [revisionNotes, setRevisionNotes] = useState('');
@@ -968,37 +969,76 @@ export default function TeamWorkspace() {
     e.preventDefault();
     if (!selectedTask || !currentUser || !team) return;
 
-    await updateTaskStatus(
-      selectedTask.id,
-      'review',
-      currentUser.id,
-      submitTaskNotes.trim(),
-      submitTaskLink.trim()
+    setIsSubmittingReview(true);
+    const targetTaskId = selectedTask.id;
+    const taskTitle = selectedTask.title;
+    const notes = submitTaskNotes.trim();
+    const link = submitTaskLink.trim();
+
+    // 1. Optimistic Update di antarmuka web langsung seketika
+    setTasks((prev) =>
+      prev.map((t) =>
+        t.id === targetTaskId
+          ? {
+              ...t,
+              status: 'review',
+              review_notes: notes,
+              task_link: link || t.task_link || '',
+            }
+          : t
+      )
     );
 
-    // Notifikasi In-App & WA Real-Time ke Ketua Tim
-    const ketuaMember = members.find((m) => m.role === 'ketua');
-    if (ketuaMember && ketuaMember.user_id !== currentUser.id) {
-      createNotification(
-        ketuaMember.user_id,
-        '🔍 Tugas Diajukan untuk Dicek',
-        `${currentUser.full_name} mengajukan "${selectedTask.title}" untuk dicek.`,
-        `/team/${team.username}`,
-        team.id
-      );
+    try {
+      // 2. Kirim update ke database
+      const res = await updateTask(targetTaskId, {
+        status: 'review',
+        review_notes: notes,
+        task_link: link || selectedTask.task_link || '',
+      });
 
-      if (ketuaMember.profile?.phone_number) {
-        const waMsg = `📋 *PENGAJUAN TUGAS UNTUK DICEK - TIMJUARA*\n\nHalo *${ketuaMember.profile.full_name}* (Ketua)! 👋\n*${currentUser.full_name}* telah menyelesaikan dan mengajukan tugas untuk dicek:\n📌 *${selectedTask.title}*\n${submitTaskLink.trim() ? `🔗 Link Hasil: ${submitTaskLink.trim()}\n` : ''}${submitTaskNotes.trim() ? `📝 Catatan: ${submitTaskNotes.trim()}\n` : ''}\nSilakan periksa di TimJuara: ${window.location.origin}/team/${team.username}`;
-        sendRealtimeWhatsAppNotification([ketuaMember.profile.phone_number], waMsg, team.wa_gateway_token);
+      if (!res.success) {
+        console.error('Gagal mengajukan review:', res.error);
+        showToast('Gagal mengajukan review: ' + (res.error || 'Terjadi kesalahan'));
+        // Rollback jika update gagal
+        const rolledBack = await getTeamTasks(team.id);
+        setTasks(rolledBack);
+        setIsSubmittingReview(false);
+        return;
       }
+
+      // 3. Notifikasi In-App & WA Real-Time ke Ketua Tim
+      const ketuaMember = members.find(
+        (m) => m.role === 'ketua' || (m as any).role === 'leader' || (team.created_by && m.user_id === team.created_by)
+      );
+      if (ketuaMember && ketuaMember.user_id !== currentUser.id) {
+        createNotification(
+          ketuaMember.user_id,
+          '🔍 Tugas Diajukan untuk Dicek',
+          `${currentUser.full_name} mengajukan "${taskTitle}" untuk dicek.`,
+          `/team/${team.username}`,
+          team.id
+        );
+
+        if (ketuaMember.profile?.phone_number) {
+          const waMsg = `📋 *PENGAJUAN TUGAS UNTUK DICEK - TIMJUARA*\n\nHalo *${ketuaMember.profile.full_name}* (Ketua)! 👋\n*${currentUser.full_name}* telah menyelesaikan dan mengajukan tugas untuk dicek:\n📌 *${taskTitle}*\n${link ? `🔗 Link Hasil: ${link}\n` : ''}${notes ? `📝 Catatan: ${notes}\n` : ''}\nSilakan periksa di TimJuara: ${window.location.origin}/team/${team.username}`;
+          sendRealtimeWhatsAppNotification([ketuaMember.profile.phone_number], waMsg, team.wa_gateway_token);
+        }
+      }
+
+      setShowReviewModal(false);
+      setSelectedTask(null);
+      showToast('Tugas telah diajukan ke Ketua Tim untuk dicek! 🔍');
+
+      // Sinkronisasi ulang dengan database
+      const updated = await getTeamTasks(team.id);
+      setTasks(updated);
+    } catch (err: any) {
+      console.error('Exception in handleConfirmSubmitReview:', err);
+      showToast('Terjadi kesalahan saat mengajukan review.');
+    } finally {
+      setIsSubmittingReview(false);
     }
-
-    setShowReviewModal(false);
-    setSelectedTask(null);
-    showToast('Tugas telah diajukan ke Ketua Tim untuk dicek! 🔍');
-
-    const updated = await getTeamTasks(team.id);
-    setTasks(updated);
   };
 
   // Approve Task (Ketua -> Done)
@@ -1859,7 +1899,7 @@ export default function TeamWorkspace() {
       return <span className="badge badge-success"><CheckCircle2 size={12} /> Selesai</span>;
     }
     if (status === 'review') {
-      return <span className="badge badge-purple"><Clock size={12} /> Menunggu Dicek Ketua</span>;
+      return <span className="badge badge-purple"><Clock size={12} /> Menunggu Review / ACC Ketua</span>;
     }
     if (!deadlineStr) {
       return <span className="badge badge-neutral"><Clock size={12} /> Tanpa Deadline</span>;
@@ -2909,7 +2949,7 @@ export default function TeamWorkspace() {
 
                                     {task.status === 'review' ? (
                                       <span className="badge badge-purple" style={{ fontSize: '0.675rem' }}>
-                                        🔍 Menunggu Review
+                                        🔍 Menunggu Review / ACC Ketua
                                       </span>
                                     ) : task.review_notes?.toLowerCase().includes('revisi') ? (
                                       <span className="badge badge-warning" style={{ fontSize: '0.675rem' }}>
@@ -3284,7 +3324,7 @@ export default function TeamWorkspace() {
                       onClick={() => setTaskFilter('review')}
                       className={`btn btn-sm task-filter-chip ${taskFilter === 'review' ? 'btn-primary' : 'btn-secondary'}`}
                     >
-                      🔍 Menunggu Review ({inReviewTasks})
+                      🔍 Menunggu Review / ACC ({inReviewTasks})
                     </button>
                     <button
                       onClick={() => setTaskFilter('done')}
@@ -3664,9 +3704,20 @@ export default function TeamWorkspace() {
                                       </button>
                                     </div>
                                   ) : (
-                                    <span className="badge badge-purple">
-                                      Sedang Dicek Ketua
-                                    </span>
+                                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                                      <span className="badge badge-purple" style={{ padding: '6px 12px', fontSize: '0.8rem', fontWeight: 700 }}>
+                                        🔍 Menunggu Review / ACC Ketua
+                                      </span>
+                                      <button
+                                        type="button"
+                                        onClick={() => openSubmitReview(task)}
+                                        className="btn btn-secondary btn-sm"
+                                        style={{ padding: '5px 8px', fontSize: '0.75rem' }}
+                                        title="Perbarui link hasil kerja atau catatan untuk Ketua"
+                                      >
+                                        Edit Pengajuan
+                                      </button>
+                                    </div>
                                   )}
                                 </>
                               )}
@@ -4797,11 +4848,23 @@ export default function TeamWorkspace() {
       {/* MODAL: AJUKAN REVIEW KE KETUA (Member Workflow)                          */}
       {/* ========================================================================= */}
       {showReviewModal && (
-        <div className="modal-overlay" onClick={() => setShowReviewModal(false)}>
+        <div className="modal-overlay" onClick={() => !isSubmittingReview && setShowReviewModal(false)}>
           <div className="modal-card" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h3 style={{ fontSize: '1.15rem', fontWeight: 800 }}>Ajukan Tugas untuk Dicek Ketua</h3>
-              <button onClick={() => setShowReviewModal(false)} style={{ background: 'none', border: 'none', fontSize: '1.2rem', cursor: 'pointer', color: 'var(--text-muted)' }}>
+              <div>
+                <h3 style={{ fontSize: '1.15rem', fontWeight: 800 }}>Ajukan Tugas untuk Dicek Ketua</h3>
+                {selectedTask && (
+                  <div style={{ fontSize: '0.825rem', color: 'var(--primary)', fontWeight: 600, marginTop: 3 }}>
+                    📌 Tugas: {selectedTask.title}
+                  </div>
+                )}
+              </div>
+              <button
+                type="button"
+                disabled={isSubmittingReview}
+                onClick={() => setShowReviewModal(false)}
+                style={{ background: 'none', border: 'none', fontSize: '1.2rem', cursor: isSubmittingReview ? 'not-allowed' : 'pointer', color: 'var(--text-muted)' }}
+              >
                 ✕
               </button>
             </div>
@@ -4816,14 +4879,13 @@ export default function TeamWorkspace() {
                   fontSize: '0.825rem',
                   color: isDarkMode ? '#d8b4fe' : '#5b21b6',
                 }}>
-                  📌 <b>Info:</b> Tugas ini akan masuk ke daftar <i>&quot;Menunggu Review Ketua&quot;</i> agar dicek kelayakannya terlebih dahulu sebelum ditandai resmi selesai.
+                  📌 <b>Info:</b> Setelah diajukan, status tugas akan langsung berubah menjadi <i>&quot;🔍 Menunggu Review / ACC Ketua&quot;</i> agar Ketua Tim dapat memverifikasi hasil kerja Anda.
                 </div>
 
                 <div className="form-group">
-                  <label className="form-label">Link Hasil Pengerjaan (Google Drive / Docs / Figma)</label>
+                  <label className="form-label">Link Hasil Pengerjaan (Google Drive / Docs / Figma) <span style={{ fontSize: '0.75rem', fontWeight: 'normal', color: 'var(--text-muted)' }}>(Opsional jika link sudah ada di deskripsi/catatan)</span></label>
                   <input
                     type="text"
-                    required
                     placeholder="https://docs.google.com/... atau https://drive.google.com/..."
                     value={submitTaskLink}
                     onChange={(e) => setSubmitTaskLink(e.target.value)}
@@ -4844,11 +4906,21 @@ export default function TeamWorkspace() {
                 </div>
               </div>
               <div className="modal-footer">
-                <button type="button" onClick={() => setShowReviewModal(false)} className="btn btn-secondary">
+                <button
+                  type="button"
+                  disabled={isSubmittingReview}
+                  onClick={() => setShowReviewModal(false)}
+                  className="btn btn-secondary"
+                >
                   Batal
                 </button>
-                <button type="submit" className="btn btn-primary" style={{ background: '#7c3aed' }}>
-                  <Send size={15} /> Kirim Pengajuan Review
+                <button
+                  type="submit"
+                  disabled={isSubmittingReview}
+                  className="btn btn-primary"
+                  style={{ background: '#7c3aed' }}
+                >
+                  <Send size={15} /> {isSubmittingReview ? 'Mengirim Pengajuan...' : 'Kirim Pengajuan Review'}
                 </button>
               </div>
             </form>
