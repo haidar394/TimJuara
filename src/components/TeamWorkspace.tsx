@@ -174,6 +174,7 @@ export default function TeamWorkspace() {
   const [isSavingTeamGroup, setIsSavingTeamGroup] = useState(false);
   const [isTestingTeamGroup, setIsTestingTeamGroup] = useState(false);
   const [isSendingGroupRecap, setIsSendingGroupRecap] = useState(false);
+  const [sendingTeamReminders, setSendingTeamReminders] = useState(false);
 
   // Unread Comments Tracking (task_id -> last_known_count)
   const [readCommentsMap, setReadCommentsMap] = useState<Record<string, number>>({});
@@ -497,6 +498,9 @@ export default function TeamWorkspace() {
     loadAiDigest(teamData.name, taskList, membersData);
     loadAiPersonalFocus(user.full_name || 'Rekan Tim', allTasks, teamData.name);
 
+    // Auto-heartbeat: cek & jalankan otomasi bot deadline harian jika sudah melewati jam 08:00 WIB
+    checkDailyDeadlineAutomation(teamData.id);
+
     // Load Global WhatsApp Token
     getGlobalWhatsAppConfig().then((cfg) => {
       if (cfg?.wa_gateway_token) {
@@ -668,6 +672,60 @@ export default function TeamWorkspace() {
       showToast('✨ Kriteria selesai berhasil ditambahkan ke deskripsi!');
     } else {
       showToast('Gagal membuat kriteria selesai.');
+    }
+  };
+
+  // ==========================================
+  // AUTOMATION: BOT DEADLINE CHECK & NOTIFIKASI KETUA
+  // ==========================================
+  const checkDailyDeadlineAutomation = async (teamId: string) => {
+    if (typeof window === 'undefined') return;
+    const todayStr = new Date().toISOString().split('T')[0];
+    const checkKey = `timjuara_auto_remind_${teamId}_${todayStr}`;
+    if (localStorage.getItem(checkKey)) return;
+
+    // Hitung jam WIB (UTC + 7)
+    const now = new Date();
+    const utcHours = now.getUTCHours();
+    const wibHours = (utcHours + 7) % 24;
+
+    // Jika jam 8 pagi atau lebih (08:00 - 23:59 WIB)
+    if (wibHours >= 8) {
+      localStorage.setItem(checkKey, 'pending');
+      try {
+        const res = await triggerDeadlineReminders(teamId, false);
+        if (res.success) {
+          localStorage.setItem(checkKey, 'done');
+          if (currentUser) {
+            loadNotifications(currentUser.id);
+          }
+          if (res.sentCount && res.sentCount > 0) {
+            showToast(`📢 Bot WhatsApp: ${res.sentCount} pengingat deadline otomatis berhasil dikirim jam 08:00 hari ini!`);
+          }
+        }
+      } catch (err) {
+        console.warn('Auto remind error:', err);
+      }
+    }
+  };
+
+  const handleManualTriggerTeamReminders = async () => {
+    if (!team) return;
+    setSendingTeamReminders(true);
+    try {
+      const res = await triggerDeadlineReminders(team.id, true);
+      if (res.success) {
+        showToast(`📢 Bot WhatsApp: Berhasil mengirim ${res.sentCount || 0} pengingat deadline ke WhatsApp tim!`);
+        if (currentUser) {
+          loadNotifications(currentUser.id);
+        }
+      } else {
+        showToast('⚠️ Gagal: ' + (res.error || 'Periksa token Fonnte'));
+      }
+    } catch (err: any) {
+      showToast('Gagal mengirim pengingat: ' + err.message);
+    } finally {
+      setSendingTeamReminders(false);
     }
   };
 
@@ -2362,6 +2420,61 @@ export default function TeamWorkspace() {
                     </button>
                   </div>
                 </div>
+
+                {/* Banner Status Bot Otomatis Jam 08:00 WIB untuk Ketua */}
+                {isKetua && (
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      flexWrap: 'wrap',
+                      gap: 12,
+                      padding: '12px 18px',
+                      borderRadius: 14,
+                      background: isDarkMode ? 'rgba(34, 197, 94, 0.1)' : '#f0fdf4',
+                      border: isDarkMode ? '1px solid rgba(34, 197, 94, 0.25)' : '1px solid #bbf7d0',
+                      marginBottom: 20,
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <div
+                        style={{
+                          width: 34,
+                          height: 34,
+                          borderRadius: 8,
+                          background: isDarkMode ? 'rgba(34, 197, 94, 0.2)' : '#dcfce7',
+                          color: '#16a34a',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          flexShrink: 0,
+                        }}
+                      >
+                        <BellRing size={18} />
+                      </div>
+                      <div>
+                        <div style={{ fontWeight: 700, fontSize: '0.88rem', color: isDarkMode ? '#86efac' : '#15803d' }}>
+                          Otomasi Bot Deadline Jam 08:00 WIB Aktif
+                        </div>
+                        <p style={{ margin: 0, fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                          Bot memindai tugas yang mendekati batas waktu setiap hari jam 08:00 WIB dan mengirim notifikasi langsung ke WhatsApp & web ini.
+                        </p>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={handleManualTriggerTeamReminders}
+                      disabled={sendingTeamReminders}
+                      className="btn btn-secondary btn-sm"
+                      style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.78rem', color: '#16a34a', borderColor: '#86efac' }}
+                    >
+                      <RefreshCw size={13} className={sendingTeamReminders ? 'animate-spin' : ''} />
+                      {sendingTeamReminders ? 'Mengirim...' : 'Kirim Pengingat Sekarang'}
+                    </button>
+                  </div>
+                )}
 
                 {/* 4 Metric Summary Cards */}
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 16, marginBottom: 28 }}>
