@@ -2741,4 +2741,183 @@ export async function deleteMultipleUsersByAdmin(userIds: string[]): Promise<{ s
   }
 }
 
+// ==========================================
+// AI ENGINE HELPERS (TIMJUARA AI)
+// ==========================================
+
+export interface AITeamDigest {
+  health: 'healthy' | 'warning' | 'critical';
+  healthLabel: string;
+  completionRate: number;
+  summary: string;
+  bottlenecks: string[];
+  highlights: string[];
+  advice: string;
+}
+
+export interface AIPersonalFocus {
+  priorityTaskId?: string;
+  priorityTaskTitle?: string;
+  focusReason: string;
+  actionAdvice: string;
+  urgency: 'high' | 'medium' | 'normal';
+}
+
+export interface AISubtask {
+  title: string;
+  description: string;
+  estimatedDays: number;
+  suggestedRole: string;
+}
+
+export interface AITaskBreakdown {
+  subtasks: AISubtask[];
+  definitionOfDone: string[];
+}
+
+export async function getAITeamDigest(
+  teamName: string,
+  tasks: any[],
+  members: any[]
+): Promise<{ success: boolean; data?: AITeamDigest; error?: string }> {
+  try {
+    const res = await fetch('/api/ai', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'overview_standup',
+        teamName,
+        tasks,
+        members,
+      }),
+    });
+
+    const result = await res.json();
+    if (!res.ok || !result.success) {
+      return { success: false, error: result.error || 'Gagal menghasilkan analisis AI.' };
+    }
+    return { success: true, data: result.data };
+  } catch (err: any) {
+    return { success: false, error: err.message || 'Kesalahan jaringan saat memproses AI.' };
+  }
+}
+
+export async function getAIPersonalFocus(
+  userName: string,
+  userTasks: any[],
+  teamName: string
+): Promise<{ success: boolean; data?: AIPersonalFocus; error?: string }> {
+  try {
+    const res = await fetch('/api/ai', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'personal_focus',
+        userName,
+        userTasks,
+        teamName,
+      }),
+    });
+
+    const result = await res.json();
+    if (!res.ok || !result.success) {
+      return { success: false, error: result.error || 'Gagal menghasilkan fokus personal.' };
+    }
+    return { success: true, data: result.data };
+  } catch (err: any) {
+    return { success: false, error: err.message || 'Kesalahan jaringan saat memproses fokus personal.' };
+  }
+}
+
+export async function breakdownTaskWithAI(
+  taskTitle: string,
+  taskDesc?: string
+): Promise<{ success: boolean; data?: AITaskBreakdown; error?: string }> {
+  try {
+    const res = await fetch('/api/ai', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'breakdown_tasks',
+        taskTitle,
+        taskDesc,
+      }),
+    });
+
+    const result = await res.json();
+    if (!res.ok || !result.success) {
+      return { success: false, error: result.error || 'Gagal memecah tugas dengan AI.' };
+    }
+    return { success: true, data: result.data };
+  } catch (err: any) {
+    return { success: false, error: err.message || 'Kesalahan jaringan saat memecah tugas.' };
+  }
+}
+
+export async function testGeminiAPIKey(
+  apiKey: string
+): Promise<{ success: boolean; message?: string; error?: string }> {
+  try {
+    const res = await fetch('/api/ai', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'test_connection',
+        apiKey,
+      }),
+    });
+
+    const result = await res.json();
+    if (!res.ok || !result.success) {
+      return { success: false, error: result.error || 'Gagal terhubung ke Google Gemini.' };
+    }
+    return { success: true, message: result.message };
+  } catch (err: any) {
+    return { success: false, error: err.message || 'Kesalahan jaringan saat tes Gemini.' };
+  }
+}
+
+export async function saveGeminiApiKey(apiKey: string): Promise<boolean> {
+  if (typeof window !== 'undefined') {
+    if (apiKey.trim()) {
+      localStorage.setItem('master_gemini_api_key', apiKey.trim());
+    } else {
+      localStorage.removeItem('master_gemini_api_key');
+    }
+  }
+
+  try {
+    if (isSupabaseConfigured && supabase) {
+      await supabase.from('system_settings').upsert([
+        { key: 'gemini_api_key', value: apiKey.trim(), updated_at: new Date().toISOString() },
+      ]);
+    }
+    return true;
+  } catch (e) {
+    console.warn('Gagal simpan gemini_api_key ke Supabase:', e);
+    return false;
+  }
+}
+
+export async function getStoredGeminiApiKey(): Promise<string> {
+  if (typeof window !== 'undefined') {
+    const local = localStorage.getItem('master_gemini_api_key');
+    if (local) return local;
+  }
+
+  try {
+    if (isSupabaseConfigured && supabase) {
+      const { data } = await supabase
+        .from('system_settings')
+        .select('value')
+        .eq('key', 'gemini_api_key')
+        .maybeSingle();
+      if (data?.value) return data.value;
+    }
+  } catch (e) {}
+
+  return '';
+}
+
+
 

@@ -20,6 +20,9 @@ import {
   updateUserByMasterAdmin,
   updateTeamWhatsAppGroup,
   getWhatsAppGroups,
+  testGeminiAPIKey,
+  saveGeminiApiKey,
+  getStoredGeminiApiKey,
 } from '@/lib/dataService';
 import {
   Profile,
@@ -56,6 +59,8 @@ import {
   EyeOff,
   Sun,
   Moon,
+  Key,
+  Bot,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -69,8 +74,15 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
 
   // Tabs & Search
-  const [activeTab, setActiveTab] = useState<'teams' | 'users' | 'whatsapp'>('teams');
+  const [activeTab, setActiveTab] = useState<'teams' | 'users' | 'whatsapp' | 'ai'>('teams');
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Google Gemini AI Configuration (Master Admin)
+  const [geminiKey, setGeminiKey] = useState('');
+  const [showGeminiKey, setShowGeminiKey] = useState(false);
+  const [savingGeminiKey, setSavingGeminiKey] = useState(false);
+  const [testingGemini, setTestingGemini] = useState(false);
+  const [geminiTestResult, setGeminiTestResult] = useState<string | null>(null);
 
   // WhatsApp Gateway Bot Configuration (Master Admin)
   const [waToken, setWaToken] = useState('');
@@ -152,11 +164,12 @@ export default function AdminDashboard() {
     }
     setCurrentUser(user);
 
-    const [st, tm, us, waConfig] = await Promise.all([
+    const [st, tm, us, waConfig, geminiKeyData] = await Promise.all([
       getAdminStats(),
       getAllTeamsForAdmin(),
       getAllUsersForAdmin(),
       getGlobalWhatsAppConfig(),
+      getStoredGeminiApiKey(),
     ]);
 
     setStats(st);
@@ -164,6 +177,9 @@ export default function AdminDashboard() {
     setUsers(us);
     setWaToken(waConfig.wa_gateway_token);
     setWaEnabled(waConfig.wa_notifications_enabled);
+    if (geminiKeyData) {
+      setGeminiKey(geminiKeyData);
+    }
     setLoading(false);
   };
 
@@ -232,6 +248,34 @@ export default function AdminDashboard() {
       }
     } else {
       showToast(`Gagal mengirim notifikasi: ${res.error}`);
+    }
+  };
+
+  const handleSaveGeminiKey = async () => {
+    setSavingGeminiKey(true);
+    const ok = await saveGeminiApiKey(geminiKey);
+    setSavingGeminiKey(false);
+    if (ok) {
+      showToast('API Key Google Gemini berhasil disimpan! ✨');
+    } else {
+      showToast('Gagal menyimpan API Key.');
+    }
+  };
+
+  const handleTestGeminiAdmin = async () => {
+    if (!geminiKey.trim()) {
+      showToast('Masukkan API Key Google Gemini terlebih dahulu.');
+      return;
+    }
+    setTestingGemini(true);
+    setGeminiTestResult(null);
+    const res = await testGeminiAPIKey(geminiKey.trim());
+    setTestingGemini(false);
+    if (res.success) {
+      setGeminiTestResult(res.message || 'Koneksi AI aktif & siap!');
+      showToast('✅ Koneksi Google Gemini AI berhasil terhubung!');
+    } else {
+      showToast('❌ Gagal: ' + (res.error || 'Periksa API Key'));
     }
   };
 
@@ -788,10 +832,28 @@ export default function AdminDashboard() {
                 <span>Bot WhatsApp Gateway</span>
                 <span className="badge badge-success" style={{ fontSize: '0.65rem', padding: '1px 6px' }}>100% Gratis</span>
               </button>
+
+              <button
+                onClick={() => { setActiveTab('ai'); setSearchQuery(''); setSelectedTeamIds([]); setSelectedUserIds([]); }}
+                className={`btn ${activeTab === 'ai' ? 'btn-primary' : 'btn-secondary'} btn-sm`}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  color: activeTab === 'ai' ? '#ffffff' : (isDarkMode ? '#c084fc' : '#7e22ce'),
+                  borderColor: activeTab === 'ai' ? 'var(--primary)' : (isDarkMode ? 'rgba(168, 85, 247, 0.35)' : '#d8b4fe'),
+                  background: activeTab === 'ai' ? 'var(--primary)' : (isDarkMode ? 'rgba(168, 85, 247, 0.12)' : '#faf5ff'),
+                  fontWeight: 600,
+                }}
+              >
+                <Sparkles size={15} />
+                <span>Google Gemini AI</span>
+                <span className="badge badge-purple" style={{ fontSize: '0.65rem', padding: '1px 6px' }}>Cerdas</span>
+              </button>
             </div>
 
             {/* Search Input (Hanya tampil di tab Teams & Users) */}
-            {activeTab !== 'whatsapp' && (
+            {activeTab !== 'whatsapp' && activeTab !== 'ai' && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 260, flex: 1, maxWidth: 400 }}>
                 <div style={{ position: 'relative', width: '100%' }}>
                   <Search size={16} color="var(--text-muted)" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }} />
@@ -1458,6 +1520,174 @@ export default function AdminDashboard() {
                     {testingWa ? 'Mengirim...' : '📲 Kirim Pesan Tes'}
                   </button>
                 </div>
+              </div>
+            </div>
+          )}
+
+          {/* ========================================================================= */}
+          {/* TAB 4: GOOGLE GEMINI AI CONFIGURATION (MASTER ADMIN)                     */}
+          {/* ========================================================================= */}
+          {activeTab === 'ai' && (
+            <div
+              className="card"
+              style={{
+                padding: 28,
+                border: isDarkMode ? '1px solid rgba(168, 85, 247, 0.3)' : '1px solid #e9d5ff',
+                background: isDarkMode
+                  ? 'linear-gradient(to bottom, rgba(147, 51, 234, 0.08) 0%, var(--surface) 200px)'
+                  : 'linear-gradient(to bottom, #faf5ff 0%, #ffffff 200px)',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 14, marginBottom: 22 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                  <div
+                    style={{
+                      width: 48,
+                      height: 48,
+                      borderRadius: 14,
+                      background: isDarkMode ? 'rgba(147, 51, 234, 0.2)' : '#f3e8ff',
+                      color: isDarkMode ? '#c084fc' : '#9333ea',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0,
+                      boxShadow: '0 4px 12px rgba(147, 51, 234, 0.15)',
+                    }}
+                  >
+                    <Bot size={26} />
+                  </div>
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                      <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-main)', margin: 0 }}>
+                        Integrasi Google Gemini AI
+                      </h3>
+                      <span className="badge badge-purple" style={{ fontSize: '0.75rem' }}>Gemini 2.0 / 1.5 Flash</span>
+                      <span className="badge badge-neutral" style={{ fontSize: '0.75rem' }}>Gratis</span>
+                    </div>
+                    <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)', marginTop: 2, margin: 0 }}>
+                      Kecerdasan buatan untuk <b>Daily Standup Ringkasan Tim</b>, <b>Deteksi Risiko & Hambatan</b>, <b>Fokus Kamu Hari Ini</b>, dan <b>Pecah Tugas Otomatis</b>.
+                    </p>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span className="badge badge-success" style={{ padding: '6px 12px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <Check size={14} /> Smart Heuristic Fallback Aktif
+                  </span>
+                </div>
+              </div>
+
+              {/* Panduan Mendapatkan API Key Gratis */}
+              <div
+                style={{
+                  background: isDarkMode ? 'rgba(147, 51, 234, 0.1)' : '#fdf4ff',
+                  border: isDarkMode ? '1px solid rgba(168, 85, 247, 0.25)' : '1px solid #f5d0fe',
+                  borderRadius: 14,
+                  padding: '16px 20px',
+                  marginBottom: 24,
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 700, color: isDarkMode ? '#e9d5ff' : '#86198f', fontSize: '0.92rem', marginBottom: 8 }}>
+                  <Sparkles size={16} />
+                  <span>Cara Mendapatkan API Key Google Gemini (100% Gratis):</span>
+                </div>
+                <ol style={{ margin: 0, paddingLeft: 20, color: 'var(--text-muted)', fontSize: '0.85rem', lineHeight: 1.6 }}>
+                  <li>Kunjungi portal resmi Google di <b><a href="https://aistudio.google.com" target="_blank" rel="noreferrer" style={{ color: '#9333ea', textDecoration: 'underline' }}>aistudio.google.com</a></b> lalu login dengan akun Google Anda.</li>
+                  <li>Klik tombol <b>"Get API key"</b> di pojok kiri atas, lalu buat kunci baru (Create API Key).</li>
+                  <li>Salin API Key tersebut dan tempelkan pada kolom di bawah ini, lalu klik <b>Simpan & Tes Koneksi</b>.</li>
+                </ol>
+                <div style={{ marginTop: 10, fontSize: '0.8rem', color: isDarkMode ? '#d8b4fe' : '#701a75' }}>
+                  💡 <i>Catatan: Jika API Key belum diisi, TimJuara tetap akan menggunakan <b>Smart Heuristic Engine</b> lokal sehingga seluruh fitur AI tetap bekerja cerdas tanpa error!</i>
+                </div>
+              </div>
+
+              {/* Form Input API Key */}
+              <div style={{ maxWidth: 640 }}>
+                <div className="form-group" style={{ marginBottom: 18 }}>
+                  <label className="form-label" style={{ fontWeight: 700, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <Key size={14} color="#9333ea" /> Google Gemini API Key
+                    </span>
+                    {geminiKey ? (
+                      <span style={{ fontSize: '0.75rem', color: '#10b981', fontWeight: 600 }}>● Terkonfigurasi</span>
+                    ) : (
+                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Belum diisi (Menggunakan Fallback)</span>
+                    )}
+                  </label>
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      type={showGeminiKey ? 'text' : 'password'}
+                      placeholder="AIzaSy..."
+                      value={geminiKey}
+                      onChange={(e) => setGeminiKey(e.target.value)}
+                      className="form-input"
+                      style={{ paddingRight: 42, fontFamily: showGeminiKey ? 'inherit' : 'monospace' }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowGeminiKey(!showGeminiKey)}
+                      style={{
+                        position: 'absolute',
+                        right: 12,
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        background: 'none',
+                        border: 'none',
+                        cursor: 'pointer',
+                        color: 'var(--text-muted)',
+                      }}
+                    >
+                      {showGeminiKey ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                  </div>
+                  <span className="form-hint">
+                    Key disimpan aman di database Supabase (system_settings) dan memori server platform.
+                  </span>
+                </div>
+
+                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+                  <button
+                    type="button"
+                    onClick={handleSaveGeminiKey}
+                    disabled={savingGeminiKey}
+                    className="btn btn-primary"
+                    style={{ background: 'linear-gradient(135deg, #7c3aed, #4f46e5)', display: 'flex', alignItems: 'center', gap: 6 }}
+                  >
+                    <Check size={16} />
+                    {savingGeminiKey ? 'Menyimpan...' : 'Simpan API Key'}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleTestGeminiAdmin}
+                    disabled={testingGemini}
+                    className="btn btn-secondary"
+                    style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#9333ea', borderColor: '#d8b4fe' }}
+                  >
+                    <Sparkles size={16} />
+                    {testingGemini ? 'Menguji Koneksi...' : 'Tes Koneksi AI'}
+                  </button>
+                </div>
+
+                {geminiTestResult && (
+                  <div
+                    style={{
+                      marginTop: 16,
+                      padding: '12px 16px',
+                      borderRadius: 10,
+                      background: isDarkMode ? 'rgba(16, 185, 129, 0.15)' : '#ecfdf5',
+                      border: '1px solid #a7f3d0',
+                      color: isDarkMode ? '#6ee7b7' : '#065f46',
+                      fontSize: '0.85rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                    }}
+                  >
+                    <CheckCircle2 size={16} />
+                    <span><b>Respon AI:</b> {geminiTestResult}</span>
+                  </div>
+                )}
               </div>
             </div>
           )}

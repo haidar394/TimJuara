@@ -45,6 +45,13 @@ import {
   sendRealtimeWhatsAppNotification,
   updateTeamWhatsAppGroup,
   getWhatsAppGroups,
+  getAITeamDigest,
+  getAIPersonalFocus,
+  breakdownTaskWithAI,
+  AITeamDigest,
+  AIPersonalFocus,
+  AISubtask,
+  AITaskBreakdown,
 } from '@/lib/dataService';
 import {
   Profile,
@@ -109,6 +116,10 @@ import {
   Moon,
   MessageCircle,
   RefreshCw,
+  Bot,
+  Wand2,
+  Lightbulb,
+  AlertTriangle,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -166,6 +177,18 @@ export default function TeamWorkspace() {
 
   // Unread Comments Tracking (task_id -> last_known_count)
   const [readCommentsMap, setReadCommentsMap] = useState<Record<string, number>>({});
+
+  // TimJuara AI States
+  const [aiDigest, setAiDigest] = useState<AITeamDigest | null>(null);
+  const [loadingAiDigest, setLoadingAiDigest] = useState(false);
+  const [aiPersonalFocus, setAiPersonalFocus] = useState<AIPersonalFocus | null>(null);
+  const [loadingAiPersonalFocus, setLoadingAiPersonalFocus] = useState(false);
+  const [showAiBreakdownModal, setShowAiBreakdownModal] = useState(false);
+  const [loadingAiBreakdown, setLoadingAiBreakdown] = useState(false);
+  const [aiBreakdownResult, setAiBreakdownResult] = useState<AITaskBreakdown | null>(null);
+  const [selectedSubtasks, setSelectedSubtasks] = useState<number[]>([]);
+  const [creatingSubtasks, setCreatingSubtasks] = useState(false);
+  const [generatingDod, setGeneratingDod] = useState(false);
 
   // Toasts
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -470,6 +493,10 @@ export default function TeamWorkspace() {
     const allTasks = await getUserAllActiveTasks(user.id);
     setAllUserTasks(allTasks);
 
+    // Load AI Digest & Personal Focus
+    loadAiDigest(teamData.name, taskList, membersData);
+    loadAiPersonalFocus(user.full_name || 'Rekan Tim', allTasks, teamData.name);
+
     // Load Global WhatsApp Token
     getGlobalWhatsAppConfig().then((cfg) => {
       if (cfg?.wa_gateway_token) {
@@ -495,6 +522,152 @@ export default function TeamWorkspace() {
       setNewTeamDesc('');
       showToast(`Tim ${newT.name} berhasil dibuat!`);
       router.push(`/team/${newT.username}`);
+    }
+  };
+
+  // ==========================================
+  // TIMJUARA AI HANDLERS
+  // ==========================================
+  const loadAiDigest = async (tName?: string, tTasks?: Task[], tMembers?: TeamMember[], force: boolean = false) => {
+    const currentTeamName = tName || team?.name;
+    if (!currentTeamName) return;
+    const currentTasks = tTasks || tasks;
+    const currentMembers = tMembers || members;
+    const cacheKey = `timjuara_ai_digest_${team?.id || currentTeamName}`;
+
+    if (!force && typeof window !== 'undefined') {
+      const cached = sessionStorage.getItem(cacheKey);
+      if (cached) {
+        try {
+          setAiDigest(JSON.parse(cached));
+          return;
+        } catch (e) {}
+      }
+    }
+
+    setLoadingAiDigest(true);
+    try {
+      const res = await getAITeamDigest(currentTeamName, currentTasks, currentMembers);
+      if (res.success && res.data) {
+        setAiDigest(res.data);
+        if (typeof window !== 'undefined') {
+          sessionStorage.setItem(cacheKey, JSON.stringify(res.data));
+        }
+      }
+    } catch (e) {
+      console.warn('Gagal memuat AI Digest:', e);
+    } finally {
+      setLoadingAiDigest(false);
+    }
+  };
+
+  const loadAiPersonalFocus = async (uName?: string, uTasks?: any[], tName?: string, force: boolean = false) => {
+    const userName = uName || currentUser?.full_name || 'Rekan Tim';
+    const allTasks = uTasks || allUserTasks;
+    const currentTeamName = tName || team?.name || 'TimJuara';
+    const cacheKey = `timjuara_ai_focus_${currentUser?.id || userName}`;
+
+    if (!force && typeof window !== 'undefined') {
+      const cached = sessionStorage.getItem(cacheKey);
+      if (cached) {
+        try {
+          setAiPersonalFocus(JSON.parse(cached));
+          return;
+        } catch (e) {}
+      }
+    }
+
+    setLoadingAiPersonalFocus(true);
+    try {
+      const activeMyTasks = allTasks.filter((t: any) => t.status !== 'done');
+      const res = await getAIPersonalFocus(userName, activeMyTasks, currentTeamName);
+      if (res.success && res.data) {
+        setAiPersonalFocus(res.data);
+        if (typeof window !== 'undefined') {
+          sessionStorage.setItem(cacheKey, JSON.stringify(res.data));
+        }
+      }
+    } catch (e) {
+      console.warn('Gagal memuat AI Focus:', e);
+    } finally {
+      setLoadingAiPersonalFocus(false);
+    }
+  };
+
+  const handleTriggerAiBreakdown = async () => {
+    if (!taskTitle.trim()) {
+      showToast('Ketik nama/judul tugas terlebih dahulu untuk dipecah oleh AI! 💡');
+      return;
+    }
+    setLoadingAiBreakdown(true);
+    setShowAiBreakdownModal(true);
+    setAiBreakdownResult(null);
+
+    const res = await breakdownTaskWithAI(taskTitle, taskDesc);
+    setLoadingAiBreakdown(false);
+    if (res.success && res.data) {
+      setAiBreakdownResult(res.data);
+      setSelectedSubtasks(res.data.subtasks.map((_, i) => i));
+    } else {
+      showToast('Gagal memecah tugas: ' + (res.error || 'Terjadi kesalahan'));
+    }
+  };
+
+  const handleApplySubtasks = async () => {
+    if (!aiBreakdownResult || !team || !currentUser) return;
+    const toCreate = aiBreakdownResult.subtasks.filter((_, i) => selectedSubtasks.includes(i));
+    if (toCreate.length === 0) {
+      showToast('Pilih minimal 1 subtask untuk dibuat! ⚠️');
+      return;
+    }
+
+    setCreatingSubtasks(true);
+    try {
+      for (const sub of toCreate) {
+        const d = new Date();
+        d.setDate(d.getDate() + (sub.estimatedDays || 2));
+        await createTask({
+          team_id: team.id,
+          title: sub.title,
+          description: sub.description ? `${sub.description}\n\nPeran Rekomendasi: ${sub.suggestedRole}` : undefined,
+          deadline: d.toISOString(),
+          assigned_to: taskAssigneeIds.length > 0 ? taskAssigneeIds[0] : undefined,
+          assigned_to_ids: taskAssigneeIds.length > 0 ? taskAssigneeIds : undefined,
+          status: 'todo',
+          created_by: currentUser.id,
+        });
+      }
+      showToast(`🎉 Berhasil membuat ${toCreate.length} subtask sekaligus ke workspace!`);
+      setShowAiBreakdownModal(false);
+      setShowAddTaskModal(false);
+      setTaskTitle('');
+      setTaskDesc('');
+      setTaskAssigneeIds([]);
+      setTaskDeadline('');
+      const updated = await getTeamTasks(team.id);
+      setTasks(updated);
+      loadAiDigest(team.name, updated, members, true);
+    } catch (err: any) {
+      showToast('Gagal membuat subtask: ' + err.message);
+    } finally {
+      setCreatingSubtasks(false);
+    }
+  };
+
+  const handleGenerateAiDod = async () => {
+    if (!taskTitle.trim()) {
+      showToast('Ketik nama/judul tugas terlebih dahulu! 💡');
+      return;
+    }
+    setGeneratingDod(true);
+    const res = await breakdownTaskWithAI(taskTitle, taskDesc);
+    setGeneratingDod(false);
+    if (res.success && res.data && res.data.definitionOfDone?.length > 0) {
+      const dodText = '\n\n📋 *Kriteria Selesai (Definition of Done)*:\n' + res.data.definitionOfDone.map((d) => `• ${d}`).join('\n');
+      setTaskDesc((prev) => (prev ? prev.trim() + dodText : dodText.trim()));
+      showToast('✨ Kriteria selesai berhasil ditambahkan ke deskripsi!');
+    } else {
+      showToast('Gagal membuat kriteria selesai.');
     }
   };
 
@@ -2238,6 +2411,197 @@ export default function TeamWorkspace() {
                     </div>
                   </div>
                 </div>
+
+                {/* ========================================================================= */}
+                {/* WIDGET AI 1: AI DAILY STANDUP & RISK PREDICTOR                            */}
+                {/* ========================================================================= */}
+                <div className="card ai-card" style={{ padding: '22px 24px', marginBottom: 28 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <div className="ai-badge">
+                        <Sparkles size={12} /> TimJuara AI
+                      </div>
+                      <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-main)', margin: 0 }}>
+                        Daily Standup & Risk Predictor
+                      </h3>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      {aiDigest && (
+                        <span
+                          className={`badge ${
+                            aiDigest.health === 'healthy'
+                              ? 'badge-success'
+                              : aiDigest.health === 'warning'
+                              ? 'badge-warning'
+                              : 'badge-danger'
+                          }`}
+                          style={{ padding: '4px 10px', fontWeight: 700, fontSize: '0.78rem' }}
+                        >
+                          {aiDigest.health === 'healthy' && '🟢 '}
+                          {aiDigest.health === 'warning' && '🟡 '}
+                          {aiDigest.health === 'critical' && '🔴 '}
+                          {aiDigest.healthLabel}
+                        </span>
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={() => loadAiDigest(undefined, undefined, undefined, true)}
+                        disabled={loadingAiDigest}
+                        className="btn btn-secondary btn-sm"
+                        style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.78rem' }}
+                        title="Analisis ulang kondisi tim dengan AI"
+                      >
+                        <RefreshCw size={13} className={loadingAiDigest ? 'animate-spin' : ''} />
+                        {loadingAiDigest ? 'Menganalisis...' : 'Analisis Ulang'}
+                      </button>
+                    </div>
+                  </div>
+
+                  {loadingAiDigest && !aiDigest ? (
+                    <div style={{ padding: '12px 0' }}>
+                      <div className="ai-shimmer-loading" style={{ height: 20, width: '90%', marginBottom: 10 }} />
+                      <div className="ai-shimmer-loading" style={{ height: 16, width: '75%', marginBottom: 10 }} />
+                      <div className="ai-shimmer-loading" style={{ height: 16, width: '60%' }} />
+                    </div>
+                  ) : aiDigest ? (
+                    <div>
+                      {/* Summary text */}
+                      <p style={{ fontSize: '0.92rem', color: 'var(--text-main)', lineHeight: 1.6, margin: '0 0 16px 0', fontWeight: 500 }}>
+                        {aiDigest.summary}
+                      </p>
+
+                      {/* 2-Column Grid: Risks vs Highlights */}
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 14, marginBottom: 16 }}>
+                        {/* Box 1: Risiko & Bottleneck */}
+                        <div
+                          style={{
+                            padding: '14px 16px',
+                            borderRadius: 12,
+                            background: isDarkMode ? 'rgba(239, 68, 68, 0.08)' : '#fef2f2',
+                            border: isDarkMode ? '1px solid rgba(239, 68, 68, 0.2)' : '1px solid #fee2e2',
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#ef4444', fontWeight: 700, fontSize: '0.82rem', marginBottom: 8 }}>
+                            <AlertTriangle size={14} /> Deteksi Hambatan & Risiko (Bottleneck)
+                          </div>
+                          <ul style={{ margin: 0, paddingLeft: 18, fontSize: '0.82rem', color: 'var(--text-main)', lineHeight: 1.5 }}>
+                            {aiDigest.bottlenecks.map((b, idx) => (
+                              <li key={idx} style={{ marginBottom: 4 }}>{b}</li>
+                            ))}
+                          </ul>
+                        </div>
+
+                        {/* Box 2: Highlights & Pencapaian */}
+                        <div
+                          style={{
+                            padding: '14px 16px',
+                            borderRadius: 12,
+                            background: isDarkMode ? 'rgba(16, 185, 129, 0.08)' : '#f0fdf4',
+                            border: isDarkMode ? '1px solid rgba(16, 185, 129, 0.2)' : '1px solid #dcfce7',
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#10b981', fontWeight: 700, fontSize: '0.82rem', marginBottom: 8 }}>
+                            <CheckCircle2 size={14} /> Pencapaian & Progres Terkini
+                          </div>
+                          <ul style={{ margin: 0, paddingLeft: 18, fontSize: '0.82rem', color: 'var(--text-main)', lineHeight: 1.5 }}>
+                            {aiDigest.highlights.map((h, idx) => (
+                              <li key={idx} style={{ marginBottom: 4 }}>{h}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      </div>
+
+                      {/* Rekomendasi Aksi Tim */}
+                      {aiDigest.advice && (
+                        <div
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 10,
+                            padding: '10px 14px',
+                            borderRadius: 10,
+                            background: isDarkMode ? 'rgba(99, 102, 241, 0.12)' : '#eef2ff',
+                            border: isDarkMode ? '1px solid rgba(99, 102, 241, 0.25)' : '1px solid #c7d2fe',
+                            fontSize: '0.84rem',
+                            color: isDarkMode ? '#c7d2fe' : '#3730a3',
+                          }}
+                        >
+                          <Lightbulb size={16} style={{ flexShrink: 0 }} />
+                          <div>
+                            <b>Saran Aksi Hari Ini:</b> {aiDigest.advice}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ) : null}
+                </div>
+
+                {/* ========================================================================= */}
+                {/* WIDGET AI 2: FOKUS KAMU HARI INI (PERSONAL ACTIONABLE CARD)               */}
+                {/* ========================================================================= */}
+                {aiPersonalFocus && aiPersonalFocus.priorityTaskTitle && (
+                  <div
+                    className="card"
+                    style={{
+                      padding: '18px 22px',
+                      marginBottom: 24,
+                      border: isDarkMode ? '1px solid rgba(79, 70, 229, 0.35)' : '1px solid #c7d2fe',
+                      background: isDarkMode
+                        ? 'linear-gradient(135deg, rgba(79, 70, 229, 0.15) 0%, rgba(147, 51, 234, 0.1) 100%)'
+                        : 'linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%)',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10, marginBottom: 8 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ fontSize: '1.1rem' }}>🎯</span>
+                        <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: 'var(--text-main)' }}>
+                          Fokus Utama Kamu Hari Ini
+                        </h4>
+                        <span
+                          className={`badge ${aiPersonalFocus.urgency === 'high' ? 'badge-danger' : 'badge-purple'}`}
+                          style={{ fontSize: '0.7rem' }}
+                        >
+                          {aiPersonalFocus.urgency === 'high' ? '⚡ Mendesak' : 'Fokus Hari Ini'}
+                        </span>
+                      </div>
+
+                      <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                        Personalisasi Akun: <b>{currentUser?.full_name?.split(' ')[0]}</b>
+                      </span>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+                      <div>
+                        <div style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--primary)', marginBottom: 4 }}>
+                          {aiPersonalFocus.priorityTaskTitle}
+                        </div>
+                        <p style={{ margin: 0, fontSize: '0.84rem', color: 'var(--text-muted)' }}>
+                          {aiPersonalFocus.focusReason} {aiPersonalFocus.actionAdvice}
+                        </p>
+                      </div>
+
+                      {aiPersonalFocus.priorityTaskId && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setActiveTab('tasks');
+                            setTimeout(() => {
+                              const el = document.getElementById(`task-${aiPersonalFocus.priorityTaskId}`);
+                              if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            }, 250);
+                          }}
+                          className="btn btn-primary btn-sm"
+                          style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700 }}
+                        >
+                          <span>Kerjakan Sekarang</span>
+                          <ArrowRight size={13} />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
 
                 {/* Section: Tugas Aktif Anda di Seluruh Tim */}
                 {(() => {
@@ -4033,7 +4397,18 @@ export default function TeamWorkspace() {
             <form onSubmit={handleCreateTask}>
               <div className="modal-body">
                 <div className="form-group">
-                  <label className="form-label">Nama / Judul Tugas</label>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                    <label className="form-label" style={{ margin: 0 }}>Nama / Judul Tugas</label>
+                    <button
+                      type="button"
+                      onClick={handleTriggerAiBreakdown}
+                      className="ai-pill-btn"
+                      style={{ fontSize: '0.75rem', padding: '3px 10px' }}
+                      title="Pecah tugas besar ini menjadi 3-4 subtask terstruktur secara otomatis dengan AI"
+                    >
+                      <Wand2 size={12} /> Pecah Tugas (AI)
+                    </button>
+                  </div>
                   <input
                     type="text"
                     required
@@ -4045,7 +4420,19 @@ export default function TeamWorkspace() {
                 </div>
 
                 <div className="form-group">
-                  <label className="form-label">Keterangan / Detail Tugas</label>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                    <label className="form-label" style={{ margin: 0 }}>Keterangan / Detail Tugas</label>
+                    <button
+                      type="button"
+                      onClick={handleGenerateAiDod}
+                      disabled={generatingDod}
+                      className="ai-pill-btn"
+                      style={{ fontSize: '0.72rem', padding: '2px 8px' }}
+                      title="Otomatis tuliskan standar kelayakan pengerjaan (Definition of Done)"
+                    >
+                      <Sparkles size={11} /> {generatingDod ? 'Menulis...' : 'Generate Kriteria DoD'}
+                    </button>
+                  </div>
                   <textarea
                     rows={3}
                     placeholder="Jelaskan apa yang harus dikerjakan rekan tim..."
@@ -5322,6 +5709,191 @@ export default function TeamWorkspace() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {/* ========================================================================= */}
+      {/* MODAL AI TASK BREAKDOWN PREVIEW (TIMJUARA AI)                            */}
+      {/* ========================================================================= */}
+      {showAiBreakdownModal && (
+        <div
+          className="modal-overlay"
+          onClick={() => !creatingSubtasks && setShowAiBreakdownModal(false)}
+          style={{ zIndex: 10000 }}
+        >
+          <div
+            className="modal-card"
+            onClick={(e) => e.stopPropagation()}
+            style={{ maxWidth: 620, width: '100%', maxHeight: '90vh', overflowY: 'auto' }}
+          >
+            <div className="modal-header">
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div className="ai-badge">
+                  <Wand2 size={12} /> AI Breakdown
+                </div>
+                <h3 style={{ fontSize: '1.15rem', fontWeight: 800, margin: 0 }}>
+                  Pecah Tugas Cerdas
+                </h3>
+              </div>
+              <button
+                onClick={() => !creatingSubtasks && setShowAiBreakdownModal(false)}
+                style={{ background: 'none', border: 'none', fontSize: '1.2rem', cursor: 'pointer', color: 'var(--text-muted)' }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="modal-body">
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Tugas Utama:</div>
+                <div style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--primary)' }}>
+                  "{taskTitle}"
+                </div>
+              </div>
+
+              {loadingAiBreakdown ? (
+                <div style={{ padding: '30px 20px', textAlign: 'center' }}>
+                  <div className="avatar-badge" style={{ width: 44, height: 44, margin: '0 auto 14px', animation: 'pulseGlow 1.5s infinite', background: 'linear-gradient(135deg, #7c3aed, #4f46e5)' }}>
+                    <Sparkles size={20} />
+                  </div>
+                  <div style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--text-main)', marginBottom: 6 }}>
+                    AI sedang memecah tugas...
+                  </div>
+                  <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+                    Menganalisis peran PIC, estimasi durasi, dan kriteria penyelesaian (DoD).
+                  </div>
+                </div>
+              ) : aiBreakdownResult ? (
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                    <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-main)' }}>
+                      Pilih Subtask yang Ingin Dibuat ({selectedSubtasks.length} dipilih):
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (selectedSubtasks.length === aiBreakdownResult.subtasks.length) {
+                          setSelectedSubtasks([]);
+                        } else {
+                          setSelectedSubtasks(aiBreakdownResult.subtasks.map((_, i) => i));
+                        }
+                      }}
+                      style={{ background: 'none', border: 'none', color: 'var(--primary)', fontSize: '0.78rem', cursor: 'pointer', fontWeight: 600 }}
+                    >
+                      {selectedSubtasks.length === aiBreakdownResult.subtasks.length ? 'Batal Pilih Semua' : 'Pilih Semua'}
+                    </button>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 18 }}>
+                    {aiBreakdownResult.subtasks.map((sub, idx) => {
+                      const isChecked = selectedSubtasks.includes(idx);
+                      return (
+                        <div
+                          key={idx}
+                          onClick={() => {
+                            setSelectedSubtasks((prev) =>
+                              isChecked ? prev.filter((i) => i !== idx) : [...prev, idx]
+                            );
+                          }}
+                          className="ai-subtask-item"
+                          style={{
+                            cursor: 'pointer',
+                            borderColor: isChecked ? 'var(--primary)' : undefined,
+                            background: isChecked
+                              ? (isDarkMode ? 'rgba(79, 70, 229, 0.12)' : '#f5f3ff')
+                              : undefined,
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={() => {}}
+                              style={{ marginTop: 3, accentColor: 'var(--primary)', cursor: 'pointer' }}
+                            />
+                            <div style={{ flex: 1 }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 6, marginBottom: 4 }}>
+                                <span style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-main)' }}>
+                                  {sub.title}
+                                </span>
+                                <span className="badge badge-purple" style={{ fontSize: '0.68rem', padding: '1px 6px' }}>
+                                  ⏱ +{sub.estimatedDays} hari • {sub.suggestedRole}
+                                </span>
+                              </div>
+                              <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-muted)', lineHeight: 1.4 }}>
+                                {sub.description}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {aiBreakdownResult.definitionOfDone?.length > 0 && (
+                    <div
+                      style={{
+                        padding: '12px 14px',
+                        borderRadius: 10,
+                        background: isDarkMode ? 'rgba(245, 158, 11, 0.08)' : '#fffbeb',
+                        border: isDarkMode ? '1px solid rgba(245, 158, 11, 0.2)' : '1px solid #fef3c7',
+                        marginBottom: 16,
+                      }}
+                    >
+                      <div style={{ fontWeight: 700, fontSize: '0.8rem', color: '#d97706', marginBottom: 6 }}>
+                        📋 Standar Kelayakan (Definition of Done):
+                      </div>
+                      <ul style={{ margin: 0, paddingLeft: 18, fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                        {aiBreakdownResult.definitionOfDone.map((dod, i) => (
+                          <li key={i}>{dod}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              ) : null}
+            </div>
+
+            <div className="modal-footer" style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
+              <button
+                type="button"
+                onClick={() => setShowAiBreakdownModal(false)}
+                className="btn btn-secondary"
+              >
+                Tutup
+              </button>
+
+              <div style={{ display: 'flex', gap: 8 }}>
+                {aiBreakdownResult && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const lines = aiBreakdownResult.subtasks.map((s, i) => `${i + 1}. ${s.title} (${s.suggestedRole})\n   ${s.description}`).join('\n\n');
+                      setTaskDesc((prev) => (prev ? prev.trim() + '\n\n' + lines : lines));
+                      setShowAiBreakdownModal(false);
+                      showToast('Daftar subtask disalin ke deskripsi tugas!');
+                    }}
+                    className="btn btn-secondary"
+                    style={{ fontSize: '0.82rem' }}
+                  >
+                    Salin ke Deskripsi
+                  </button>
+                )}
+
+                {aiBreakdownResult && (
+                  <button
+                    type="button"
+                    onClick={handleApplySubtasks}
+                    disabled={creatingSubtasks || selectedSubtasks.length === 0}
+                    className="btn btn-primary"
+                    style={{ background: 'linear-gradient(135deg, #7c3aed, #4f46e5)', display: 'flex', alignItems: 'center', gap: 6 }}
+                  >
+                    <Check size={15} />
+                    {creatingSubtasks ? 'Membuat...' : `Buat ${selectedSubtasks.length} Subtask Sekaligus`}
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       )}
