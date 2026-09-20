@@ -29,6 +29,8 @@ export async function POST(req: Request) {
     delete cleanUpdates.assignee_profile;
     delete cleanUpdates.assignee_profiles;
     delete cleanUpdates.comments_count;
+    delete cleanUpdates.last_comment_user_id;
+    delete cleanUpdates.last_comment_at;
 
     if ('assigned_to_ids' in cleanUpdates && Array.isArray(cleanUpdates.assigned_to_ids)) {
       const ids = cleanUpdates.assigned_to_ids.filter(Boolean);

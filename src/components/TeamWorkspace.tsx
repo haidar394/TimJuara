@@ -38,6 +38,8 @@ import {
   getGlobalWhatsAppConfig,
   getTaskComments,
   addTaskComment,
+  getUserReadComments,
+  saveUserReadComments,
   getUserNotifications,
   createNotification,
   markNotificationAsRead,
@@ -328,26 +330,33 @@ export default function TeamWorkspace() {
     setShowCommentsModal(true);
     setLoadingComments(true);
 
-    // Tandai seluruh komentar pada tugas ini sudah dibaca oleh user saat ini
-    if (currentUser) {
-      const currentCommentsCount = task.comments_count || 0;
-      const updated = {
-        ...readCommentsMap,
-        [task.id]: Math.max(currentCommentsCount, (readCommentsMap[task.id] || 0) + 1),
-      };
-      setReadCommentsMap(updated);
-      if (typeof window !== 'undefined') {
-        try {
-          localStorage.setItem(`timjuara_read_comments_${currentUser.id}`, JSON.stringify(updated));
-        } catch (err) {
-          console.error(err);
-        }
-      }
-    }
-
     const data = await getTaskComments(task.id);
     setTaskComments(data);
     setLoadingComments(false);
+
+    // Tandai seluruh komentar pada tugas ini sudah dibaca oleh user saat ini
+    if (currentUser) {
+      const realCount = Math.max(data.length, task.comments_count || 0);
+      setTasks((prev) =>
+        prev.map((t) => (t.id === task.id ? { ...t, comments_count: realCount } : t))
+      );
+      setReadCommentsMap((prev) => {
+        const updated = { ...prev, [task.id]: realCount };
+        saveUserReadComments(currentUser.id, updated);
+        return updated;
+      });
+
+      // Tandai notifikasi lonceng terkait tugas ini sebagai terbaca
+      const matchingNotifs = notifications.filter(
+        (n) => !n.is_read && (n.title.includes(task.title) || n.message.includes(task.title))
+      );
+      matchingNotifs.forEach((n) => markNotificationAsRead(n.id));
+      if (matchingNotifs.length > 0) {
+        setNotifications((prev) =>
+          prev.map((n) => (n.title.includes(task.title) || n.message.includes(task.title) ? { ...n, is_read: true } : n))
+        );
+      }
+    }
   };
 
   const handleSendComment = async (e: React.FormEvent) => {
@@ -370,21 +379,17 @@ export default function TeamWorkspace() {
       setTasks((prev) =>
         prev.map((t) =>
           t.id === selectedTaskForComments.id
-            ? { ...t, comments_count: newCommentsCount }
+            ? { ...t, comments_count: newCommentsCount, last_comment_user_id: currentUser.id }
             : t
         )
       );
 
       // Tandai komentar sendiri sebagai telah dibaca
-      const updatedRead = { ...readCommentsMap, [selectedTaskForComments.id]: newCommentsCount };
-      setReadCommentsMap(updatedRead);
-      if (typeof window !== 'undefined') {
-        try {
-          localStorage.setItem(`timjuara_read_comments_${currentUser.id}`, JSON.stringify(updatedRead));
-        } catch (err) {
-          console.error(err);
-        }
-      }
+      setReadCommentsMap((prev) => {
+        const updatedRead = { ...prev, [selectedTaskForComments.id]: newCommentsCount };
+        saveUserReadComments(currentUser.id, updatedRead);
+        return updatedRead;
+      });
 
       const recipientIds = new Set<string>();
       (selectedTaskForComments.assigned_to_ids || []).forEach((id) => recipientIds.add(id));
@@ -454,16 +459,14 @@ export default function TeamWorkspace() {
     setUserAvatarUrl(user.avatar_url || '');
     loadNotifications(user.id);
 
-    // Ambil rekam jejak komentar yang sudah dibaca user dari localStorage
-    if (typeof window !== 'undefined') {
-      try {
-        const storedRead = localStorage.getItem(`timjuara_read_comments_${user.id}`);
-        if (storedRead) {
-          setReadCommentsMap(JSON.parse(storedRead));
-        }
-      } catch (e) {
-        console.error('Error loading read comments map:', e);
+    // Ambil rekam jejak komentar yang sudah dibaca user (Cloud Auth & Local Sync)
+    try {
+      const storedRead = await getUserReadComments(user.id);
+      if (storedRead) {
+        setReadCommentsMap(storedRead);
       }
+    } catch (e) {
+      console.error('Error loading read comments map:', e);
     }
 
     const { team: teamData, members: membersData } = await getTeamByUsername(teamUsername);
@@ -1244,6 +1247,13 @@ export default function TeamWorkspace() {
 
       const updated = await getTeamTasks(team.id);
       setTasks(updated);
+
+      setReadCommentsMap((prev) => {
+        const revCount = (ketuaReviewTask.comments_count || 0) + 1;
+        const newMap = { ...prev, [ketuaReviewTask.id]: revCount };
+        saveUserReadComments(currentUser.id, newMap);
+        return newMap;
+      });
     } catch (err: any) {
       showToast('Gagal mengirim revisi: ' + (err?.message || 'Terjadi kesalahan'));
     } finally {
@@ -1264,6 +1274,12 @@ export default function TeamWorkspace() {
           currentUser.id,
           `✅ [DISETUJUI SELESAI]: ${ketuaReviewNotes.trim()}`
         );
+        setReadCommentsMap((prev) => {
+          const appCount = (ketuaReviewTask.comments_count || 0) + 1;
+          const newMap = { ...prev, [ketuaReviewTask.id]: appCount };
+          saveUserReadComments(currentUser.id, newMap);
+          return newMap;
+        });
       }
 
       // 2. Tandai tugas resmi selesai
@@ -3432,7 +3448,8 @@ export default function TeamWorkspace() {
                       const isDone = task.status === 'done';
                       const isInProgress = task.status === 'in_progress';
                       const isReview = task.status === 'review';
-                      const isUnreadComment = (task.comments_count || 0) > (readCommentsMap[task.id] || 0);
+                      const isOwnLastComment = Boolean(task.last_comment_user_id && currentUser && task.last_comment_user_id === currentUser.id);
+                      const isUnreadComment = !isOwnLastComment && (task.comments_count || 0) > (readCommentsMap[task.id] || 0);
 
                       let borderLeftColor = '#cbd5e1';
                       if (isDone) borderLeftColor = 'var(--success)';

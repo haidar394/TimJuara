@@ -182,6 +182,7 @@ export async function getCurrentUser(): Promise<Profile | null> {
       email: user.email || '',
       avatar_url: profile?.avatar_url || '',
       phone_number: profile?.phone_number || '',
+      read_comments: user.user_metadata?.read_comments || undefined,
     };
   } else {
     // Mode Demo Lokal
@@ -1581,17 +1582,22 @@ export async function getTeamTasks(teamId: string): Promise<Task[]> {
       }
     });
 
-    // Ambil hitungan komentar untuk tiap tugas
+    // Ambil hitungan komentar & komentar terakhir untuk tiap tugas
     const commentCountMap: Record<string, number> = {};
+    const lastCommentUserMap: Record<string, string> = {};
+    const lastCommentAtMap: Record<string, string> = {};
     try {
       const taskIds = data.map((t: any) => t.id);
       if (taskIds.length > 0) {
         const { data: commData } = await supabase
           .from('task_comments')
-          .select('task_id')
-          .in('task_id', taskIds);
+          .select('task_id, user_id, created_at')
+          .in('task_id', taskIds)
+          .order('created_at', { ascending: true });
         (commData || []).forEach((c: any) => {
           commentCountMap[c.task_id] = (commentCountMap[c.task_id] || 0) + 1;
+          lastCommentUserMap[c.task_id] = c.user_id;
+          lastCommentAtMap[c.task_id] = c.created_at;
         });
       }
     } catch {
@@ -1617,6 +1623,8 @@ export async function getTeamTasks(teamId: string): Promise<Task[]> {
         assignee_profile: t.profiles || assigneeProfiles[0],
         assignee_profiles: assigneeProfiles.length > 0 ? assigneeProfiles : (t.profiles ? [t.profiles] : []),
         comments_count: commentCountMap[t.id] || 0,
+        last_comment_user_id: lastCommentUserMap[t.id],
+        last_comment_at: lastCommentAtMap[t.id],
       };
     }).sort((a, b) => {
       const aDone = a.status === 'done';
@@ -1649,7 +1657,9 @@ export async function getTeamTasks(teamId: string): Promise<Task[]> {
           }
         }
 
-        const commentsCount = (db.task_comments || []).filter(c => c.task_id === t.id).length;
+        const taskComms = (db.task_comments || []).filter(c => c.task_id === t.id);
+        const commentsCount = taskComms.length;
+        const lastComm = taskComms[taskComms.length - 1];
         const isMarkedReview = t.review_notes && t.review_notes.includes('[STATUS:REVIEW]');
         const effectiveStatus: TaskStatus = (t.status === 'review' || (isMarkedReview && t.status !== 'done')) ? 'review' : (t.status as TaskStatus);
 
@@ -1660,6 +1670,8 @@ export async function getTeamTasks(teamId: string): Promise<Task[]> {
           assignee_profile: assigneeProfiles[0] || (t.assigned_to ? db.users.find(u => u.id === t.assigned_to) : undefined),
           assignee_profiles: assigneeProfiles,
           comments_count: commentsCount,
+          last_comment_user_id: lastComm?.user_id,
+          last_comment_at: lastComm?.created_at,
         };
       })
       .sort((a, b) => {
@@ -1783,6 +1795,8 @@ export async function updateTask(taskId: string, updates: Partial<Task>): Promis
   delete cleanUpdates.profiles;
   delete cleanUpdates.id;
   delete cleanUpdates.comments_count;
+  delete cleanUpdates.last_comment_user_id;
+  delete cleanUpdates.last_comment_at;
 
   // 1. Selalu sinkronkan ke Demo DB di LocalStorage jika ada
   try {
@@ -2039,6 +2053,53 @@ export async function addTaskComment(
       },
       error: null,
     };
+  }
+}
+
+export async function getUserReadComments(userId: string): Promise<Record<string, number>> {
+  let localMap: Record<string, number> = {};
+  if (typeof window !== 'undefined') {
+    try {
+      const raw = localStorage.getItem(`timjuara_read_comments_${userId}`);
+      if (raw) localMap = JSON.parse(raw);
+    } catch {}
+  }
+
+  if (isSupabaseConfigured && supabase) {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user?.user_metadata?.read_comments) {
+        const cloudMap = user.user_metadata.read_comments as Record<string, number>;
+        const merged: Record<string, number> = { ...cloudMap, ...localMap };
+        for (const [taskId, count] of Object.entries(cloudMap)) {
+          merged[taskId] = Math.max(merged[taskId] || 0, count);
+        }
+        if (typeof window !== 'undefined') {
+          try {
+            localStorage.setItem(`timjuara_read_comments_${userId}`, JSON.stringify(merged));
+          } catch {}
+        }
+        return merged;
+      }
+    } catch {}
+  }
+
+  return localMap;
+}
+
+export async function saveUserReadComments(userId: string, readMap: Record<string, number>): Promise<void> {
+  if (typeof window !== 'undefined') {
+    try {
+      localStorage.setItem(`timjuara_read_comments_${userId}`, JSON.stringify(readMap));
+    } catch {}
+  }
+
+  if (isSupabaseConfigured && supabase) {
+    try {
+      await supabase.auth.updateUser({
+        data: { read_comments: readMap }
+      });
+    } catch {}
   }
 }
 

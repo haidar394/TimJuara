@@ -11,6 +11,7 @@ export interface Profile {
   avatar_url?: string;
   phone_number?: string; // Nomor WhatsApp (contoh: 08123456789 atau 628123456789)
   created_at?: string;
+  read_comments?: Record<string, number>;
 }
 
 export interface Team {
@@ -54,6 +55,8 @@ export interface Task {
   assignee_profiles?: Profile[]; // Daftar seluruh profil PIC
   completed_by_profile?: Profile;
   comments_count?: number;
+  last_comment_user_id?: string;
+  last_comment_at?: string;
 }
 
 export interface TaskComment {
