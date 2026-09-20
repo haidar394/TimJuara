@@ -612,9 +612,18 @@ export default function TeamWorkspace() {
 
       const groupWaMsg = `📢 *TUGAS BARU - ${team.name.toUpperCase()}* 🚀\n\nHalo Rekan-rekan Tim! 👋\nAda tugas baru yang baru saja ditambahkan ke workspace:\n\n📌 *Judul*: *${taskTitle.trim()}*\n👤 *Ditugaskan ke*: *${picNames}*\n📅 *Deadline*: *${deadlineText}*\n${taskDesc.trim() ? `📝 *Catatan*: ${taskDesc.trim()}\n` : ''}${taskLink.trim() ? `🔗 *Link*: ${taskLink.trim()}\n` : ''}\nYuk segera berproses bersama di TimJuara:\n👉 ${window.location.origin}/team/${team.username}\n\nSemangat berkolaborasi dan raih juara! 🔥`;
 
-      sendTestWhatsAppMessage(teamGroupId, groupWaMsg, team.wa_gateway_token).catch((e) => {
-        console.warn('Gagal kirim bot ke grup:', e);
-      });
+      sendTestWhatsAppMessage(teamGroupId, groupWaMsg, team.wa_gateway_token)
+        .then((res) => {
+          if (res.success) {
+            showToast('📢 Bot WA: Notifikasi tugas baru terkirim ke grup!');
+          } else {
+            console.warn('Gagal kirim bot ke grup:', res.error);
+            showToast('⚠️ Bot WA grup: ' + (res.error || 'Gagal mengirim pesan'));
+          }
+        })
+        .catch((e) => {
+          console.warn('Gagal kirim bot ke grup:', e);
+        });
     }
 
     setTaskTitle('');
@@ -811,9 +820,18 @@ export default function TeamWorkspace() {
       const completerName = completerProfile?.full_name || 'Rekan Tim';
       const groupWaMsg = `🎉 *TUGAS SELESAI & DISETUJUI - ${team.name.toUpperCase()}* 🏆\n\nKabar gembira untuk seluruh tim! Tugas berikut telah resmi diverifikasi & disetujui selesai:\n\n✅ *Tugas*: *${task.title}*\n👤 *Diselesaikan oleh*: *${completerName}*\n${task.task_link ? `🔗 *Hasil Kerja*: ${task.task_link}\n` : ''}\nHebat tim! Satu langkah lebih dekat menuju kemenangan! 🚀💪\n👉 Buka Workspace: ${window.location.origin}/team/${team.username}`;
 
-      sendTestWhatsAppMessage(teamGroupId, groupWaMsg, team.wa_gateway_token).catch((e) => {
-        console.warn('Gagal kirim bot selesai ke grup:', e);
-      });
+      sendTestWhatsAppMessage(teamGroupId, groupWaMsg, team.wa_gateway_token)
+        .then((res) => {
+          if (res.success) {
+            showToast('📢 Bot WA: Pengumuman tugas selesai terkirim ke grup!');
+          } else {
+            console.warn('Gagal kirim bot selesai ke grup:', res.error);
+            showToast('⚠️ Bot WA grup: ' + (res.error || 'Gagal mengirim pesan'));
+          }
+        })
+        .catch((e) => {
+          console.warn('Gagal kirim bot selesai ke grup:', e);
+        });
     }
 
     showToast('🎉 Tugas telah disetujui selesai oleh Ketua!');
@@ -971,9 +989,18 @@ export default function TeamWorkspace() {
         const completerName = completerProfile?.full_name || 'Rekan Tim';
         const groupWaMsg = `🎉 *TUGAS SELESAI & DISETUJUI - ${team.name.toUpperCase()}* 🏆\n\nKabar luar biasa untuk tim! Tugas berikut telah diverifikasi & disetujui selesai oleh Ketua:\n\n✅ *Tugas*: *${ketuaReviewTask.title}*\n👤 *Diselesaikan oleh*: *${completerName}*\n${ketuaReviewNotes.trim() ? `📝 *Catatan Ketua*: "${ketuaReviewNotes.trim()}"\n` : ''}${ketuaReviewTask.task_link ? `🔗 *Hasil Kerja*: ${ketuaReviewTask.task_link}\n` : ''}\nKerja bagus rekan-rekan! Terus melaju menuju target tim! 🚀💪\n👉 Workspace: ${window.location.origin}/team/${team.username}`;
 
-        sendTestWhatsAppMessage(teamGroupId, groupWaMsg, team.wa_gateway_token).catch((e) => {
-          console.warn('Gagal kirim bot selesai ke grup:', e);
-        });
+        sendTestWhatsAppMessage(teamGroupId, groupWaMsg, team.wa_gateway_token)
+          .then((res) => {
+            if (res.success) {
+              showToast('📢 Bot WA: Pengumuman tugas selesai terkirim ke grup!');
+            } else {
+              console.warn('Gagal kirim bot selesai ke grup:', res.error);
+              showToast('⚠️ Bot WA grup: ' + (res.error || 'Gagal mengirim pesan'));
+            }
+          })
+          .catch((e) => {
+            console.warn('Gagal kirim bot selesai ke grup:', e);
+          });
       }
 
       setShowKetuaReviewModal(false);
