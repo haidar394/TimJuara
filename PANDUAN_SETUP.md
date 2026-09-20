@@ -257,6 +257,13 @@ Jika Anda sudah memiliki database Supabase yang berjalan sebelumnya:
    CREATE POLICY "Users can update their own notifications" ON public.notifications FOR UPDATE TO authenticated USING (auth.uid() = user_id);
    DROP POLICY IF EXISTS "Users can delete their own notifications" ON public.notifications;
    CREATE POLICY "Users can delete their own notifications" ON public.notifications FOR DELETE TO authenticated USING (auth.uid() = user_id);
+
+   -- 7. Kolom Pengaturan WhatsApp Tim & Avatar Tim (Sinkronisasi Global Lintas Device)
+   ALTER TABLE public.teams ADD COLUMN IF NOT EXISTS wa_group_id TEXT;
+   ALTER TABLE public.teams ADD COLUMN IF NOT EXISTS wa_group_name TEXT;
+   ALTER TABLE public.teams ADD COLUMN IF NOT EXISTS wa_gateway_token TEXT;
+   ALTER TABLE public.teams ADD COLUMN IF NOT EXISTS wa_notifications_enabled BOOLEAN DEFAULT true;
+   ALTER TABLE public.teams ADD COLUMN IF NOT EXISTS avatar_url TEXT DEFAULT '';
    ```
 3. Klik **Run**. Seluruh fitur manajemen pengguna, multi-PIC, komentar, & notifikasi kini aktif!
 

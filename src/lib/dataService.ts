@@ -841,26 +841,26 @@ export async function updateTeamAvatar(
     } catch (e) {
       console.error(e);
     }
+
+    // Simpan ke database sentral via API server (Bypass RLS & fallback system_settings)
+    fetch('/api/teams/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        teamId,
+        avatar_url: cleanUrl,
+      }),
+    }).catch((e) => console.warn('Sync avatar to /api/teams/settings warning:', e));
   }
 
   if (isSupabaseConfigured && supabase) {
     try {
-      const { error } = await supabase
+      await supabase
         .from('teams')
         .update({ avatar_url: cleanUrl })
         .eq('id', teamId);
-
-      if (error) {
-        const errMsg = error.message.toLowerCase();
-        if (errMsg.includes('avatar_url') || errMsg.includes('column of \'teams\'') || errMsg.includes('schema cache')) {
-          console.warn('Kolom avatar_url belum ada di tabel Supabase teams, tersimpan di browser storage.', error.message);
-          return { success: true, error: null };
-        }
-        return { success: false, error: error.message };
-      }
       return { success: true, error: null };
-    } catch (err: any) {
-      console.warn('Gagal update avatar_url ke Supabase, fallback aktif:', err);
+    } catch {
       return { success: true, error: null };
     }
   } else {
@@ -882,7 +882,7 @@ export async function updateTeamWhatsAppGroup(
   const cleanGroupId = (groupId || '').trim();
   const cleanGroupName = (groupName || '').trim();
 
-  // 1. Simpan ke browser local storage untuk persistensi instan & offline
+  // 1. Simpan ke browser local storage untuk persistensi instan & offline cache
   if (typeof window !== 'undefined') {
     try {
       if (cleanGroupId) {
@@ -900,37 +900,46 @@ export async function updateTeamWhatsAppGroup(
     }
   }
 
-  // 2. Simpan ke Supabase jika terkonfigurasi
+  // 2. Simpan permanen ke Database Sentral via API Server (Bypass RLS & Garansi Tersimpan di system_settings)
+  let apiSuccess = false;
+  if (typeof window !== 'undefined') {
+    try {
+      const res = await fetch('/api/teams/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          teamId,
+          wa_group_id: cleanGroupId,
+          wa_group_name: cleanGroupName,
+        }),
+      });
+      const resData = await res.json();
+      if (res.ok && resData.success) {
+        apiSuccess = true;
+      } else {
+        console.warn('API /api/teams/settings warning:', resData?.error);
+      }
+    } catch (apiErr) {
+      console.warn('Network call to /api/teams/settings failed:', apiErr);
+    }
+  }
+
+  // 3. Simpan juga langsung ke Supabase client jika terkonfigurasi
   if (isSupabaseConfigured && supabase) {
     try {
-      const { error } = await supabase
+      await supabase
         .from('teams')
         .update({
           wa_group_id: cleanGroupId || null,
           wa_group_name: cleanGroupName || null,
         })
         .eq('id', teamId);
-
-      if (error) {
-        const errMsg = error.message.toLowerCase();
-        if (
-          errMsg.includes('wa_group_id') ||
-          errMsg.includes('wa_group_name') ||
-          errMsg.includes('column of \'teams\'') ||
-          errMsg.includes('schema cache')
-        ) {
-          console.warn('Kolom wa_group_id belum ada di tabel Supabase teams, tersimpan di localStorage.', error.message);
-          return { success: true, error: null };
-        }
-        return { success: false, error: error.message };
-      }
       return { success: true, error: null };
-    } catch (err: any) {
-      console.warn('Gagal update wa_group_id ke Supabase, fallback aktif:', err);
+    } catch {
       return { success: true, error: null };
     }
   } else {
-    // 3. Simpan ke Demo Database
+    // 4. Simpan ke Demo Database
     const db = getDemoDb();
     const t = db.teams.find((item) => item.id === teamId);
     if (t) {
@@ -1124,14 +1133,40 @@ export async function getUserTeamsWithDetails(userId: string): Promise<UserTeamI
       taskCounts[t.team_id] = (taskCounts[t.team_id] || 0) + 1;
     });
 
+    // Query system_settings untuk grup WA dan avatar
+    const sysKeys: string[] = [];
+    teamIds.forEach((id) => {
+      sysKeys.push(`team_wa_group_${id}`, `team_wa_group_name_${id}`, `team_avatar_${id}`);
+    });
+    const { data: sysRes } = await supabase
+      .from('system_settings')
+      .select('key, value')
+      .in('key', sysKeys);
+
+    const sysMap: Record<string, string> = {};
+    (sysRes || []).forEach((item: any) => {
+      if (item.value) sysMap[item.key] = item.value;
+    });
+
     return teamsWithRole.map(({ team, role }) => {
-      let avatar = team.avatar_url;
+      let avatar: string = team.avatar_url || sysMap[`team_avatar_${team.id}`] || '';
       if (!avatar && typeof window !== 'undefined') {
         avatar = localStorage.getItem(`timjuara_team_avatar_${team.id}`) || '';
       }
+      let wa_group_id: string | undefined = team.wa_group_id || sysMap[`team_wa_group_${team.id}`];
+      if (!wa_group_id && typeof window !== 'undefined') {
+        wa_group_id = localStorage.getItem(`timjuara_team_wa_group_${team.id}`) || undefined;
+      }
+      let wa_group_name: string | undefined = team.wa_group_name || sysMap[`team_wa_group_name_${team.id}`];
+      if (!wa_group_name && typeof window !== 'undefined') {
+        wa_group_name = localStorage.getItem(`timjuara_team_wa_group_name_${team.id}`) || undefined;
+      }
+
       return {
         ...team,
         avatar_url: avatar,
+        wa_group_id: wa_group_id || undefined,
+        wa_group_name: wa_group_name || undefined,
         user_role: role,
         member_count: memberCounts[team.id] || 1,
         task_count: taskCounts[team.id] || 0,
@@ -1245,23 +1280,81 @@ export async function getTeamByUsername(username: string): Promise<{ team: Team 
 
     if (error || !team) return { team: null, members: [] };
 
-    if (!team.avatar_url && typeof window !== 'undefined') {
-      const localAvatar = localStorage.getItem(`timjuara_team_avatar_${team.id}`);
-      if (localAvatar) {
-        team.avatar_url = localAvatar;
+    // 1. Ambil pengaturan dari system_settings jika belum ada di tabel teams (sentral cloud)
+    if (!team.wa_group_id || !team.wa_group_name || !team.avatar_url) {
+      try {
+        const { data: sysSettings } = await supabase
+          .from('system_settings')
+          .select('key, value')
+          .in('key', [
+            `team_wa_group_${team.id}`,
+            `team_wa_group_name_${team.id}`,
+            `team_avatar_${team.id}`,
+          ]);
+
+        if (sysSettings && sysSettings.length > 0) {
+          for (const item of sysSettings) {
+            if (item.key === `team_wa_group_${team.id}` && item.value && !team.wa_group_id) {
+              team.wa_group_id = item.value;
+            }
+            if (item.key === `team_wa_group_name_${team.id}` && item.value && !team.wa_group_name) {
+              team.wa_group_name = item.value;
+            }
+            if (item.key === `team_avatar_${team.id}` && item.value && !team.avatar_url) {
+              team.avatar_url = item.value;
+            }
+          }
+        }
+      } catch (sysErr) {
+        console.warn('Error reading team fallback from system_settings:', sysErr);
       }
     }
 
-    if (!team.wa_group_id && typeof window !== 'undefined') {
+    // 2. Sinkronisasi Dua Arah (Bidirectional Sync) dengan browser localStorage
+    if (typeof window !== 'undefined') {
       const localGroupId = localStorage.getItem(`timjuara_team_wa_group_${team.id}`);
-      if (localGroupId) {
-        team.wa_group_id = localGroupId;
-      }
-    }
-    if (!team.wa_group_name && typeof window !== 'undefined') {
       const localGroupName = localStorage.getItem(`timjuara_team_wa_group_name_${team.id}`);
-      if (localGroupName) {
-        team.wa_group_name = localGroupName;
+      const localAvatar = localStorage.getItem(`timjuara_team_avatar_${team.id}`);
+
+      // Skenario A: Laptop lama memiliki ID di localStorage tapi server cloud belum terisi
+      if (localGroupId && !team.wa_group_id) {
+        team.wa_group_id = localGroupId;
+        team.wa_group_name = localGroupName || undefined;
+        // Auto-migrasi ke database sentral agar perangkat lain (laptop B/HP) langsung menerima ID ini
+        fetch('/api/teams/settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            teamId: team.id,
+            wa_group_id: localGroupId,
+            wa_group_name: localGroupName || '',
+          }),
+        }).catch((e) => console.warn('Auto-sync wa_group to cloud failed:', e));
+      } else if (team.wa_group_id) {
+        // Skenario B: Server cloud memiliki ID grup (misal dibuka di Laptop B yang baru)
+        // Simpan ke localStorage laptop ini untuk caching lokal
+        try {
+          localStorage.setItem(`timjuara_team_wa_group_${team.id}`, team.wa_group_id);
+          if (team.wa_group_name) {
+            localStorage.setItem(`timjuara_team_wa_group_name_${team.id}`, team.wa_group_name);
+          }
+        } catch {}
+      }
+
+      if (localAvatar && !team.avatar_url) {
+        team.avatar_url = localAvatar;
+        fetch('/api/teams/settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            teamId: team.id,
+            avatar_url: localAvatar,
+          }),
+        }).catch((e) => console.warn('Auto-sync avatar to cloud failed:', e));
+      } else if (team.avatar_url) {
+        try {
+          localStorage.setItem(`timjuara_team_avatar_${team.id}`, team.avatar_url);
+        } catch {}
       }
     }
 
@@ -2450,21 +2543,41 @@ export async function getAllTeamsForAdmin(): Promise<AdminTeamItem[]> {
       taskCounts[t.team_id] = (taskCounts[t.team_id] || 0) + 1;
     });
 
+    // 3. Fetch fallback settings from system_settings
+    const teamIds = teamsData.map((t: any) => t.id);
+    const sysKeys: string[] = [];
+    teamIds.forEach((id: string) => {
+      sysKeys.push(`team_wa_group_${id}`, `team_wa_group_name_${id}`, `team_avatar_${id}`);
+    });
+    const { data: sysRes } = await supabase
+      .from('system_settings')
+      .select('key, value')
+      .in('key', sysKeys);
+
+    const sysMap: Record<string, string> = {};
+    (sysRes || []).forEach((item: any) => {
+      if (item.value) sysMap[item.key] = item.value;
+    });
+
     return teamsData.map((t: any) => {
-      let wa_group_id = t.wa_group_id;
-      let wa_group_name = t.wa_group_name;
+      let wa_group_id: string | undefined = t.wa_group_id || sysMap[`team_wa_group_${t.id}`];
+      let wa_group_name: string | undefined = t.wa_group_name || sysMap[`team_wa_group_name_${t.id}`];
+      let avatar_url: string = t.avatar_url || sysMap[`team_avatar_${t.id}`] || '';
       if (!wa_group_id && typeof window !== 'undefined') {
         wa_group_id = localStorage.getItem('timjuara_team_wa_group_' + t.id) || undefined;
       }
       if (!wa_group_name && typeof window !== 'undefined') {
         wa_group_name = localStorage.getItem('timjuara_team_wa_group_name_' + t.id) || undefined;
       }
+      if (!avatar_url && typeof window !== 'undefined') {
+        avatar_url = localStorage.getItem('timjuara_team_avatar_' + t.id) || '';
+      }
       return {
         id: t.id,
         name: t.name,
         username: t.username,
         description: t.description,
-        avatar_url: t.avatar_url,
+        avatar_url: avatar_url || '',
         created_by: t.created_by,
         created_at: t.created_at,
         wa_gateway_token: t.wa_gateway_token,

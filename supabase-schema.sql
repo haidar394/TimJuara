@@ -55,6 +55,13 @@ CREATE TABLE IF NOT EXISTS public.teams (
 
 CREATE INDEX IF NOT EXISTS idx_teams_username ON public.teams(username);
 
+-- Pastikan kolom pengaturan WhatsApp & Avatar tersedia pada tabel teams
+ALTER TABLE public.teams ADD COLUMN IF NOT EXISTS wa_group_id TEXT;
+ALTER TABLE public.teams ADD COLUMN IF NOT EXISTS wa_group_name TEXT;
+ALTER TABLE public.teams ADD COLUMN IF NOT EXISTS wa_gateway_token TEXT;
+ALTER TABLE public.teams ADD COLUMN IF NOT EXISTS wa_notifications_enabled BOOLEAN DEFAULT true;
+ALTER TABLE public.teams ADD COLUMN IF NOT EXISTS avatar_url TEXT DEFAULT '';
+
 
 -- 4. Tabel Anggota Tim (Team Members) & Role (Ketua / Anggota)
 CREATE TABLE IF NOT EXISTS public.team_members (
@@ -149,6 +156,8 @@ CREATE POLICY "Team leader can update team"
 ON public.teams FOR UPDATE TO authenticated
 USING (
     (auth.jwt() ->> 'email') = 'admin@gmail.com'
+    OR
+    teams.created_by = auth.uid()
     OR
     EXISTS (
         SELECT 1 FROM public.team_members
