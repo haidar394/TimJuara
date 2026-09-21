@@ -82,11 +82,11 @@ export default function HomePage() {
           zIndex: 30,
         }}
       >
-        <div className="container" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', height: 72, paddingLeft: 'clamp(36px, 6vw, 84px)' }}>
+        <div className="nop-header-container">
           {/* Logo & Hand-Drawn Emblem */}
-          <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: 12, textDecoration: 'none', color: '#191712' }}>
+          <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none', color: '#191712', flexShrink: 0 }}>
             <div
-              className="nop-hand-card"
+              className="nop-hand-card nop-logo-badge"
               style={{
                 width: 42,
                 height: 42,
@@ -96,22 +96,23 @@ export default function HomePage() {
                 justifyContent: 'center',
                 fontWeight: 800,
                 fontSize: '1.25rem',
+                flexShrink: 0,
               }}
             >
               TJ
             </div>
             <div>
-              <div style={{ fontSize: '1.45rem', fontWeight: 700, lineHeight: 1.1, letterSpacing: '-0.01em' }}>
+              <div className="nop-logo-title" style={{ fontSize: '1.45rem', fontWeight: 700, lineHeight: 1.1, letterSpacing: '-0.01em' }}>
                 TimJuara<span style={{ color: '#ef4444' }}>.</span>
               </div>
-              <div className="font-typewriter" style={{ fontSize: '0.68rem', color: '#64748b', letterSpacing: '0.04em' }}>
+              <div className="font-typewriter nop-logo-sub" style={{ fontSize: '0.68rem', color: '#64748b', letterSpacing: '0.04em' }}>
                 KOLABORASI TIM JUARA
               </div>
             </div>
           </Link>
 
           {/* Nav Items & Auth CTA */}
-          <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
             <a href="#problem" className="hide-mobile" style={{ color: '#191712', textDecoration: 'none', fontSize: '1.1rem', fontWeight: 600 }}>
               Masalah
             </a>
@@ -128,28 +129,29 @@ export default function HomePage() {
                 background: '#ffffff',
                 border: '1.5px solid #191712',
                 borderRadius: '50%',
-                width: 36,
-                height: 36,
+                width: 34,
+                height: 34,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 cursor: 'pointer',
                 boxShadow: '2px 2px 0px #191712',
+                flexShrink: 0,
               }}
               title={isDarkMode ? 'Mode Terang' : 'Mode Gelap'}
             >
-              {isDarkMode ? <Sun size={16} color="#f59e0b" /> : <Moon size={16} color="#191712" />}
+              {isDarkMode ? <Sun size={15} color="#f59e0b" /> : <Moon size={15} color="#191712" />}
             </button>
 
-            <Link href="/auth" className="nop-btn-black" style={{ padding: '8px 18px', fontSize: '1.05rem' }}>
-              Masuk / Daftar →
+            <Link href="/auth" className="nop-btn-black nop-header-btn" style={{ padding: '8px 18px', fontSize: '1.05rem', whiteSpace: 'nowrap' }}>
+              <span className="hide-mobile">Masuk / </span>Daftar →
             </Link>
           </div>
         </div>
       </header>
 
       {/* Main Content Body */}
-      <main style={{ flex: 1, paddingLeft: 'clamp(28px, 6vw, 76px)', paddingRight: 'clamp(16px, 4vw, 48px)' }}>
+      <main className="nop-main-content">
         
         {/* ================= HERO SECTION ================= */}
         <section style={{ padding: '56px 0 72px' }}>
@@ -646,15 +648,15 @@ export default function HomePage() {
 
       {/* Footer Nothing On Purpose Style */}
       <footer
+        className="nop-footer-container"
         style={{
           borderTop: '2px solid #191712',
           background: 'rgba(251, 246, 230, 0.95)',
-          padding: '24px 0',
-          paddingLeft: 'clamp(36px, 6vw, 84px)',
-          paddingRight: 'clamp(16px, 4vw, 48px)',
+          paddingTop: 24,
+          paddingBottom: 24,
         }}
       >
-        <div className="container" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
           <div className="font-typewriter" style={{ fontSize: '0.85rem', color: '#475569' }}>
             © {new Date().getFullYear()} TimJuara · Dibuat untuk pejuang lomba & kerja kelompok.
           </div>

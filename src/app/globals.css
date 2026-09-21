@@ -2054,7 +2054,7 @@ button, input, select, textarea {
     padding: 14px 10px calc(84px + env(safe-area-inset-bottom, 0px)) !important;
   }
 
-  .container {
+  .workspace-main .container {
     padding: 0 !important;
   }
 
@@ -2322,7 +2322,7 @@ button, input, select, textarea {
   z-index: 2;
 }
 
-@media (max-width: 640px) {
+@media (max-width: 768px) {
   .nop-spiral {
     width: 24px;
     background-size: 24px 32px;
@@ -2473,6 +2473,119 @@ button, input, select, textarea {
   padding: 4px 14px;
   font-size: 0.95rem;
   box-shadow: 2px 2px 0px #191712;
+}
+
+/* Nothing On Purpose Notebook Layout Alignment */
+.nop-header-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  height: 72px;
+  padding-left: 84px !important;
+  padding-right: 28px !important;
+  max-width: 1200px;
+  margin: 0 auto;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.nop-main-content {
+  flex: 1;
+  padding-left: 84px !important;
+  padding-right: 28px !important;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.nop-main-content > section > .container {
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+}
+
+.nop-footer-container {
+  padding-left: 84px !important;
+  padding-right: 28px !important;
+  max-width: 1200px;
+  margin: 0 auto;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+@media (max-width: 768px) {
+  .nop-header-container {
+    padding-left: 58px !important;
+    padding-right: 18px !important;
+    height: 66px;
+  }
+  .nop-main-content {
+    padding-left: 58px !important;
+    padding-right: 18px !important;
+  }
+  .nop-footer-container {
+    padding-left: 58px !important;
+    padding-right: 18px !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .nop-header-container {
+    padding-left: 52px !important;
+    padding-right: 14px !important;
+    height: 62px;
+  }
+  .nop-main-content {
+    padding-left: 52px !important;
+    padding-right: 14px !important;
+  }
+  .nop-footer-container {
+    padding-left: 52px !important;
+    padding-right: 14px !important;
+  }
+  .nop-logo-badge {
+    width: 36px !important;
+    height: 36px !important;
+    font-size: 1.05rem !important;
+  }
+  .nop-logo-title {
+    font-size: 1.25rem !important;
+  }
+  .nop-logo-sub {
+    font-size: 0.62rem !important;
+  }
+  .nop-header-btn {
+    padding: 6px 12px !important;
+    font-size: 0.88rem !important;
+  }
+}
+
+@media (max-width: 380px) {
+  .nop-header-container {
+    padding-left: 46px !important;
+    padding-right: 10px !important;
+  }
+  .nop-main-content {
+    padding-left: 46px !important;
+    padding-right: 10px !important;
+  }
+  .nop-footer-container {
+    padding-left: 46px !important;
+    padding-right: 10px !important;
+  }
+  .nop-logo-badge {
+    width: 32px !important;
+    height: 32px !important;
+    font-size: 0.95rem !important;
+  }
+  .nop-logo-title {
+    font-size: 1.15rem !important;
+  }
+  .nop-logo-sub {
+    display: none !important;
+  }
+  .nop-header-btn {
+    padding: 5px 10px !important;
+    font-size: 0.82rem !important;
+  }
 }
 
 /* ==========================================================================
