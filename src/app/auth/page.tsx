@@ -102,11 +102,11 @@ export default function AuthPage() {
   };
 
   return (
-    <div suppressHydrationWarning className="auth-page-bg" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: 'radial-gradient(ellipse at 50% 20%, #e0e7ff 0%, #f8fafc 80%)' }}>
+    <div suppressHydrationWarning className="auth-page-bg" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: 'var(--bg-page)' }}>
       {/* Mini Header */}
       <div className="auth-mini-header" style={{ padding: '20px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div className="avatar-badge" style={{ width: 34, height: 34, background: 'linear-gradient(135deg, #4f46e5, #06b6d4)' }}>
+          <div className="avatar-badge" style={{ width: 34, height: 34, background: '#4f46e5' }}>
             TJ
           </div>
           <span style={{ fontWeight: 800, fontSize: '1.1rem', color: 'var(--text-main)' }}>TimJuara</span>

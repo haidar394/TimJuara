@@ -208,12 +208,12 @@ function OnboardingContent() {
   }
 
   return (
-    <div suppressHydrationWarning className="onboarding-page-bg" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: 'radial-gradient(ellipse at 50% 10%, #eef2ff 0%, #f8fafc 60%)' }}>
+    <div suppressHydrationWarning className="onboarding-page-bg" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: 'var(--bg-page)' }}>
       {/* Header */}
       <header className="onboarding-header" style={{ borderBottom: '1px solid var(--surface-border)', background: 'rgba(255, 255, 255, 0.9)', backdropFilter: 'blur(10px)', padding: '16px 0', position: 'sticky', top: 0, zIndex: 50 }}>
         <div className="container" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <div className="avatar-badge" style={{ width: 38, height: 38, background: 'linear-gradient(135deg, #4f46e5, #06b6d4)', boxShadow: '0 4px 12px rgba(79, 70, 229, 0.25)' }}>
+            <div className="avatar-badge" style={{ width: 38, height: 38, background: '#4f46e5', boxShadow: '0 4px 12px rgba(79, 70, 229, 0.25)' }}>
               TJ
             </div>
             <div>
@@ -228,7 +228,7 @@ function OnboardingContent() {
                 href="/admin"
                 className="btn btn-sm"
                 style={{
-                  background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                  background: '#ef4444',
                   color: '#fff',
                   border: 'none',
                   display: 'flex',
@@ -501,9 +501,7 @@ function OnboardingContent() {
                                     width: 48,
                                     height: 48,
                                     borderRadius: 12,
-                                    background: isLeader
-                                      ? 'linear-gradient(135deg, #f59e0b, #ef4444)'
-                                      : 'linear-gradient(135deg, #4f46e5, #06b6d4)',
+                                    background: isLeader ? '#f59e0b' : '#4f46e5',
                                     color: '#ffffff',
                                     display: 'flex',
                                     alignItems: 'center',

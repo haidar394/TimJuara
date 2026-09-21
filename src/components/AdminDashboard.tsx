@@ -700,7 +700,7 @@ export default function AdminDashboard() {
       <header style={{ background: '#0f172a', color: '#f8fafc', borderBottom: '1px solid #1e293b', padding: '16px 0', position: 'sticky', top: 0, zIndex: 100 }}>
         <div className="container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 14 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-            <div style={{ width: 40, height: 40, borderRadius: 10, background: 'linear-gradient(135deg, #ef4444, #f59e0b)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 12px rgba(239, 68, 68, 0.3)' }}>
+            <div style={{ width: 40, height: 40, borderRadius: 10, background: '#ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 12px rgba(239, 68, 68, 0.3)' }}>
               <Crown size={22} color="#fff" />
             </div>
             <div>
@@ -901,7 +901,7 @@ export default function AdminDashboard() {
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
-                    background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
+                    background: '#0f172a',
                     color: '#f8fafc',
                     padding: '12px 18px',
                     borderRadius: 14,
@@ -942,7 +942,7 @@ export default function AdminDashboard() {
                       onClick={() => setShowBulkDeleteTeamsModal(true)}
                       className="btn btn-sm"
                       style={{
-                        background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                        background: '#ef4444',
                         color: '#ffffff',
                         border: 'none',
                         fontSize: '0.825rem',
@@ -1166,7 +1166,7 @@ export default function AdminDashboard() {
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
-                    background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
+                    background: '#0f172a',
                     color: '#f8fafc',
                     padding: '12px 18px',
                     borderRadius: 14,
@@ -1207,7 +1207,7 @@ export default function AdminDashboard() {
                       onClick={() => setShowBulkDeleteUsersModal(true)}
                       className="btn btn-sm"
                       style={{
-                        background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                        background: '#ef4444',
                         color: '#ffffff',
                         border: 'none',
                         fontSize: '0.825rem',
@@ -1397,7 +1397,7 @@ export default function AdminDashboard() {
           {/* TAB 3: BOT WHATSAPP GATEWAY (MASTER ADMIN)                                */}
           {/* ========================================================================= */}
           {activeTab === 'whatsapp' && (
-            <div className="card" style={{ padding: 28, border: isDarkMode ? '1px solid rgba(34, 197, 94, 0.25)' : '1px solid #bbf7d0', background: isDarkMode ? 'linear-gradient(to bottom, rgba(22, 163, 74, 0.08) 0%, var(--surface) 200px)' : 'linear-gradient(to bottom, #f0fdf4 0%, #ffffff 200px)' }}>
+            <div className="card" style={{ padding: 28, border: isDarkMode ? '1px solid rgba(34, 197, 94, 0.25)' : '1px solid #bbf7d0', background: isDarkMode ? 'rgba(22, 163, 74, 0.08)' : '#f0fdf4' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 14, marginBottom: 22 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
                   <div style={{ width: 48, height: 48, borderRadius: 14, background: isDarkMode ? 'rgba(22, 163, 74, 0.18)' : '#dcfce7', color: isDarkMode ? '#4ade80' : '#16a34a', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: '0 4px 12px rgba(22, 163, 74, 0.15)' }}>
@@ -1533,9 +1533,7 @@ export default function AdminDashboard() {
               style={{
                 padding: 28,
                 border: isDarkMode ? '1px solid rgba(168, 85, 247, 0.3)' : '1px solid #e9d5ff',
-                background: isDarkMode
-                  ? 'linear-gradient(to bottom, rgba(147, 51, 234, 0.08) 0%, var(--surface) 200px)'
-                  : 'linear-gradient(to bottom, #faf5ff 0%, #ffffff 200px)',
+                background: isDarkMode ? 'rgba(147, 51, 234, 0.08)' : '#faf5ff',
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 14, marginBottom: 22 }}>
@@ -1651,7 +1649,7 @@ export default function AdminDashboard() {
                     onClick={handleSaveGeminiKey}
                     disabled={savingGeminiKey}
                     className="btn btn-primary"
-                    style={{ background: 'linear-gradient(135deg, #7c3aed, #4f46e5)', display: 'flex', alignItems: 'center', gap: 6 }}
+                    style={{ background: '#7c3aed', display: 'flex', alignItems: 'center', gap: 6 }}
                   >
                     <Check size={16} />
                     {savingGeminiKey ? 'Menyimpan...' : 'Simpan API Key'}
@@ -1941,7 +1939,7 @@ export default function AdminDashboard() {
                     display: 'flex',
                     alignItems: 'center',
                     gap: 6,
-                    background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
+                    background: '#16a34a',
                     borderColor: '#16a34a',
                   }}
                 >
@@ -2056,7 +2054,7 @@ export default function AdminDashboard() {
                   width: 42,
                   height: 42,
                   borderRadius: 10,
-                  background: 'linear-gradient(135deg, #ef4444, #f97316)',
+                  background: '#ef4444',
                   color: '#fff',
                   display: 'flex',
                   alignItems: 'center',
@@ -2129,7 +2127,7 @@ export default function AdminDashboard() {
                 style={{
                   padding: '11px 16px',
                   borderRadius: 10,
-                  background: 'linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)',
+                  background: '#dc2626',
                   border: 'none',
                   color: '#ffffff',
                   fontWeight: 700,
@@ -2916,7 +2914,7 @@ export default function AdminDashboard() {
                 style={{
                   padding: '11px 16px',
                   borderRadius: 10,
-                  background: 'linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)',
+                  background: '#dc2626',
                   border: 'none',
                   color: '#ffffff',
                   fontWeight: 700,
@@ -3123,7 +3121,7 @@ export default function AdminDashboard() {
                 style={{
                   padding: '11px 16px',
                   borderRadius: 10,
-                  background: 'linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)',
+                  background: '#dc2626',
                   border: 'none',
                   color: '#ffffff',
                   fontWeight: 700,
@@ -3331,7 +3329,7 @@ export default function AdminDashboard() {
                 style={{
                   padding: '11px 16px',
                   borderRadius: 10,
-                  background: 'linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)',
+                  background: '#dc2626',
                   border: 'none',
                   color: '#ffffff',
                   fontWeight: 700,

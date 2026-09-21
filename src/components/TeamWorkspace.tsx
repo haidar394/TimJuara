@@ -2443,7 +2443,7 @@ export default function TeamWorkspace() {
             style={{
               padding: '16px',
               borderRadius: 16,
-              background: 'linear-gradient(145deg, #09211a 0%, #0f382c 100%)',
+              background: '#0f382c',
               color: '#ffffff',
               boxShadow: '0 8px 20px rgba(15, 56, 44, 0.25)',
               position: 'relative',
@@ -3154,9 +3154,7 @@ export default function TeamWorkspace() {
             {isMasterAdminUser && (
               <div
                 style={{
-                  background: isDarkMode
-                    ? 'linear-gradient(135deg, rgba(245, 158, 11, 0.15) 0%, rgba(217, 119, 6, 0.08) 100%)'
-                    : 'linear-gradient(135deg, #fef3c7 0%, #fffbeb 100%)',
+                  background: isDarkMode ? 'rgba(245, 158, 11, 0.12)' : '#fef3c7',
                   border: isDarkMode ? '1px solid rgba(245, 158, 11, 0.35)' : '1px solid #fde68a',
                   color: isDarkMode ? '#fde68a' : '#92400e',
                   borderRadius: 'var(--radius-md)',
@@ -3232,7 +3230,7 @@ export default function TeamWorkspace() {
 
                 {/* 4 Donezo Metric Summary Cards */}
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 18, marginBottom: 28 }}>
-                  {/* Card 1: Hero Forest Green Gradient */}
+                  {/* Card 1: Hero Forest Green Card */}
                   <div className="donezo-metric-card hero-green">
                     <div style={{ fontSize: '0.88rem', fontWeight: 600, opacity: 0.9, marginBottom: 8 }}>
                       Total Tugas Tim
@@ -3518,7 +3516,7 @@ export default function TeamWorkspace() {
                       style={{
                         borderRadius: 20,
                         padding: '22px 24px',
-                        background: 'linear-gradient(135deg, #09211a 0%, #0f382c 100%)',
+                        background: '#0f382c',
                         color: '#ffffff',
                         boxShadow: '0 8px 24px rgba(15, 56, 44, 0.3)',
                         position: 'relative',
@@ -3755,9 +3753,7 @@ export default function TeamWorkspace() {
                       padding: '18px 22px',
                       marginBottom: 24,
                       border: isDarkMode ? '1px solid rgba(79, 70, 229, 0.35)' : '1px solid #c7d2fe',
-                      background: isDarkMode
-                        ? 'linear-gradient(135deg, rgba(79, 70, 229, 0.15) 0%, rgba(147, 51, 234, 0.1) 100%)'
-                        : 'linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%)',
+                      background: isDarkMode ? 'rgba(79, 70, 229, 0.12)' : '#f5f3ff',
                     }}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10, marginBottom: 8 }}>
@@ -4142,9 +4138,7 @@ export default function TeamWorkspace() {
                                         width: 44,
                                         height: 44,
                                         borderRadius: 12,
-                                        background: isLeader
-                                          ? 'linear-gradient(135deg, #f59e0b, #ef4444)'
-                                          : 'linear-gradient(135deg, #4f46e5, #06b6d4)',
+                                        background: isLeader ? '#f59e0b' : '#4f46e5',
                                         color: '#ffffff',
                                         display: 'flex',
                                         alignItems: 'center',
@@ -4777,7 +4771,7 @@ export default function TeamWorkspace() {
                                       <button
                                         onClick={() => handleQuickSubmitReview(task)}
                                         className="btn btn-primary btn-sm"
-                                        style={{ background: 'linear-gradient(135deg, #7c3aed, #4f46e5)', fontWeight: 700 }}
+                                        style={{ background: '#7c3aed', fontWeight: 700 }}
                                         title="Klik untuk langsung ajukan tugas ke Ketua agar dicek & di-ACC"
                                       >
                                         <Send size={13} /> {task.review_notes?.toLowerCase().includes('revisi') ? 'Ajukan Ulang Hasil Revisi' : 'Ajukan Dicek Ketua'}
@@ -5153,7 +5147,7 @@ export default function TeamWorkspace() {
                     ? (isDarkMode ? '1px solid rgba(34, 197, 94, 0.3)' : '1px solid #bbf7d0')
                     : '1px solid var(--surface-border)',
                   background: team.wa_group_id
-                    ? (isDarkMode ? 'linear-gradient(to bottom, rgba(34, 197, 94, 0.08) 0%, var(--surface) 180px)' : 'linear-gradient(to bottom, #f0fdf4 0%, var(--surface) 180px)')
+                    ? (isDarkMode ? 'rgba(34, 197, 94, 0.08)' : '#f0fdf4')
                     : 'var(--surface)',
                 }}
               >
@@ -5223,7 +5217,7 @@ export default function TeamWorkspace() {
                         onClick={handleOpenConnectTeamGroupModal}
                         className="btn btn-primary btn-sm"
                         style={{
-                          background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
+                          background: '#16a34a',
                           borderColor: '#16a34a',
                         }}
                       >
@@ -6845,7 +6839,7 @@ export default function TeamWorkspace() {
                 disabled={isSavingTeamGroup || !teamGroupInputId.trim()}
                 className="btn btn-primary"
                 style={{
-                  background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
+                  background: '#16a34a',
                   borderColor: '#16a34a',
                 }}
               >
@@ -7051,7 +7045,7 @@ export default function TeamWorkspace() {
 
               {loadingAiBreakdown ? (
                 <div style={{ padding: '30px 20px', textAlign: 'center' }}>
-                  <div className="avatar-badge" style={{ width: 44, height: 44, margin: '0 auto 14px', animation: 'pulseGlow 1.5s infinite', background: 'linear-gradient(135deg, #7c3aed, #4f46e5)' }}>
+                  <div className="avatar-badge" style={{ width: 44, height: 44, margin: '0 auto 14px', animation: 'pulseGlow 1.5s infinite', background: '#7c3aed' }}>
                     <Sparkles size={20} />
                   </div>
                   <div style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--text-main)', marginBottom: 6 }}>
@@ -7184,7 +7178,7 @@ export default function TeamWorkspace() {
                     onClick={handleApplySubtasks}
                     disabled={creatingSubtasks || selectedSubtasks.length === 0}
                     className="btn btn-primary"
-                    style={{ background: 'linear-gradient(135deg, #7c3aed, #4f46e5)', display: 'flex', alignItems: 'center', gap: 6 }}
+                    style={{ background: '#7c3aed', display: 'flex', alignItems: 'center', gap: 6 }}
                   >
                     <Check size={15} />
                     {creatingSubtasks ? 'Membuat...' : `Buat ${selectedSubtasks.length} Subtask Sekaligus`}

@@ -38,7 +38,7 @@
   --danger-light: #fef2f2;
   --danger-border: #fecaca;
 
-  --bg-gradient: radial-gradient(circle at 10% 20%, #f4f6f5 0%, #ffffff 90%);
+  --bg-gradient: #f4f6f5;
   --bg-page: #f4f6f5;
   --surface: #ffffff;
   --surface-secondary: #f8faf9;
@@ -73,7 +73,7 @@
   --donezo-card: #131d33;
   --donezo-border: #243455;
 
-  --bg-gradient: radial-gradient(circle at 10% 20%, #0f172a 0%, #080d1a 90%);
+  --bg-gradient: #0b1120;
   --bg-page: #0b1120;
   --surface: #131d33;
   --surface-secondary: #1a2744;
@@ -196,7 +196,7 @@
 
 [data-theme="dark"] .contributor-card-champion,
 .dark .contributor-card-champion {
-  background: linear-gradient(135deg, rgba(245, 158, 11, 0.12) 0%, rgba(217, 119, 6, 0.05) 100%) !important;
+  background: rgba(245, 158, 11, 0.12) !important;
   border: 1px solid rgba(245, 158, 11, 0.45) !important;
   box-shadow: 0 4px 20px rgba(245, 158, 11, 0.08) !important;
 }
@@ -447,13 +447,13 @@ button, input, select, textarea {
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, var(--primary) 0%, #6366f1 100%);
+  background: var(--primary);
   color: #ffffff;
   box-shadow: 0 4px 12px var(--primary-glow);
 }
 
 .btn-primary:hover {
-  background: linear-gradient(135deg, var(--primary-hover) 0%, #4f46e5 100%);
+  background: var(--primary-hover);
   box-shadow: 0 6px 16px rgba(79, 70, 229, 0.3);
   transform: translateY(-1px);
 }
@@ -631,7 +631,7 @@ button, input, select, textarea {
   width: 36px;
   height: 36px;
   border-radius: var(--radius-full);
-  background: linear-gradient(135deg, #6366f1, #a855f7);
+  background: #6366f1;
   color: white;
   display: flex;
   align-items: center;
@@ -797,7 +797,7 @@ button, input, select, textarea {
   width: 44px;
   height: 44px;
   border-radius: 12px;
-  background: linear-gradient(135deg, #4f46e5, #06b6d4);
+  background: #4f46e5;
   color: white;
   display: flex;
   align-items: center;
@@ -1483,7 +1483,7 @@ button, input, select, textarea {
 /* --- Auth Page Background Dark Mode --- */
 [data-theme="dark"] .auth-page-bg,
 .dark .auth-page-bg {
-  background: radial-gradient(ellipse at 50% 20%, #0f172a 0%, #080d1a 80%) !important;
+  background: #0b1120 !important;
 }
 
 /* --- Auth Page Tab Switcher Dark Mode --- */
@@ -1508,7 +1508,7 @@ button, input, select, textarea {
 /* --- Onboarding Page Background Dark Mode --- */
 [data-theme="dark"] .onboarding-page-bg,
 .dark .onboarding-page-bg {
-  background: radial-gradient(ellipse at 50% 10%, #0f172a 0%, #080d1a 60%) !important;
+  background: #0b1120 !important;
 }
 
 /* --- Onboarding Header Dark Mode --- */
@@ -1777,7 +1777,7 @@ button, input, select, textarea {
   overflow: hidden;
   border-radius: var(--radius-lg);
   border: 1px solid rgba(124, 58, 237, 0.25);
-  background: linear-gradient(135deg, rgba(79, 70, 229, 0.04) 0%, rgba(147, 51, 234, 0.06) 100%);
+  background: #fbfbfe;
   box-shadow: 0 8px 24px -6px rgba(124, 58, 237, 0.08);
   transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
@@ -1785,7 +1785,7 @@ button, input, select, textarea {
 [data-theme="dark"] .ai-card,
 .dark .ai-card {
   border-color: rgba(139, 92, 246, 0.3);
-  background: linear-gradient(135deg, rgba(30, 27, 75, 0.45) 0%, rgba(59, 7, 100, 0.25) 100%);
+  background: #1e1b4b;
   box-shadow: 0 10px 30px -8px rgba(0, 0, 0, 0.5);
 }
 
@@ -1799,24 +1799,23 @@ button, input, select, textarea {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  background: linear-gradient(135deg, #4f46e5, #9333ea);
+  background: #6366f1;
   color: #ffffff;
   box-shadow: 0 2px 8px rgba(79, 70, 229, 0.3);
 }
 
-@keyframes aiShimmer {
-  0% {
-    background-position: -200% 0;
+@keyframes aiPulse {
+  0%, 100% {
+    opacity: 0.4;
   }
-  100% {
-    background-position: 200% 0;
+  50% {
+    opacity: 0.9;
   }
 }
 
 .ai-shimmer-loading {
-  background: linear-gradient(90deg, rgba(99, 102, 241, 0.1) 25%, rgba(168, 85, 247, 0.25) 50%, rgba(99, 102, 241, 0.1) 75%);
-  background-size: 200% 100%;
-  animation: aiShimmer 1.8s infinite;
+  background: rgba(99, 102, 241, 0.15);
+  animation: aiPulse 1.6s ease-in-out infinite;
   border-radius: 8px;
 }
 
@@ -1842,7 +1841,7 @@ button, input, select, textarea {
 }
 
 .ai-pill-btn:hover {
-  background: linear-gradient(135deg, #4f46e5, #9333ea);
+  background: #6366f1;
   color: #ffffff;
   border-color: transparent;
   transform: translateY(-1px);
@@ -2559,7 +2558,7 @@ button, input, select, textarea {
 }
 
 .donezo-metric-card.hero-green {
-  background: linear-gradient(145deg, #0f382c 0%, #164e3f 100%);
+  background: #0f382c;
   border-color: #0f382c;
   color: #ffffff;
 }
