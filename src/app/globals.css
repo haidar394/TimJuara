@@ -1973,6 +1973,51 @@ button, input, select, textarea {
   margin-bottom: 16px;
 }
 
+/* Bot Automation Banner */
+.bot-automation-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding: 16px 20px;
+  border-radius: 14px;
+  margin-bottom: 24px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+}
+
+.bot-automation-content {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex: 1;
+  min-width: 260px;
+}
+
+.bot-automation-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.bot-automation-title {
+  font-weight: 700;
+  font-size: 0.9rem;
+  line-height: 1.35;
+  margin-bottom: 3px;
+}
+
+.bot-automation-desc {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
 /* Mobile Media Queries (<= 640px) */
 @media (max-width: 640px) {
   .workspace-header {
@@ -2122,12 +2167,20 @@ button, input, select, textarea {
   .bot-automation-banner {
     flex-direction: column !important;
     align-items: stretch !important;
-    padding: 12px 14px !important;
+    padding: 14px 14px !important;
+    gap: 14px !important;
+    border-radius: 12px !important;
+  }
+
+  .bot-automation-content {
+    align-items: flex-start !important;
+    gap: 12px !important;
   }
 
   .bot-automation-banner .btn {
     width: 100% !important;
     justify-content: center !important;
+    padding: 9px 14px !important;
   }
 
   /* Task Card Mobile adjustments */

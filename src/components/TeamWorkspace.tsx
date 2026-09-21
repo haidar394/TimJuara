@@ -2703,32 +2703,40 @@ export default function TeamWorkspace() {
                   <div
                     className="bot-automation-banner"
                     style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      flexWrap: 'wrap',
+                      gap: 16,
+                      padding: '16px 20px',
+                      borderRadius: 14,
                       background: isDarkMode ? 'rgba(34, 197, 94, 0.1)' : '#f0fdf4',
                       border: isDarkMode ? '1px solid rgba(34, 197, 94, 0.25)' : '1px solid #bbf7d0',
-                      marginBottom: 20,
+                      marginBottom: 24,
                     }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <div className="bot-automation-content" style={{ display: 'flex', alignItems: 'center', gap: 14, flex: 1, minWidth: 260 }}>
                       <div
+                        className="bot-automation-icon"
                         style={{
-                          width: 34,
-                          height: 34,
-                          borderRadius: 8,
+                          width: 40,
+                          height: 40,
+                          borderRadius: 10,
                           background: isDarkMode ? 'rgba(34, 197, 94, 0.2)' : '#dcfce7',
-                          color: '#16a34a',
+                          color: isDarkMode ? '#86efac' : '#16a34a',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
                           flexShrink: 0,
                         }}
                       >
-                        <BellRing size={18} />
+                        <BellRing size={20} />
                       </div>
                       <div>
-                        <div style={{ fontWeight: 700, fontSize: '0.88rem', color: isDarkMode ? '#86efac' : '#15803d' }}>
+                        <div className="bot-automation-title" style={{ fontWeight: 700, fontSize: '0.9rem', color: isDarkMode ? '#86efac' : '#15803d', marginBottom: 3 }}>
                           Otomasi Bot Deadline Jam 08:00 WIB Aktif
                         </div>
-                        <p style={{ margin: 0, fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                        <p className="bot-automation-desc" style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-muted)', lineHeight: 1.45 }}>
                           Bot memindai tugas yang mendekati batas waktu setiap hari jam 08:00 WIB dan mengirim notifikasi langsung ke WhatsApp & web ini.
                         </p>
                       </div>
@@ -2739,9 +2747,22 @@ export default function TeamWorkspace() {
                       onClick={handleManualTriggerTeamReminders}
                       disabled={sendingTeamReminders}
                       className="btn btn-secondary btn-sm"
-                      style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.78rem', color: '#16a34a', borderColor: '#86efac' }}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 7,
+                        fontSize: '0.8rem',
+                        fontWeight: 600,
+                        color: isDarkMode ? '#86efac' : '#16a34a',
+                        borderColor: isDarkMode ? 'rgba(34, 197, 94, 0.4)' : '#86efac',
+                        background: isDarkMode ? 'rgba(34, 197, 94, 0.12)' : '#ffffff',
+                        padding: '8px 16px',
+                        borderRadius: 9,
+                        whiteSpace: 'nowrap',
+                        flexShrink: 0,
+                      }}
                     >
-                      <RefreshCw size={13} className={sendingTeamReminders ? 'animate-spin' : ''} />
+                      <RefreshCw size={14} className={sendingTeamReminders ? 'animate-spin' : ''} />
                       {sendingTeamReminders ? 'Mengirim...' : 'Kirim Pengingat Sekarang'}
                     </button>
                   </div>
