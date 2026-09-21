@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import confetti from 'canvas-confetti';
 import {
@@ -125,6 +125,7 @@ import {
   ArrowUpRight,
   Play,
   Pause,
+  X,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -205,6 +206,24 @@ export default function TeamWorkspace() {
   const [trackerSeconds, setTrackerSeconds] = useState(5048); // 01:24:08 like Donezo
   const [trackerRunning, setTrackerRunning] = useState(false);
   const [dashboardSearchQuery, setDashboardSearchQuery] = useState('');
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && (e.key.toLowerCase() === 'f' || e.key.toLowerCase() === 'k')) {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+        setIsSearchFocused(true);
+      }
+      if (e.key === 'Escape') {
+        setIsSearchFocused(false);
+        searchInputRef.current?.blur();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   useEffect(() => {
     let interval: NodeJS.Timeout | null = null;
@@ -1958,10 +1977,52 @@ export default function TeamWorkspace() {
   // -------------------------------------------------------------
   const { contributions, totalTasks, completedTasks, inReviewTasks, overallProgress } = calculateContributionStats(members, tasks);
 
+  const searchMatches = (() => {
+    const q = dashboardSearchQuery.trim().toLowerCase();
+    if (!q) return { tasks: [], members: [], research: [], total: 0 };
+
+    const matchedTasks = tasks.filter((t) => {
+      const titleMatch = t.title.toLowerCase().includes(q);
+      const descMatch = (t.description || '').toLowerCase().includes(q);
+      const assigneeMatch = (t.assignee_profile?.full_name || '').toLowerCase().includes(q) ||
+        (t.assignee_profiles || []).some((p) => p.full_name.toLowerCase().includes(q));
+      return titleMatch || descMatch || assigneeMatch;
+    });
+
+    const matchedMembers = members.filter((m) => {
+      const nameMatch = (m.profile?.full_name || '').toLowerCase().includes(q);
+      const emailMatch = (m.profile?.email || '').toLowerCase().includes(q);
+      const phoneMatch = (m.profile?.phone_number || '').includes(q);
+      return nameMatch || emailMatch || phoneMatch;
+    });
+
+    const matchedResearch = research.filter((r) => {
+      const titleMatch = r.title.toLowerCase().includes(q);
+      const notesMatch = (r.notes || '').toLowerCase().includes(q);
+      const urlMatch = (r.resource_url || '').toLowerCase().includes(q);
+      return titleMatch || notesMatch || urlMatch;
+    });
+
+    return {
+      tasks: matchedTasks,
+      members: matchedMembers,
+      research: matchedResearch,
+      total: matchedTasks.length + matchedMembers.length + matchedResearch.length,
+    };
+  })();
+
   const filteredTasks = [...tasks]
     .filter((t) => {
-      if (taskFilter === 'all') return true;
-      return t.status === taskFilter;
+      if (taskFilter !== 'all' && t.status !== taskFilter) return false;
+      if (dashboardSearchQuery.trim()) {
+        const q = dashboardSearchQuery.toLowerCase().trim();
+        const titleMatch = t.title.toLowerCase().includes(q);
+        const descMatch = (t.description || '').toLowerCase().includes(q);
+        const assigneeMatch = (t.assignee_profile?.full_name || '').toLowerCase().includes(q) ||
+          (t.assignee_profiles || []).some((p) => p.full_name.toLowerCase().includes(q));
+        if (!titleMatch && !descMatch && !assigneeMatch) return false;
+      }
+      return true;
     })
     .sort((a, b) => {
       // 1. Tugas yang sudah selesai ('done') SELALU ditaruh di paling bawah
@@ -2312,7 +2373,7 @@ export default function TeamWorkspace() {
         </div>
 
         {/* Donezo Group GENERAL */}
-        <div style={{ padding: '12px 14px', flex: 1 }}>
+        <div style={{ padding: '12px 14px' }}>
           <div style={{ fontSize: '0.68rem', fontWeight: 800, textTransform: 'uppercase', color: 'var(--text-muted)', letterSpacing: '0.08em', paddingLeft: 10, marginBottom: 8 }}>
             PENGATURAN
           </div>
@@ -2325,19 +2386,11 @@ export default function TeamWorkspace() {
               <Settings size={18} />
               <span>Pengaturan</span>
             </button>
-
-            <button
-              onClick={() => setShowTeamSwitcher(true)}
-              className="donezo-nav-item"
-            >
-              <Users size={18} />
-              <span>Ganti Tim ({userTeams.length})</span>
-            </button>
           </div>
         </div>
 
-        {/* Donezo Bottom Card (Mobile App / WhatsApp Bot Promotion Widget) */}
-        <div style={{ padding: '0 14px 16px' }} className="donezo-sidebar-desktop-only">
+        {/* Sidebar User Profile Card (Keterangan Profil Pengguna) */}
+        <div style={{ padding: '0 14px 16px', marginTop: 'auto' }} className="donezo-sidebar-desktop-only">
           <div
             style={{
               padding: '16px',
@@ -2349,76 +2402,115 @@ export default function TeamWorkspace() {
               overflow: 'hidden',
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-              <div style={{ width: 28, height: 28, borderRadius: 8, background: 'rgba(255,255,255,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <BellRing size={15} color="#86efac" />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+              <div style={{ position: 'relative' }}>
+                {currentUser?.avatar_url ? (
+                  <img
+                    src={currentUser.avatar_url}
+                    alt={currentUser.full_name}
+                    className="avatar-photo"
+                    style={{ width: 40, height: 40, borderRadius: '50%', border: '2px solid #34d399', objectFit: 'cover' }}
+                  />
+                ) : (
+                  <div
+                    className="avatar-badge"
+                    style={{ width: 40, height: 40, fontSize: '0.85rem', background: 'rgba(255,255,255,0.15)', color: '#ffffff', border: '2px solid #34d399' }}
+                  >
+                    {currentUser?.full_name?.slice(0, 2).toUpperCase() || 'TJ'}
+                  </div>
+                )}
+                <span
+                  style={{
+                    position: 'absolute',
+                    bottom: 0,
+                    right: 0,
+                    width: 10,
+                    height: 10,
+                    borderRadius: '50%',
+                    background: '#22c55e',
+                    border: '2px solid #0f382c',
+                  }}
+                  title="Online"
+                />
               </div>
-              <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#86efac' }}>Bot WA 08:00 WIB</span>
-            </div>
-            <p style={{ margin: '0 0 12px', fontSize: '0.72rem', opacity: 0.85, lineHeight: 1.4 }}>
-              Pengingat deadline otomatis dikirim ke WhatsApp anggota.
-            </p>
-            <button
-              type="button"
-              onClick={handleManualTriggerTeamReminders}
-              disabled={sendingTeamReminders}
-              style={{
-                width: '100%',
-                padding: '7px 12px',
-                borderRadius: 999,
-                background: '#34d399',
-                color: '#0f382c',
-                border: 'none',
-                fontWeight: 700,
-                fontSize: '0.75rem',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 6,
-                boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
-              }}
-            >
-              <RefreshCw size={12} className={sendingTeamReminders ? 'animate-spin' : ''} />
-              {sendingTeamReminders ? 'Mengirim...' : 'Picu Sekarang'}
-            </button>
-          </div>
-        </div>
 
-        {/* Sidebar Footer: User Profile & Logout */}
-        <div style={{ padding: '14px 14px', borderTop: '1px solid var(--surface-border)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            {currentUser?.avatar_url ? (
-              <img
-                src={currentUser.avatar_url}
-                alt={currentUser.full_name}
-                className="avatar-photo"
-                style={{ width: 34, height: 34, borderRadius: '50%' }}
-              />
-            ) : (
-              <div className="avatar-badge" style={{ width: 34, height: 34, fontSize: '0.75rem' }}>
-                {currentUser?.full_name?.slice(0, 2).toUpperCase() || 'AG'}
-              </div>
-            )}
-            <div style={{ minWidth: 0, flex: 1 }}>
-              <div style={{ fontSize: '0.825rem', fontWeight: 700, color: 'var(--text-main)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {currentUser?.full_name}
-              </div>
-              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {currentUser?.email}
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <div style={{ fontSize: '0.88rem', fontWeight: 700, color: '#ffffff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {currentUser?.full_name}
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
+                  <span
+                    style={{
+                      fontSize: '0.65rem',
+                      fontWeight: 700,
+                      padding: '1px 6px',
+                      borderRadius: 99,
+                      background: isKetua ? '#fef3c7' : 'rgba(255,255,255,0.15)',
+                      color: isKetua ? '#92400e' : '#86efac',
+                    }}
+                  >
+                    {isKetua ? '👑 Ketua Tim' : '👤 Anggota'}
+                  </span>
+                </div>
               </div>
             </div>
-            <button
-              onClick={async () => {
-                await signOutUser();
-                router.push('/auth');
-              }}
-              className="btn btn-secondary btn-sm"
-              style={{ padding: '6px 8px', flexShrink: 0 }}
-              title="Keluar akun"
-            >
-              <LogOut size={13} />
-            </button>
+
+            <div style={{ fontSize: '0.72rem', opacity: 0.85, lineHeight: 1.4, marginBottom: 12, paddingBottom: 10, borderBottom: '1px solid rgba(255,255,255,0.12)' }}>
+              <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                ✉️ {currentUser?.email || 'Belum ada email'}
+              </div>
+              {currentUser?.phone_number && (
+                <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 3 }}>
+                  📱 {currentUser.phone_number}
+                </div>
+              )}
+            </div>
+
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button
+                type="button"
+                onClick={() => setActiveTab('settings')}
+                style={{
+                  flex: 1,
+                  padding: '7px 10px',
+                  borderRadius: 8,
+                  background: '#34d399',
+                  color: '#0f382c',
+                  border: 'none',
+                  fontWeight: 700,
+                  fontSize: '0.72rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 5,
+                }}
+              >
+                <Settings size={12} /> Edit Profil
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  await signOutUser();
+                  router.push('/auth');
+                }}
+                style={{
+                  padding: '7px 10px',
+                  borderRadius: 8,
+                  background: 'rgba(255,255,255,0.12)',
+                  color: '#ffffff',
+                  border: 'none',
+                  fontSize: '0.72rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+                title="Keluar akun"
+              >
+                <LogOut size={13} />
+              </button>
+            </div>
           </div>
         </div>
       </aside>
@@ -2622,7 +2714,7 @@ export default function TeamWorkspace() {
             </div>
 
             {/* Donezo Central Search Bar (Desktop) */}
-            <div className="hide-mobile" style={{ flex: 1, maxWidth: 360, margin: '0 12px' }}>
+            <div className="hide-mobile" style={{ position: 'relative', flex: 1, maxWidth: 380, margin: '0 12px' }}>
               <div
                 style={{
                   position: 'relative',
@@ -2632,40 +2724,274 @@ export default function TeamWorkspace() {
               >
                 <Search size={15} style={{ position: 'absolute', left: 12, color: 'var(--text-muted)' }} />
                 <input
+                  ref={searchInputRef}
                   type="text"
                   placeholder="Cari tugas, timeline, anggota..."
                   value={dashboardSearchQuery}
-                  onChange={(e) => setDashboardSearchQuery(e.target.value)}
+                  onChange={(e) => {
+                    setDashboardSearchQuery(e.target.value);
+                    setIsSearchFocused(true);
+                  }}
+                  onFocus={() => setIsSearchFocused(true)}
                   style={{
                     width: '100%',
-                    padding: '8px 48px 8px 34px',
+                    padding: '8px 72px 8px 34px',
                     borderRadius: 999,
-                    border: '1px solid var(--surface-border)',
+                    border: isSearchFocused ? '1px solid #0f382c' : '1px solid var(--surface-border)',
                     background: 'var(--surface-secondary)',
                     fontSize: '0.8rem',
                     color: 'var(--text-main)',
                     outline: 'none',
-                    transition: 'border-color 0.2s',
+                    transition: 'border-color 0.2s, box-shadow 0.2s',
+                    boxShadow: isSearchFocused ? '0 0 0 3px rgba(15, 56, 44, 0.1)' : 'none',
                   }}
-                  onFocus={(e) => (e.currentTarget.style.borderColor = '#0f382c')}
-                  onBlur={(e) => (e.currentTarget.style.borderColor = 'var(--surface-border)')}
                 />
-                <kbd
-                  style={{
-                    position: 'absolute',
-                    right: 10,
-                    fontSize: '0.65rem',
-                    padding: '2px 6px',
-                    borderRadius: 6,
-                    background: 'var(--surface)',
-                    border: '1px solid var(--surface-border)',
-                    color: 'var(--text-muted)',
-                    fontFamily: 'monospace',
-                  }}
-                >
-                  ⌘F
-                </kbd>
+                <div style={{ position: 'absolute', right: 8, display: 'flex', alignItems: 'center', gap: 4 }}>
+                  {dashboardSearchQuery ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDashboardSearchQuery('');
+                        searchInputRef.current?.focus();
+                      }}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        padding: 2,
+                        cursor: 'pointer',
+                        color: 'var(--text-muted)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        borderRadius: '50%',
+                      }}
+                      title="Hapus pencarian"
+                    >
+                      <X size={13} />
+                    </button>
+                  ) : null}
+                  <kbd
+                    onClick={() => {
+                      searchInputRef.current?.focus();
+                      setIsSearchFocused(true);
+                    }}
+                    style={{
+                      fontSize: '0.65rem',
+                      padding: '2px 6px',
+                      borderRadius: 6,
+                      background: 'var(--surface)',
+                      border: '1px solid var(--surface-border)',
+                      color: 'var(--text-muted)',
+                      fontFamily: 'monospace',
+                      cursor: 'pointer',
+                    }}
+                    title="Tekan ⌘F atau Ctrl+F"
+                  >
+                    ⌘F
+                  </kbd>
+                </div>
               </div>
+
+              {/* Floating Live Search Results Popover */}
+              {isSearchFocused && dashboardSearchQuery.trim() && (
+                <>
+                  <div
+                    style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 250 }}
+                    onClick={() => setIsSearchFocused(false)}
+                  />
+                  <div
+                    className="card"
+                    style={{
+                      position: 'absolute',
+                      top: 'calc(100% + 8px)',
+                      left: 0,
+                      right: 0,
+                      zIndex: 260,
+                      padding: '12px',
+                      maxHeight: 400,
+                      overflowY: 'auto',
+                      boxShadow: '0 16px 36px rgba(0, 0, 0, 0.25)',
+                      borderRadius: 14,
+                      background: 'var(--surface)',
+                      border: '1px solid var(--surface-border)',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 8, borderBottom: '1px solid var(--surface-border)', marginBottom: 8 }}>
+                      <span style={{ fontSize: '0.72rem', fontWeight: 800, textTransform: 'uppercase', color: 'var(--text-muted)', letterSpacing: '0.04em' }}>
+                        Hasil Pencarian ({searchMatches.total})
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActiveTab('tasks');
+                          setIsSearchFocused(false);
+                        }}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: '#0f382c',
+                          fontWeight: 700,
+                          fontSize: '0.72rem',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        Buka di Daftar Tugas →
+                      </button>
+                    </div>
+
+                    {searchMatches.total === 0 ? (
+                      <div style={{ padding: '24px 12px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.825rem' }}>
+                        Tidak ada tugas, anggota, atau materi yang cocok dengan &quot;{dashboardSearchQuery}&quot;
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                        {/* Matching Tasks */}
+                        {searchMatches.tasks.length > 0 && (
+                          <div>
+                            <div style={{ fontSize: '0.68rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 6 }}>
+                              📋 Tugas ({searchMatches.tasks.length})
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                              {searchMatches.tasks.slice(0, 5).map((t) => (
+                                <div
+                                  key={t.id}
+                                  onClick={() => {
+                                    setIsSearchFocused(false);
+                                    setActiveTab('tasks');
+                                    setTimeout(() => {
+                                      const el = document.getElementById(`task-${t.id}`);
+                                      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                    }, 200);
+                                  }}
+                                  style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                    padding: '8px 10px',
+                                    borderRadius: 8,
+                                    cursor: 'pointer',
+                                    background: 'var(--surface-secondary)',
+                                    gap: 10,
+                                    transition: 'background 0.15s',
+                                  }}
+                                >
+                                  <div style={{ minWidth: 0, flex: 1 }}>
+                                    <div style={{ fontSize: '0.825rem', fontWeight: 700, color: 'var(--text-main)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                      {t.title}
+                                    </div>
+                                    <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>
+                                      PIC: {t.assignee_profile?.full_name || 'Belum ada'} • {t.deadline ? new Date(t.deadline).toLocaleDateString('id-ID', { dateStyle: 'medium' }) : 'Tanpa deadline'}
+                                    </div>
+                                  </div>
+                                  <span
+                                    style={{
+                                      fontSize: '0.65rem',
+                                      fontWeight: 700,
+                                      padding: '2px 8px',
+                                      borderRadius: 99,
+                                      background: t.status === 'done' ? '#dcfce7' : t.status === 'in_progress' ? '#eff6ff' : t.status === 'review' ? '#fef3c7' : 'var(--surface-border)',
+                                      color: t.status === 'done' ? '#166534' : t.status === 'in_progress' ? '#1e40af' : t.status === 'review' ? '#92400e' : 'var(--text-muted)',
+                                      flexShrink: 0,
+                                    }}
+                                  >
+                                    {t.status === 'done' ? 'Selesai' : t.status === 'in_progress' ? 'Berjalan' : t.status === 'review' ? 'Review' : 'Todo'}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Matching Members */}
+                        {searchMatches.members.length > 0 && (
+                          <div>
+                            <div style={{ fontSize: '0.68rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 6 }}>
+                              👥 Anggota Tim ({searchMatches.members.length})
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                              {searchMatches.members.map((m) => (
+                                <div
+                                  key={m.id}
+                                  onClick={() => {
+                                    setDashboardSearchQuery(m.profile?.full_name || '');
+                                    setActiveTab('tasks');
+                                    setIsSearchFocused(false);
+                                  }}
+                                  style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 10,
+                                    padding: '6px 10px',
+                                    borderRadius: 8,
+                                    cursor: 'pointer',
+                                    background: 'var(--surface-secondary)',
+                                  }}
+                                >
+                                  {m.profile?.avatar_url ? (
+                                    <img src={m.profile.avatar_url} alt={m.profile.full_name} className="avatar-photo" style={{ width: 26, height: 26, borderRadius: '50%' }} />
+                                  ) : (
+                                    <div className="avatar-badge" style={{ width: 26, height: 26, fontSize: '0.65rem' }}>
+                                      {m.profile?.full_name?.slice(0, 2).toUpperCase() || 'AG'}
+                                    </div>
+                                  )}
+                                  <div style={{ minWidth: 0, flex: 1 }}>
+                                    <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-main)' }}>
+                                      {m.profile?.full_name}
+                                    </div>
+                                    <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>
+                                      {m.role === 'ketua' ? '👑 Ketua' : '👤 Anggota'} • Klik untuk filter tugas
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Matching Research */}
+                        {searchMatches.research.length > 0 && (
+                          <div>
+                            <div style={{ fontSize: '0.68rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 6 }}>
+                              📁 Materi Riset ({searchMatches.research.length})
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                              {searchMatches.research.map((r) => (
+                                <a
+                                  key={r.id}
+                                  href={r.resource_url}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  onClick={() => setIsSearchFocused(false)}
+                                  style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 10,
+                                    padding: '6px 10px',
+                                    borderRadius: 8,
+                                    textDecoration: 'none',
+                                    background: 'var(--surface-secondary)',
+                                    color: 'var(--text-main)',
+                                  }}
+                                >
+                                  {getResourceIcon(r.resource_type)}
+                                  <div style={{ minWidth: 0, flex: 1 }}>
+                                    <div style={{ fontSize: '0.8rem', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                      {r.title}
+                                    </div>
+                                    <div style={{ fontSize: '0.65rem', color: 'var(--primary)' }}>
+                                      Buka link ↗
+                                    </div>
+                                  </div>
+                                </a>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
             </div>
 
             {/* Kanan Atas: Notifikasi, Theme Toggle & Profil */}
@@ -2937,65 +3263,9 @@ export default function TeamWorkspace() {
 
                 {/* Donezo Modular Widgets Grid */}
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 20, marginBottom: 28 }}>
-                  {/* Left Column Section: Project Analytics & Team Collaboration */}
+                  {/* Left Column Section: Team Collaboration */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
                     
-                    {/* Widget: Project Analytics (Donezo Signature Capsule Bars) */}
-                    <div className="card" style={{ padding: '22px 24px', borderRadius: 20 }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-                        <div>
-                          <h3 style={{ fontSize: '1.05rem', fontWeight: 800, margin: 0, color: 'var(--text-main)' }}>
-                            Project Analytics
-                          </h3>
-                          <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: '3px 0 0' }}>
-                            Aktivitas dan distribusi progres tugas per hari
-                          </p>
-                        </div>
-                        <span className="badge" style={{ background: '#e8f3ed', color: '#166534', fontWeight: 700, fontSize: '0.75rem', padding: '4px 10px', borderRadius: 99 }}>
-                          Minggu Ini
-                        </span>
-                      </div>
-
-                      {/* 7 Capsule Bars */}
-                      <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', height: 160, padding: '10px 14px 0' }}>
-                        {[
-                          { day: 'S', height: 45, striped: true, count: 2 },
-                          { day: 'M', height: 75, striped: false, count: 5 },
-                          { day: 'T', height: 62, striped: false, count: 4, activeLabel: '74%' },
-                          { day: 'W', height: 95, striped: false, dark: true, count: 8 },
-                          { day: 'T', height: 50, striped: true, count: 3 },
-                          { day: 'F', height: 68, striped: true, count: 4 },
-                          { day: 'S', height: 40, striped: true, count: 2 },
-                        ].map((bar, idx) => (
-                          <div key={idx} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, flex: 1 }}>
-                            {bar.activeLabel && (
-                              <span style={{ fontSize: '0.68rem', fontWeight: 700, padding: '2px 6px', borderRadius: 99, background: '#0f382c', color: 'white', marginBottom: -4 }}>
-                                {bar.activeLabel}
-                              </span>
-                            )}
-                            <div
-                              style={{
-                                width: 32,
-                                height: `${bar.height}%`,
-                                borderRadius: 999,
-                                background: bar.dark
-                                  ? '#0f382c'
-                                  : bar.striped
-                                  ? 'repeating-linear-gradient(45deg, #dcfce7, #dcfce7 6px, #bbf7d0 6px, #bbf7d0 12px)'
-                                  : '#34d399',
-                                transition: 'height 0.3s ease',
-                                boxShadow: bar.dark ? '0 4px 12px rgba(15, 56, 44, 0.25)' : 'none',
-                              }}
-                              title={`${bar.day}: ${bar.count} tugas selesai`}
-                            />
-                            <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)' }}>
-                              {bar.day}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
                     {/* Widget: Team Collaboration */}
                     <div className="card" style={{ padding: '22px 24px', borderRadius: 20 }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
@@ -4014,6 +4284,46 @@ export default function TeamWorkspace() {
                     </button>
                   </div>
                 </div>
+
+                {/* Search Filter Banner */}
+                {dashboardSearchQuery.trim() && (
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '10px 16px',
+                      borderRadius: 12,
+                      background: isDarkMode ? 'rgba(15, 56, 44, 0.4)' : '#e8f3ed',
+                      border: '1px solid #34d399',
+                      color: isDarkMode ? '#86efac' : '#0f382c',
+                      marginBottom: 16,
+                      fontSize: '0.85rem',
+                      fontWeight: 600,
+                    }}
+                  >
+                    <span>
+                      🔎 Menampilkan hasil pencarian untuk: &quot;<strong>{dashboardSearchQuery}</strong>&quot; ({filteredTasks.length} tugas ditemukan)
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setDashboardSearchQuery('')}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: isDarkMode ? '#86efac' : '#0f382c',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 4,
+                        fontSize: '0.78rem',
+                      }}
+                    >
+                      <X size={14} /> Reset Pencarian
+                    </button>
+                  </div>
+                )}
 
                 {/* Task List */}
                 {filteredTasks.length === 0 ? (
