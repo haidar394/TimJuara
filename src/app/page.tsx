@@ -14,12 +14,16 @@ import {
   Bot,
   Flame,
   Star,
+  QrCode,
+  X,
+  Heart,
 } from 'lucide-react';
 import Link from 'next/link';
 
 export default function HomePage() {
   const router = useRouter();
   const [isDarkMode, setIsDarkMode] = useState(false);
+  const [showQrisModal, setShowQrisModal] = useState(false);
 
   useEffect(() => {
     const currentTheme = document.documentElement.getAttribute('data-theme');
@@ -583,11 +587,11 @@ export default function HomePage() {
 
             </div>
 
-            {/* Fun Input Strip */}
+            {/* Fun Input Strip with QRIS Option */}
             <div
               className="nop-hand-card"
               style={{
-                padding: '16px 20px',
+                padding: '16px 24px',
                 background: '#ffffff',
                 display: 'inline-flex',
                 alignItems: 'center',
@@ -596,14 +600,26 @@ export default function HomePage() {
                 justifyContent: 'center',
               }}
             >
-              <span className="font-typewriter" style={{ fontSize: '0.9rem' }}>
+              <span className="font-typewriter" style={{ fontSize: '0.95rem', fontWeight: 600 }}>
                 Mau bayar seikhlasnya?
               </span>
-              <span className="font-typewriter" style={{ borderBottom: '2px solid #191712', padding: '2px 8px', fontSize: '1.1rem' }}>
-                Rp 0
-              </span>
+              <button
+                type="button"
+                onClick={() => setShowQrisModal(true)}
+                className="nop-btn-pink"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  padding: '6px 14px',
+                  fontSize: '0.95rem',
+                  cursor: 'pointer',
+                }}
+              >
+                <QrCode size={16} /> Bayar via QRIS 📱
+              </button>
               <Link href="/auth" className="nop-btn-black" style={{ padding: '6px 14px', fontSize: '0.95rem' }}>
-                Langsung Pakai Saja →
+                Langsung Pakai Saja (Rp 0) →
               </Link>
             </div>
           </div>
@@ -659,6 +675,152 @@ export default function HomePage() {
           </div>
         </div>
       </footer>
+
+      {/* ================= MODAL BAYAR VIA QRIS ================= */}
+      {showQrisModal && (
+        <div
+          className="modal-overlay"
+          onClick={() => setShowQrisModal(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(25, 23, 18, 0.65)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            padding: 16,
+          }}
+        >
+          <div
+            className="nop-hand-card"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              maxWidth: 440,
+              width: '100%',
+              background: '#ffffff',
+              padding: '24px 22px',
+              position: 'relative',
+              maxHeight: '92vh',
+              overflowY: 'auto',
+              textAlign: 'center',
+            }}
+          >
+            {/* Close button */}
+            <button
+              type="button"
+              onClick={() => setShowQrisModal(false)}
+              style={{
+                position: 'absolute',
+                top: 14,
+                right: 14,
+                background: '#f8fafc',
+                border: '1.5px solid #191712',
+                borderRadius: '50%',
+                width: 32,
+                height: 32,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                boxShadow: '2px 2px 0px #191712',
+              }}
+              title="Tutup"
+            >
+              <X size={16} color="#191712" />
+            </button>
+
+            {/* Title */}
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+              <Heart size={18} fill="#ef4444" color="#ef4444" />
+              <h3 style={{ fontSize: '1.4rem', fontWeight: 800, margin: 0, color: '#191712' }}>
+                Pembayaran via QRIS
+              </h3>
+            </div>
+            <p style={{ fontSize: '0.95rem', color: '#475569', lineHeight: 1.45, margin: '0 0 16px' }}>
+              TimJuara dapat digunakan <strong>100% gratis</strong>. Jika platform ini bermanfaat, kamu bisa memberikan traktiran kopi atau donasi seikhlasnya via QRIS di bawah ini.
+            </p>
+
+            {/* QRIS Image Box */}
+            <div
+              style={{
+                border: '2px solid #191712',
+                borderRadius: 12,
+                overflow: 'hidden',
+                background: '#ffffff',
+                padding: 10,
+                boxShadow: '4px 4px 0px #191712',
+                marginBottom: 16,
+              }}
+            >
+              <img
+                src="/qris.jpeg"
+                alt="QRIS Pembayaran TimJuara - Muhammad Haidar Rafiq"
+                style={{
+                  width: '100%',
+                  maxHeight: 380,
+                  objectFit: 'contain',
+                  display: 'block',
+                  borderRadius: 8,
+                }}
+              />
+            </div>
+
+            {/* Merchant Info */}
+            <div
+              className="font-typewriter"
+              style={{
+                background: '#f8fafc',
+                border: '1px dashed #cbd5e1',
+                borderRadius: 8,
+                padding: '10px 12px',
+                fontSize: '0.78rem',
+                color: '#334155',
+                textAlign: 'left',
+                marginBottom: 18,
+                lineHeight: 1.5,
+              }}
+            >
+              <div><strong>Merchant:</strong> MUHAMMAD HAIDAR RAFIQ, DIGITAL & KREATIF</div>
+              <div><strong>NMID:</strong> ID1025438083160</div>
+              <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: 4 }}>
+                Bisa di-scan dari BCA, Mandiri, BRI, BNI, GoPay, OVO, DANA, ShopeePay, LinkAja & Seluruh Bank.
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
+              <a
+                href="/qris.jpeg"
+                download="QRIS_TimJuara.jpeg"
+                className="nop-btn-pink"
+                style={{
+                  padding: '8px 16px',
+                  fontSize: '0.95rem',
+                  textDecoration: 'none',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                }}
+              >
+                Simpan QRIS 📥
+              </a>
+              <Link
+                href="/auth"
+                className="nop-btn-black"
+                style={{
+                  padding: '8px 18px',
+                  fontSize: '0.95rem',
+                  textDecoration: 'none',
+                }}
+              >
+                Lanjut ke TimJuara →
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
