@@ -3,7 +3,7 @@ const path = require('path');
 const sharp = require('sharp');
 
 const svgContent = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
-  <rect width="512" height="512" rx="128" fill="#4f46e5"/>
+  <rect width="512" height="512" rx="128" fill="#166534"/>
   <text 
     x="256" 
     y="266" 

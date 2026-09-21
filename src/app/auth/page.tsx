@@ -106,7 +106,7 @@ export default function AuthPage() {
       {/* Mini Header */}
       <div className="auth-mini-header" style={{ padding: '20px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div className="avatar-badge" style={{ width: 34, height: 34, background: '#4f46e5' }}>
+          <div className="avatar-badge" style={{ width: 34, height: 34, background: '#166534' }}>
             TJ
           </div>
           <span style={{ fontWeight: 800, fontSize: '1.1rem', color: 'var(--text-main)' }}>TimJuara</span>

@@ -213,7 +213,7 @@ function OnboardingContent() {
       <header className="onboarding-header" style={{ borderBottom: '1px solid var(--surface-border)', background: 'rgba(255, 255, 255, 0.9)', backdropFilter: 'blur(10px)', padding: '16px 0', position: 'sticky', top: 0, zIndex: 50 }}>
         <div className="container" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <div className="avatar-badge" style={{ width: 38, height: 38, background: '#4f46e5', boxShadow: '0 4px 12px rgba(79, 70, 229, 0.25)' }}>
+            <div className="avatar-badge" style={{ width: 38, height: 38, background: '#166534', boxShadow: '0 4px 12px rgba(22, 101, 52, 0.25)' }}>
               TJ
             </div>
             <div>
