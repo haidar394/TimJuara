@@ -203,13 +203,20 @@ export default function TeamWorkspace() {
   const [copiedCode, setCopiedCode] = useState(false);
 
   // Donezo Time Tracker & Search State
-  const [trackerSeconds, setTrackerSeconds] = useState(5048); // 01:24:08 like Donezo
+  const [trackerSeconds, setTrackerSeconds] = useState(0);
   const [trackerRunning, setTrackerRunning] = useState(false);
   const [dashboardSearchQuery, setDashboardSearchQuery] = useState('');
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('timjuara_tracker_seconds');
+      if (saved && !isNaN(Number(saved))) {
+        setTrackerSeconds(Number(saved));
+      }
+    }
+
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && (e.key.toLowerCase() === 'f' || e.key.toLowerCase() === 'k')) {
         e.preventDefault();
@@ -229,7 +236,13 @@ export default function TeamWorkspace() {
     let interval: NodeJS.Timeout | null = null;
     if (trackerRunning) {
       interval = setInterval(() => {
-        setTrackerSeconds((prev) => prev + 1);
+        setTrackerSeconds((prev) => {
+          const next = prev + 1;
+          if (next % 5 === 0 && typeof window !== 'undefined') {
+            localStorage.setItem('timjuara_tracker_seconds', String(next));
+          }
+          return next;
+        });
       }, 1000);
     }
     return () => {
@@ -3478,7 +3491,13 @@ export default function TeamWorkspace() {
                       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                         <button
                           type="button"
-                          onClick={() => setTrackerRunning(!trackerRunning)}
+                          onClick={() => {
+                            const nextState = !trackerRunning;
+                            setTrackerRunning(nextState);
+                            if (!nextState && typeof window !== 'undefined') {
+                              localStorage.setItem('timjuara_tracker_seconds', String(trackerSeconds));
+                            }
+                          }}
                           style={{
                             width: 44,
                             height: 44,
@@ -3501,6 +3520,9 @@ export default function TeamWorkspace() {
                           onClick={() => {
                             setTrackerRunning(false);
                             setTrackerSeconds(0);
+                            if (typeof window !== 'undefined') {
+                              localStorage.removeItem('timjuara_tracker_seconds');
+                            }
                           }}
                           style={{
                             width: 36,
