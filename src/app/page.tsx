@@ -101,7 +101,7 @@ export default function HomePage() {
                 TimJuara<span style={{ color: '#ef4444' }}>.</span>
               </div>
               <div className="font-typewriter" style={{ fontSize: '0.68rem', color: '#64748b', letterSpacing: '0.04em' }}>
-                BEBAS DRAMA KELOMPOK
+                KOLABORASI TIM JUARA
               </div>
             </div>
           </Link>
@@ -179,7 +179,7 @@ export default function HomePage() {
                 {/* Trust Row Pills */}
                 <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
                   <span className="nop-trust-tag font-typewriter">
-                    <Star size={13} fill="#ffdf59" color="#191712" /> 0 Drama Kelompok
+                    <Star size={13} fill="#ffdf59" color="#191712" /> Koordinasi Rapi & Jelas
                   </span>
                   <span className="nop-trust-tag font-typewriter">
                     <Flame size={13} color="#ef4444" /> 100% Bebas Biaya
@@ -244,7 +244,7 @@ export default function HomePage() {
                           Nama Kamu Disini
                         </div>
                         <div style={{ fontSize: '0.95rem', color: '#16a34a', fontWeight: 600 }}>
-                          Ketua Tim / Anggota Paling Rajin
+                          Ketua Tim / Kontributor Utama
                         </div>
                       </div>
                     </div>
@@ -281,7 +281,7 @@ export default function HomePage() {
                     {/* Statement & Stamp */}
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: 12 }}>
                       <p style={{ margin: 0, fontSize: '0.95rem', color: '#475569', lineHeight: 1.4, flex: 1 }}>
-                        Terbukti menyelesaikan tugas tepat waktu, tidak pernah menghilang di H-1, dan siap membawa tim meraih gelar juara!
+                        Terbukti selalu proaktif menyelesaikan tugas tepat waktu, berkoordinasi dengan baik, dan siap membawa tim meraih prestasi terbaik!
                       </p>
 
                       {/* Rubber Stamp */}
@@ -416,10 +416,10 @@ export default function HomePage() {
 
               <div>
                 <div className="font-typewriter" style={{ fontSize: '2.8rem', fontWeight: 800, color: '#ef4444' }}>
-                  0
+                  100%
                 </div>
                 <div className="font-typewriter" style={{ fontSize: '0.8rem', color: '#64748b', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
-                  ALASAN LUPA DEADLINE
+                  DEADLINE TERPANTAU BOT
                 </div>
               </div>
             </div>
@@ -517,7 +517,7 @@ export default function HomePage() {
               {/* Tier 1 */}
               <div className="nop-hand-card" style={{ padding: '28px 24px', textAlign: 'left', background: '#ffffff' }}>
                 <p className="font-typewriter" style={{ fontSize: '0.78rem', color: '#dc2626', textTransform: 'uppercase', margin: '0 0 10px' }}>
-                  PAKET MAHASISWA SANTAI
+                  PAKET TUGAS KULIAH
                 </p>
                 <div className="font-typewriter" style={{ fontSize: '2.6rem', fontWeight: 800, marginBottom: 8 }}>
                   Rp 0
@@ -552,7 +552,7 @@ export default function HomePage() {
                 </div>
 
                 <p className="font-typewriter" style={{ fontSize: '0.78rem', color: '#dc2626', textTransform: 'uppercase', margin: '0 0 10px' }}>
-                  PAKET TIM LOMBA AMBIS
+                  PAKET TIM KOMPETISI & LOMBA
                 </p>
                 <div className="font-typewriter" style={{ fontSize: '2.6rem', fontWeight: 800, marginBottom: 8 }}>
                   Rp 0
