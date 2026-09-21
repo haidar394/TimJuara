@@ -244,6 +244,9 @@ export default function TeamWorkspace() {
     return `${String(hrs).padStart(2, '0')}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
   };
 
+  // Team Collaboration Widget State
+  const [showAllMembers, setShowAllMembers] = useState(false);
+
   // Modals
   const [showAddTaskModal, setShowAddTaskModal] = useState(false);
   const [showEditTaskModal, setShowEditTaskModal] = useState(false);
@@ -3258,15 +3261,16 @@ export default function TeamWorkspace() {
                     <div className="card" style={{ padding: '22px 24px', borderRadius: 20 }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
                         <h3 style={{ fontSize: '1.05rem', fontWeight: 800, margin: 0, color: 'var(--text-main)' }}>
-                          Team Collaboration
+                          Team Collaboration ({members.length})
                         </h3>
                         <button
                           type="button"
-                          onClick={() => setShowConnectTeamGroupModal(true)}
+                          onClick={handleCopyInviteLink}
                           className="donezo-btn-outline"
                           style={{ padding: '5px 12px', fontSize: '0.78rem' }}
+                          title="Salin tautan bergabung ke tim ini"
                         >
-                          <UserPlus size={13} /> + Add Member
+                          <UserPlus size={13} /> + Undang Anggota
                         </button>
                       </div>
 
@@ -3276,56 +3280,99 @@ export default function TeamWorkspace() {
                             Belum ada anggota tim terdaftar
                           </div>
                         ) : (
-                          members.slice(0, 4).map((m, idx) => {
-                            const memberTasks = tasks.filter((t) => t.assigned_to === m.user_id || t.assigned_to_ids?.includes(m.user_id));
-                            const completedCount = memberTasks.filter((t) => t.status === 'done').length;
-                            const isAllDone = memberTasks.length > 0 && completedCount === memberTasks.length;
-                            return (
-                              <div
-                                key={m.id || idx}
-                                style={{
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'space-between',
-                                  padding: '10px 12px',
-                                  borderRadius: 14,
-                                  background: 'var(--surface-secondary)',
-                                }}
-                              >
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                                  {m.profile?.avatar_url ? (
-                                    <img src={m.profile.avatar_url} alt={m.profile.full_name} className="avatar-photo" style={{ width: 36, height: 36, borderRadius: '50%' }} />
-                                  ) : (
-                                    <div className="avatar-badge" style={{ width: 36, height: 36, fontSize: '0.8rem' }}>
-                                      {m.profile?.full_name?.slice(0, 2).toUpperCase() || 'AG'}
-                                    </div>
-                                  )}
-                                  <div>
-                                    <div style={{ fontWeight: 700, fontSize: '0.875rem', color: 'var(--text-main)' }}>
-                                      {m.profile?.full_name}
-                                    </div>
-                                    <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                                      {m.role === 'ketua' ? '👑 Ketua Tim' : 'Anggota'} • {memberTasks.length} tugas dipegang
+                          <>
+                            {(showAllMembers ? members : members.slice(0, 5)).map((m, idx) => {
+                              const memberTasks = tasks.filter((t) => t.assigned_to === m.user_id || t.assigned_to_ids?.includes(m.user_id));
+                              const completedCount = memberTasks.filter((t) => t.status === 'done').length;
+                              const isAllDone = memberTasks.length > 0 && completedCount === memberTasks.length;
+                              return (
+                                <div
+                                  key={m.id || idx}
+                                  onClick={() => {
+                                    setDashboardSearchQuery(m.profile?.full_name || '');
+                                    setActiveTab('tasks');
+                                  }}
+                                  style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                    padding: '10px 14px',
+                                    borderRadius: 14,
+                                    background: 'var(--surface-secondary)',
+                                    cursor: 'pointer',
+                                    transition: 'background 0.15s ease',
+                                  }}
+                                  title={`Klik untuk melihat tugas ${m.profile?.full_name || 'anggota'}`}
+                                >
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                                    {m.profile?.avatar_url ? (
+                                      <img src={m.profile.avatar_url} alt={m.profile.full_name} className="avatar-photo" style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover' }} />
+                                    ) : (
+                                      <div className="avatar-badge" style={{ width: 36, height: 36, fontSize: '0.8rem' }}>
+                                        {m.profile?.full_name?.slice(0, 2).toUpperCase() || 'AG'}
+                                      </div>
+                                    )}
+                                    <div>
+                                      <div style={{ fontWeight: 700, fontSize: '0.875rem', color: 'var(--text-main)' }}>
+                                        {m.profile?.full_name}
+                                      </div>
+                                      <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                                        {m.role === 'ketua' ? '👑 Ketua Tim' : 'Anggota'} • {memberTasks.length} tugas dipegang
+                                      </div>
                                     </div>
                                   </div>
-                                </div>
 
-                                <span
-                                  className="badge"
-                                  style={{
-                                    background: isAllDone ? '#dcfce7' : memberTasks.length > 0 ? '#fef3c7' : '#f1f5f9',
-                                    color: isAllDone ? '#166534' : memberTasks.length > 0 ? '#b45309' : '#64748b',
-                                    fontWeight: 700,
-                                    fontSize: '0.72rem',
-                                    padding: '3px 8px',
-                                    borderRadius: 99,
-                                  }}
-                                >
-                                  {isAllDone ? 'Completed' : memberTasks.length > 0 ? 'In Progress' : 'Pending'}
-                                </span>
-                              </div>
-                            );
-                          })
+                                  <span
+                                    className="badge"
+                                    style={{
+                                      background: isAllDone ? '#dcfce7' : memberTasks.length > 0 ? '#fef3c7' : '#f1f5f9',
+                                      color: isAllDone ? '#166534' : memberTasks.length > 0 ? '#b45309' : '#64748b',
+                                      fontWeight: 700,
+                                      fontSize: '0.72rem',
+                                      padding: '3px 8px',
+                                      borderRadius: 99,
+                                    }}
+                                  >
+                                    {isAllDone ? 'Completed' : memberTasks.length > 0 ? 'In Progress' : 'Pending'}
+                                  </span>
+                                </div>
+                              );
+                            })}
+
+                            {members.length > 5 && (
+                              <button
+                                type="button"
+                                onClick={() => setShowAllMembers(!showAllMembers)}
+                                style={{
+                                  width: '100%',
+                                  padding: '9px 14px',
+                                  borderRadius: 12,
+                                  border: '1px dashed var(--surface-border)',
+                                  background: 'var(--surface-secondary)',
+                                  color: 'var(--text-main)',
+                                  fontSize: '0.8rem',
+                                  fontWeight: 700,
+                                  cursor: 'pointer',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  gap: 6,
+                                  marginTop: 4,
+                                  transition: 'background 0.15s ease',
+                                }}
+                              >
+                                {showAllMembers ? (
+                                  <>
+                                    <ChevronDown size={14} style={{ transform: 'rotate(180deg)' }} /> Tampilkan Lebih Sedikit
+                                  </>
+                                ) : (
+                                  <>
+                                    <ChevronDown size={14} /> Tampilkan Semua Anggota ({members.length})
+                                  </>
+                                )}
+                              </button>
+                            )}
+                          </>
                         )}
                       </div>
                     </div>
