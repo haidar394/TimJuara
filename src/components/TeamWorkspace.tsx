@@ -2357,18 +2357,6 @@ export default function TeamWorkspace() {
                 {research.length}
               </span>
             </button>
-
-            <button
-              onClick={() => {
-                setActiveTab('overview');
-                const el = document.getElementById('leaderboard-section');
-                if (el) el.scrollIntoView({ behavior: 'smooth' });
-              }}
-              className="donezo-nav-item"
-            >
-              <Trophy size={18} />
-              <span>Leaderboard</span>
-            </button>
           </div>
         </div>
 
