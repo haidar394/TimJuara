@@ -8,8 +8,6 @@ import {
   Trophy,
   FolderGit2,
   Sparkles,
-  Sun,
-  Moon,
   BellRing,
   Bot,
   Flame,
@@ -22,25 +20,7 @@ import Link from 'next/link';
 
 export default function HomePage() {
   const router = useRouter();
-  const [isDarkMode, setIsDarkMode] = useState(false);
   const [showQrisModal, setShowQrisModal] = useState(false);
-
-  useEffect(() => {
-    const currentTheme = document.documentElement.getAttribute('data-theme');
-    setIsDarkMode(currentTheme === 'dark');
-  }, []);
-
-  const toggleTheme = () => {
-    const newTheme = isDarkMode ? 'light' : 'dark';
-    document.documentElement.setAttribute('data-theme', newTheme);
-    if (newTheme === 'dark') {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-    setIsDarkMode(!isDarkMode);
-    localStorage.setItem('timjuara_theme', newTheme);
-  };
 
   useEffect(() => {
     async function checkAuth() {
@@ -122,26 +102,6 @@ export default function HomePage() {
             <a href="#tiers" className="hide-mobile" style={{ color: '#191712', textDecoration: 'none', fontSize: '1.1rem', fontWeight: 600 }}>
               Paket Rp 0
             </a>
-
-            <button
-              onClick={toggleTheme}
-              style={{
-                background: '#ffffff',
-                border: '1.5px solid #191712',
-                borderRadius: '50%',
-                width: 34,
-                height: 34,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                cursor: 'pointer',
-                boxShadow: '2px 2px 0px #191712',
-                flexShrink: 0,
-              }}
-              title={isDarkMode ? 'Mode Terang' : 'Mode Gelap'}
-            >
-              {isDarkMode ? <Sun size={15} color="#f59e0b" /> : <Moon size={15} color="#191712" />}
-            </button>
 
             <Link href="/auth" className="nop-btn-black nop-header-btn" style={{ padding: '8px 18px', fontSize: '1.05rem', whiteSpace: 'nowrap' }}>
               <span className="hide-mobile">Masuk / </span>Daftar →
