@@ -122,6 +122,9 @@ import {
   Wand2,
   Lightbulb,
   AlertTriangle,
+  ArrowUpRight,
+  Play,
+  Pause,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -197,6 +200,30 @@ export default function TeamWorkspace() {
   // Toasts
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [copiedCode, setCopiedCode] = useState(false);
+
+  // Donezo Time Tracker & Search State
+  const [trackerSeconds, setTrackerSeconds] = useState(5048); // 01:24:08 like Donezo
+  const [trackerRunning, setTrackerRunning] = useState(false);
+  const [dashboardSearchQuery, setDashboardSearchQuery] = useState('');
+
+  useEffect(() => {
+    let interval: NodeJS.Timeout | null = null;
+    if (trackerRunning) {
+      interval = setInterval(() => {
+        setTrackerSeconds((prev) => prev + 1);
+      }, 1000);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [trackerRunning]);
+
+  const formatTrackerTime = (sec: number) => {
+    const hrs = Math.floor(sec / 3600);
+    const mins = Math.floor((sec % 3600) / 60);
+    const secs = sec % 60;
+    return `${String(hrs).padStart(2, '0')}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+  };
 
   // Modals
   const [showAddTaskModal, setShowAddTaskModal] = useState(false);
@@ -2050,19 +2077,27 @@ export default function TeamWorkspace() {
       {/* ========================================================================= */}
       {/* DESKTOP SIDEBAR NAVIGATION (Kiri)                                         */}
       {/* ========================================================================= */}
-      <aside className="workspace-sidebar">
-        {/* App & Team Header */}
-        <div style={{ padding: '20px 16px 16px', borderBottom: '1px solid var(--surface-border)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+      {/* ========================================================================= */}
+      {/* DESKTOP SIDEBAR NAVIGATION (Kiri - Gaya Donezo)                           */}
+      {/* ========================================================================= */}
+      <aside className="workspace-sidebar" style={{ background: 'var(--donezo-card)', borderRight: '1px solid var(--donezo-border)' }}>
+        {/* Donezo App & Team Header */}
+        <div style={{ padding: '22px 18px 16px', borderBottom: '1px solid var(--surface-border)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
             <div
               onClick={() => setActiveTab('overview')}
-              style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', userSelect: 'none' }}
+              style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', userSelect: 'none' }}
               title="Overview Seluruh Tim"
             >
-              <div style={{ width: 32, height: 32, borderRadius: 10, background: 'var(--primary)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800 }}>
+              <div style={{ width: 36, height: 36, borderRadius: 12, background: 'var(--donezo-forest)', color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '0.95rem', boxShadow: '0 4px 10px rgba(15, 56, 44, 0.2)' }}>
                 TJ
               </div>
-              <span style={{ fontWeight: 800, fontSize: '1.1rem', color: 'var(--text-main)' }}>TimJuara</span>
+              <div>
+                <span style={{ fontWeight: 800, fontSize: '1.05rem', color: 'var(--text-main)', letterSpacing: '-0.02em', display: 'block', lineHeight: 1.1 }}>
+                  TimJuara
+                </span>
+                <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>Workspace</span>
+              </div>
             </div>
 
             {isMasterAdmin(currentUser) && (
@@ -2072,15 +2107,15 @@ export default function TeamWorkspace() {
             )}
           </div>
 
-          {/* Active Team Dropdown Switcher (Gambar 1) */}
+          {/* Active Team Dropdown Switcher */}
           <div style={{ position: 'relative' }}>
             <div
               onClick={() => setShowTeamSwitcher((prev) => !prev)}
               style={{
-                padding: '10px 12px',
-                borderRadius: 'var(--radius-md)',
+                padding: '9px 12px',
+                borderRadius: 14,
                 background: 'var(--surface-secondary)',
-                border: showTeamSwitcher ? '1px solid var(--primary)' : '1px solid var(--surface-border)',
+                border: showTeamSwitcher ? '1px solid var(--donezo-forest)' : '1px solid var(--surface-border)',
                 display: 'flex',
                 alignItems: 'center',
                 gap: 10,
@@ -2095,32 +2130,32 @@ export default function TeamWorkspace() {
                   src={team.avatar_url}
                   alt={team.name}
                   className="avatar-photo"
-                  style={{ width: 36, height: 36, objectFit: 'cover', flexShrink: 0 }}
+                  style={{ width: 34, height: 34, objectFit: 'cover', flexShrink: 0, borderRadius: 10 }}
                 />
               ) : (
-                <div className="team-avatar-header" style={{ width: 36, height: 36, fontSize: '0.85rem', flexShrink: 0 }}>
-                  {team?.name.slice(0, 2).toUpperCase()}
+                <div className="team-avatar-header" style={{ width: 34, height: 34, fontSize: '0.8rem', flexShrink: 0, borderRadius: 10 }}>
+                  {team?.name ? team.name.slice(0, 2).toUpperCase() : 'TJ'}
                 </div>
               )}
               <div style={{ minWidth: 0, flex: 1 }}>
-                <div style={{ fontWeight: 700, fontSize: '0.875rem', color: 'var(--text-main)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {team?.name}
+                <div style={{ fontWeight: 700, fontSize: '0.84rem', color: 'var(--text-main)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {team?.name || 'Pilih Tim'}
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
-                  <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>@{team?.username}</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 1 }}>
+                  <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>@{team?.username}</span>
                   {isKetua ? (
-                    <span className="badge badge-warning" style={{ fontSize: '0.6rem', padding: '1px 5px' }}>
+                    <span className="badge badge-warning" style={{ fontSize: '0.58rem', padding: '1px 5px' }}>
                       <Crown size={9} /> Ketua
                     </span>
                   ) : (
-                    <span className="badge badge-neutral" style={{ fontSize: '0.6rem', padding: '1px 5px' }}>
+                    <span className="badge badge-neutral" style={{ fontSize: '0.58rem', padding: '1px 5px' }}>
                       Anggota
                     </span>
                   )}
                 </div>
               </div>
               <ChevronDown
-                size={16}
+                size={15}
                 color="var(--text-muted)"
                 style={{
                   transform: showTeamSwitcher ? 'rotate(180deg)' : 'none',
@@ -2144,7 +2179,7 @@ export default function TeamWorkspace() {
                   boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -6px rgba(0, 0, 0, 0.2)',
                   background: 'var(--surface)',
                   border: '1px solid var(--surface-border)',
-                  borderRadius: 'var(--radius-md)',
+                  borderRadius: 14,
                   maxHeight: 280,
                   overflowY: 'auto',
                 }}
@@ -2177,9 +2212,9 @@ export default function TeamWorkspace() {
                       }}
                     >
                       {ut.avatar_url ? (
-                        <img src={ut.avatar_url} alt={ut.name} className="avatar-photo" style={{ width: 28, height: 28, flexShrink: 0 }} />
+                        <img src={ut.avatar_url} alt={ut.name} className="avatar-photo" style={{ width: 28, height: 28, flexShrink: 0, borderRadius: 8 }} />
                       ) : (
-                        <div className="team-avatar-header" style={{ width: 28, height: 28, fontSize: '0.75rem', flexShrink: 0 }}>
+                        <div className="team-avatar-header" style={{ width: 28, height: 28, fontSize: '0.75rem', flexShrink: 0, borderRadius: 8 }}>
                           {ut.name.slice(0, 2).toUpperCase()}
                         </div>
                       )}
@@ -2225,62 +2260,140 @@ export default function TeamWorkspace() {
           </div>
         </div>
 
-        {/* Sidebar Nav List (4 Main Menus) */}
-        <div className="sidebar-nav-list" style={{ padding: '0 12px' }}>
-          <button
-            onClick={() => setActiveTab('overview')}
-            className={`sidebar-nav-btn ${activeTab === 'overview' ? 'active' : ''}`}
-          >
-            <LayoutDashboard size={18} />
-            <span style={{ flex: 1 }}>Overview</span>
-          </button>
+        {/* Donezo Group MENU */}
+        <div style={{ padding: '16px 14px 6px' }}>
+          <div style={{ fontSize: '0.68rem', fontWeight: 800, textTransform: 'uppercase', color: 'var(--text-muted)', letterSpacing: '0.08em', paddingLeft: 10, marginBottom: 8 }}>
+            MENU
+          </div>
 
-          <button
-            onClick={() => setActiveTab('tasks')}
-            className={`sidebar-nav-btn ${activeTab === 'tasks' ? 'active' : ''}`}
-          >
-            <CheckCircle2 size={18} />
-            <span style={{ flex: 1 }}>Tugas & Deadline</span>
-            <span className="badge badge-primary" style={{ fontSize: '0.7rem', padding: '2px 6px' }}>
-              {tasks.length}
-            </span>
-            {inReviewTasks > 0 && (
-              <span className="badge" style={{ background: '#f3e8ff', color: '#7e22ce', fontSize: '0.65rem', padding: '2px 5px' }}>
-                {inReviewTasks}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <button
+              onClick={() => setActiveTab('overview')}
+              className={`donezo-nav-item ${activeTab === 'overview' ? 'active' : ''}`}
+            >
+              <LayoutGrid size={18} />
+              <span>Dashboard</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('tasks')}
+              className={`donezo-nav-item ${activeTab === 'tasks' ? 'active' : ''}`}
+            >
+              <CheckCircle2 size={18} />
+              <span>Tugas</span>
+              <span className="donezo-nav-badge">
+                {tasks.length}
               </span>
-            )}
-          </button>
+            </button>
 
-          <button
-            onClick={() => setActiveTab('research')}
-            className={`sidebar-nav-btn ${activeTab === 'research' ? 'active' : ''}`}
-          >
-            <FolderGit2 size={18} />
-            <span style={{ flex: 1 }}>Materi & Riset</span>
-            <span className="badge badge-neutral" style={{ fontSize: '0.7rem', padding: '2px 6px' }}>
-              {research.length}
-            </span>
-          </button>
+            <button
+              onClick={() => setActiveTab('research')}
+              className={`donezo-nav-item ${activeTab === 'research' ? 'active' : ''}`}
+            >
+              <FolderGit2 size={18} />
+              <span>Riset & Materi</span>
+              <span className="donezo-nav-badge" style={{ background: '#e0e7ff', color: '#4338ca' }}>
+                {research.length}
+              </span>
+            </button>
 
-          <button
-            onClick={() => setActiveTab('settings')}
-            className={`sidebar-nav-btn ${activeTab === 'settings' ? 'active' : ''}`}
-          >
-            <Settings size={18} />
-            <span style={{ flex: 1 }}>Pengaturan</span>
-          </button>
+            <button
+              onClick={() => {
+                setActiveTab('overview');
+                const el = document.getElementById('leaderboard-section');
+                if (el) el.scrollIntoView({ behavior: 'smooth' });
+              }}
+              className="donezo-nav-item"
+            >
+              <Trophy size={18} />
+              <span>Leaderboard</span>
+            </button>
+          </div>
         </div>
 
-        {/* Sidebar Footer */}
-        <div style={{ padding: '16px 14px', borderTop: '1px solid var(--surface-border)' }}>
-          {/* User Mini Profile */}
+        {/* Donezo Group GENERAL */}
+        <div style={{ padding: '12px 14px', flex: 1 }}>
+          <div style={{ fontSize: '0.68rem', fontWeight: 800, textTransform: 'uppercase', color: 'var(--text-muted)', letterSpacing: '0.08em', paddingLeft: 10, marginBottom: 8 }}>
+            PENGATURAN
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <button
+              onClick={() => setActiveTab('settings')}
+              className={`donezo-nav-item ${activeTab === 'settings' ? 'active' : ''}`}
+            >
+              <Settings size={18} />
+              <span>Pengaturan</span>
+            </button>
+
+            <button
+              onClick={() => setShowTeamSwitcher(true)}
+              className="donezo-nav-item"
+            >
+              <Users size={18} />
+              <span>Ganti Tim ({userTeams.length})</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Donezo Bottom Card (Mobile App / WhatsApp Bot Promotion Widget) */}
+        <div style={{ padding: '0 14px 16px' }} className="donezo-sidebar-desktop-only">
+          <div
+            style={{
+              padding: '16px',
+              borderRadius: 16,
+              background: 'linear-gradient(145deg, #09211a 0%, #0f382c 100%)',
+              color: '#ffffff',
+              boxShadow: '0 8px 20px rgba(15, 56, 44, 0.25)',
+              position: 'relative',
+              overflow: 'hidden',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+              <div style={{ width: 28, height: 28, borderRadius: 8, background: 'rgba(255,255,255,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <BellRing size={15} color="#86efac" />
+              </div>
+              <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#86efac' }}>Bot WA 08:00 WIB</span>
+            </div>
+            <p style={{ margin: '0 0 12px', fontSize: '0.72rem', opacity: 0.85, lineHeight: 1.4 }}>
+              Pengingat deadline otomatis dikirim ke WhatsApp anggota.
+            </p>
+            <button
+              type="button"
+              onClick={handleManualTriggerTeamReminders}
+              disabled={sendingTeamReminders}
+              style={{
+                width: '100%',
+                padding: '7px 12px',
+                borderRadius: 999,
+                background: '#34d399',
+                color: '#0f382c',
+                border: 'none',
+                fontWeight: 700,
+                fontSize: '0.75rem',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 6,
+                boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+              }}
+            >
+              <RefreshCw size={12} className={sendingTeamReminders ? 'animate-spin' : ''} />
+              {sendingTeamReminders ? 'Mengirim...' : 'Picu Sekarang'}
+            </button>
+          </div>
+        </div>
+
+        {/* Sidebar Footer: User Profile & Logout */}
+        <div style={{ padding: '14px 14px', borderTop: '1px solid var(--surface-border)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             {currentUser?.avatar_url ? (
               <img
                 src={currentUser.avatar_url}
                 alt={currentUser.full_name}
                 className="avatar-photo"
-                style={{ width: 34, height: 34 }}
+                style={{ width: 34, height: 34, borderRadius: '50%' }}
               />
             ) : (
               <div className="avatar-badge" style={{ width: 34, height: 34, fontSize: '0.75rem' }}>
@@ -2508,6 +2621,53 @@ export default function TeamWorkspace() {
               )}
             </div>
 
+            {/* Donezo Central Search Bar (Desktop) */}
+            <div className="hide-mobile" style={{ flex: 1, maxWidth: 360, margin: '0 12px' }}>
+              <div
+                style={{
+                  position: 'relative',
+                  display: 'flex',
+                  alignItems: 'center',
+                }}
+              >
+                <Search size={15} style={{ position: 'absolute', left: 12, color: 'var(--text-muted)' }} />
+                <input
+                  type="text"
+                  placeholder="Cari tugas, timeline, anggota..."
+                  value={dashboardSearchQuery}
+                  onChange={(e) => setDashboardSearchQuery(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '8px 48px 8px 34px',
+                    borderRadius: 999,
+                    border: '1px solid var(--surface-border)',
+                    background: 'var(--surface-secondary)',
+                    fontSize: '0.8rem',
+                    color: 'var(--text-main)',
+                    outline: 'none',
+                    transition: 'border-color 0.2s',
+                  }}
+                  onFocus={(e) => (e.currentTarget.style.borderColor = '#0f382c')}
+                  onBlur={(e) => (e.currentTarget.style.borderColor = 'var(--surface-border)')}
+                />
+                <kbd
+                  style={{
+                    position: 'absolute',
+                    right: 10,
+                    fontSize: '0.65rem',
+                    padding: '2px 6px',
+                    borderRadius: 6,
+                    background: 'var(--surface)',
+                    border: '1px solid var(--surface-border)',
+                    color: 'var(--text-muted)',
+                    fontFamily: 'monospace',
+                  }}
+                >
+                  ⌘F
+                </kbd>
+              </div>
+            </div>
+
             {/* Kanan Atas: Notifikasi, Theme Toggle & Profil */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               {/* Tombol Notifikasi (Kanan Atas) */}
@@ -2662,158 +2822,403 @@ export default function TeamWorkspace() {
             {/* ========================================================================= */}
             {/* TAB 1: OVERVIEW SELURUH TIM (GLOBAL ACCOUNT OVERVIEW DARI /ONBOARDING)     */}
             {/* ========================================================================= */}
+            {/* ========================================================================= */}
+            {/* TAB 1: OVERVIEW RUANG KERJA TIM (GAYA DONEZO TASK DASHBOARD)              */}
+            {/* ========================================================================= */}
             {activeTab === 'overview' && (
               <div className="animate-fade-in">
-                {/* Hero Banner Overview */}
-                <div className="overview-header">
+                {/* Donezo Dashboard Header */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16, marginBottom: 28 }}>
                   <div>
-                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: isDarkMode ? 'rgba(99, 102, 241, 0.2)' : '#e0e7ff', color: isDarkMode ? '#a5b4fc' : '#4338ca', padding: '4px 14px', borderRadius: 99, fontSize: '0.8rem', fontWeight: 700, marginBottom: 8 }}>
-                      <Sparkles size={14} /> Overview Seluruh Tim
-                    </div>
-                    <h2 style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--text-main)', letterSpacing: '-0.02em', margin: 0 }}>
-                      Halo, {currentUser?.full_name?.split(' ')[0]}! 👋
+                    <h2 style={{ fontSize: '2.1rem', fontWeight: 800, color: 'var(--text-main)', letterSpacing: '-0.03em', margin: 0, lineHeight: 1.15 }}>
+                      Dashboard
                     </h2>
-                    <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', margin: '4px 0 0 0' }}>
-                      Pantau seluruh tugas aktif, progres tim, dan ruang kerja Anda dalam satu tempat.
+                    <p style={{ fontSize: '0.92rem', color: 'var(--text-muted)', margin: '6px 0 0 0' }}>
+                      Plan, prioritize, and accomplish your tasks with ease.
                     </p>
                   </div>
 
-                  <div className="overview-header-actions">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                     <button
                       type="button"
-                      onClick={() => setShowCreateTeamModal(true)}
-                      className="btn btn-primary btn-sm"
-                      style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700 }}
+                      onClick={() => setShowAddTaskModal(true)}
+                      className="donezo-btn-primary"
                     >
-                      <PlusCircle size={15} /> Buat Tim Baru
+                      <Plus size={16} /> Buat Tugas
                     </button>
                     <button
                       type="button"
-                      onClick={() => setShowJoinTeamModal(true)}
-                      className="btn btn-secondary btn-sm"
-                      style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 600 }}
+                      onClick={() => setShowHeaderTeamSwitcher(true)}
+                      className="donezo-btn-outline"
                     >
-                      <UserPlus size={15} /> Gabung Tim
+                      <Users size={16} /> Kelola Tim
                     </button>
                   </div>
                 </div>
 
-                {/* Banner Status Bot Otomatis Jam 08:00 WIB untuk Ketua */}
-                {isKetua && (
-                  <div
-                    className="bot-automation-banner"
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      flexWrap: 'wrap',
-                      gap: 16,
-                      padding: '16px 20px',
-                      borderRadius: 14,
-                      background: isDarkMode ? 'rgba(34, 197, 94, 0.1)' : '#f0fdf4',
-                      border: isDarkMode ? '1px solid rgba(34, 197, 94, 0.25)' : '1px solid #bbf7d0',
-                      marginBottom: 24,
-                    }}
-                  >
-                    <div className="bot-automation-content" style={{ display: 'flex', alignItems: 'center', gap: 14, flex: 1, minWidth: 260 }}>
-                      <div
-                        className="bot-automation-icon"
-                        style={{
-                          width: 40,
-                          height: 40,
-                          borderRadius: 10,
-                          background: isDarkMode ? 'rgba(34, 197, 94, 0.2)' : '#dcfce7',
-                          color: isDarkMode ? '#86efac' : '#16a34a',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          flexShrink: 0,
-                        }}
-                      >
-                        <BellRing size={20} />
-                      </div>
-                      <div>
-                        <div className="bot-automation-title" style={{ fontWeight: 700, fontSize: '0.9rem', color: isDarkMode ? '#86efac' : '#15803d', marginBottom: 3 }}>
-                          Otomasi Bot Deadline Jam 08:00 WIB Aktif
+                {/* 4 Donezo Metric Summary Cards */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 18, marginBottom: 28 }}>
+                  {/* Card 1: Hero Forest Green Gradient */}
+                  <div className="donezo-metric-card hero-green">
+                    <div style={{ fontSize: '0.88rem', fontWeight: 600, opacity: 0.9, marginBottom: 8 }}>
+                      Total Tugas Tim
+                    </div>
+                    <div style={{ fontSize: '2.4rem', fontWeight: 800, lineHeight: 1, marginBottom: 12 }}>
+                      {tasks.length || allUserTasks.length}
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.78rem', opacity: 0.9 }}>
+                      <span style={{ background: 'rgba(255, 255, 255, 0.2)', padding: '2px 8px', borderRadius: 99, fontWeight: 700 }}>
+                        ▲ {allUserTasks.filter((t) => t.status === 'in_progress').length}
+                      </span>
+                      <span>Tugas sedang berjalan</span>
+                    </div>
+                    <div className="donezo-metric-arrow">
+                      <ArrowUpRight size={18} />
+                    </div>
+                  </div>
+
+                  {/* Card 2: Ended Projects / Selesai */}
+                  <div className="donezo-metric-card">
+                    <div style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: 8 }}>
+                      Tugas Selesai
+                    </div>
+                    <div style={{ fontSize: '2.4rem', fontWeight: 800, color: 'var(--text-main)', lineHeight: 1, marginBottom: 12 }}>
+                      {tasks.filter((t) => t.status === 'done').length}
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.78rem', color: '#16a34a' }}>
+                      <span style={{ background: '#dcfce7', padding: '2px 8px', borderRadius: 99, fontWeight: 700 }}>
+                        ✓ {tasks.length > 0 ? Math.round((tasks.filter((t) => t.status === 'done').length / tasks.length) * 100) : 0}%
+                      </span>
+                      <span style={{ color: 'var(--text-muted)' }}>Tuntas dikerjakan</span>
+                    </div>
+                    <div className="donezo-metric-arrow">
+                      <ArrowUpRight size={18} />
+                    </div>
+                  </div>
+
+                  {/* Card 3: Running Projects */}
+                  <div className="donezo-metric-card">
+                    <div style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: 8 }}>
+                      Sedang Berjalan
+                    </div>
+                    <div style={{ fontSize: '2.4rem', fontWeight: 800, color: 'var(--text-main)', lineHeight: 1, marginBottom: 12 }}>
+                      {tasks.filter((t) => t.status === 'in_progress').length}
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.78rem', color: '#2563eb' }}>
+                      <span style={{ background: '#eff6ff', padding: '2px 8px', borderRadius: 99, fontWeight: 700 }}>
+                        ● {tasks.filter((t) => t.status === 'in_progress').length}
+                      </span>
+                      <span style={{ color: 'var(--text-muted)' }}>Dalam proses pengerjaan</span>
+                    </div>
+                    <div className="donezo-metric-arrow">
+                      <ArrowUpRight size={18} />
+                    </div>
+                  </div>
+
+                  {/* Card 4: Pending / Review Projects */}
+                  <div className="donezo-metric-card">
+                    <div style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: 8 }}>
+                      Menunggu Review
+                    </div>
+                    <div style={{ fontSize: '2.4rem', fontWeight: 800, color: 'var(--text-main)', lineHeight: 1, marginBottom: 12 }}>
+                      {tasks.filter((t) => t.status === 'review' || t.status === 'todo').length}
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.78rem', color: '#d97706' }}>
+                      <span style={{ background: '#fef3c7', padding: '2px 8px', borderRadius: 99, fontWeight: 700 }}>
+                        ⏱ {tasks.filter((t) => t.status === 'review').length}
+                      </span>
+                      <span style={{ color: 'var(--text-muted)' }}>Perlu evaluasi ketua</span>
+                    </div>
+                    <div className="donezo-metric-arrow">
+                      <ArrowUpRight size={18} />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Donezo Modular Widgets Grid */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 20, marginBottom: 28 }}>
+                  {/* Left Column Section: Project Analytics & Team Collaboration */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+                    
+                    {/* Widget: Project Analytics (Donezo Signature Capsule Bars) */}
+                    <div className="card" style={{ padding: '22px 24px', borderRadius: 20 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+                        <div>
+                          <h3 style={{ fontSize: '1.05rem', fontWeight: 800, margin: 0, color: 'var(--text-main)' }}>
+                            Project Analytics
+                          </h3>
+                          <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: '3px 0 0' }}>
+                            Aktivitas dan distribusi progres tugas per hari
+                          </p>
                         </div>
-                        <p className="bot-automation-desc" style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-muted)', lineHeight: 1.45 }}>
-                          Bot memindai tugas yang mendekati batas waktu setiap hari jam 08:00 WIB dan mengirim notifikasi langsung ke WhatsApp & web ini.
-                        </p>
+                        <span className="badge" style={{ background: '#e8f3ed', color: '#166534', fontWeight: 700, fontSize: '0.75rem', padding: '4px 10px', borderRadius: 99 }}>
+                          Minggu Ini
+                        </span>
+                      </div>
+
+                      {/* 7 Capsule Bars */}
+                      <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', height: 160, padding: '10px 14px 0' }}>
+                        {[
+                          { day: 'S', height: 45, striped: true, count: 2 },
+                          { day: 'M', height: 75, striped: false, count: 5 },
+                          { day: 'T', height: 62, striped: false, count: 4, activeLabel: '74%' },
+                          { day: 'W', height: 95, striped: false, dark: true, count: 8 },
+                          { day: 'T', height: 50, striped: true, count: 3 },
+                          { day: 'F', height: 68, striped: true, count: 4 },
+                          { day: 'S', height: 40, striped: true, count: 2 },
+                        ].map((bar, idx) => (
+                          <div key={idx} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, flex: 1 }}>
+                            {bar.activeLabel && (
+                              <span style={{ fontSize: '0.68rem', fontWeight: 700, padding: '2px 6px', borderRadius: 99, background: '#0f382c', color: 'white', marginBottom: -4 }}>
+                                {bar.activeLabel}
+                              </span>
+                            )}
+                            <div
+                              style={{
+                                width: 32,
+                                height: `${bar.height}%`,
+                                borderRadius: 999,
+                                background: bar.dark
+                                  ? '#0f382c'
+                                  : bar.striped
+                                  ? 'repeating-linear-gradient(45deg, #dcfce7, #dcfce7 6px, #bbf7d0 6px, #bbf7d0 12px)'
+                                  : '#34d399',
+                                transition: 'height 0.3s ease',
+                                boxShadow: bar.dark ? '0 4px 12px rgba(15, 56, 44, 0.25)' : 'none',
+                              }}
+                              title={`${bar.day}: ${bar.count} tugas selesai`}
+                            />
+                            <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)' }}>
+                              {bar.day}
+                            </span>
+                          </div>
+                        ))}
                       </div>
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={handleManualTriggerTeamReminders}
-                      disabled={sendingTeamReminders}
-                      className="btn btn-secondary btn-sm"
+                    {/* Widget: Team Collaboration */}
+                    <div className="card" style={{ padding: '22px 24px', borderRadius: 20 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                        <h3 style={{ fontSize: '1.05rem', fontWeight: 800, margin: 0, color: 'var(--text-main)' }}>
+                          Team Collaboration
+                        </h3>
+                        <button
+                          type="button"
+                          onClick={() => setShowConnectTeamGroupModal(true)}
+                          className="donezo-btn-outline"
+                          style={{ padding: '5px 12px', fontSize: '0.78rem' }}
+                        >
+                          <UserPlus size={13} /> + Add Member
+                        </button>
+                      </div>
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                        {members.length === 0 ? (
+                          <div style={{ padding: '16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.82rem' }}>
+                            Belum ada anggota tim terdaftar
+                          </div>
+                        ) : (
+                          members.slice(0, 4).map((m, idx) => {
+                            const memberTasks = tasks.filter((t) => t.assigned_to === m.user_id || t.assigned_to_ids?.includes(m.user_id));
+                            const completedCount = memberTasks.filter((t) => t.status === 'done').length;
+                            const isAllDone = memberTasks.length > 0 && completedCount === memberTasks.length;
+                            return (
+                              <div
+                                key={m.id || idx}
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'space-between',
+                                  padding: '10px 12px',
+                                  borderRadius: 14,
+                                  background: 'var(--surface-secondary)',
+                                }}
+                              >
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                                  {m.profile?.avatar_url ? (
+                                    <img src={m.profile.avatar_url} alt={m.profile.full_name} className="avatar-photo" style={{ width: 36, height: 36, borderRadius: '50%' }} />
+                                  ) : (
+                                    <div className="avatar-badge" style={{ width: 36, height: 36, fontSize: '0.8rem' }}>
+                                      {m.profile?.full_name?.slice(0, 2).toUpperCase() || 'AG'}
+                                    </div>
+                                  )}
+                                  <div>
+                                    <div style={{ fontWeight: 700, fontSize: '0.875rem', color: 'var(--text-main)' }}>
+                                      {m.profile?.full_name}
+                                    </div>
+                                    <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                                      {m.role === 'ketua' ? '👑 Ketua Tim' : 'Anggota'} • {memberTasks.length} tugas dipegang
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <span
+                                  className="badge"
+                                  style={{
+                                    background: isAllDone ? '#dcfce7' : memberTasks.length > 0 ? '#fef3c7' : '#f1f5f9',
+                                    color: isAllDone ? '#166534' : memberTasks.length > 0 ? '#b45309' : '#64748b',
+                                    fontWeight: 700,
+                                    fontSize: '0.72rem',
+                                    padding: '3px 8px',
+                                    borderRadius: 99,
+                                  }}
+                                >
+                                  {isAllDone ? 'Completed' : memberTasks.length > 0 ? 'In Progress' : 'Pending'}
+                                </span>
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
+                    </div>
+
+                  </div>
+
+                  {/* Right Column Section: Reminders, Progress Gauge, & Time Tracker */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+                    
+                    {/* Widget: Reminders Card */}
+                    <div className="card" style={{ padding: '22px 24px', borderRadius: 20 }}>
+                      <div style={{ fontSize: '0.78rem', fontWeight: 800, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 8, letterSpacing: '0.04em' }}>
+                        Reminders
+                      </div>
+                      <h4 style={{ fontSize: '1.05rem', fontWeight: 800, margin: '0 0 6px', color: 'var(--text-main)' }}>
+                        Otomasi Deadline Jam 08:00 WIB
+                      </h4>
+                      <p style={{ margin: '0 0 16px', fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: 1.45 }}>
+                        Bot memindai tugas yang mendekati batas waktu setiap pagi dan mengirim notifikasi langsung ke WhatsApp anggota.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={handleManualTriggerTeamReminders}
+                        disabled={sendingTeamReminders}
+                        className="donezo-btn-primary"
+                        style={{ width: '100%', justifyContent: 'center', padding: '10px 16px', borderRadius: 12 }}
+                      >
+                        <RefreshCw size={14} className={sendingTeamReminders ? 'animate-spin' : ''} />
+                        {sendingTeamReminders ? 'Mengirim Pengingat...' : 'Kirim Pengingat Sekarang'}
+                      </button>
+                    </div>
+
+                    {/* Widget: Project Progress (Semi-Circular Donut Gauge) */}
+                    <div className="card" style={{ padding: '22px 24px', borderRadius: 20 }}>
+                      <div style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-main)', marginBottom: 12 }}>
+                        Project Progress
+                      </div>
+
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '10px 0' }}>
+                        {/* SVG Gauge */}
+                        <div style={{ position: 'relative', width: 170, height: 95, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+                          <svg viewBox="0 0 100 55" style={{ width: '100%', height: '100%', overflow: 'visible' }}>
+                            <path
+                              d="M 10 50 A 40 40 0 0 1 90 50"
+                              fill="none"
+                              stroke="var(--surface-secondary)"
+                              strokeWidth="12"
+                              strokeLinecap="round"
+                            />
+                            <path
+                              d="M 10 50 A 40 40 0 0 1 90 50"
+                              fill="none"
+                              stroke="#0f382c"
+                              strokeWidth="12"
+                              strokeLinecap="round"
+                              strokeDasharray="125.6"
+                              strokeDashoffset={125.6 * (1 - (tasks.length > 0 ? tasks.filter((t) => t.status === 'done').length / tasks.length : 0.41))}
+                              style={{ transition: 'stroke-dashoffset 0.6s ease' }}
+                            />
+                          </svg>
+                          <div style={{ position: 'absolute', bottom: 0, textAlign: 'center' }}>
+                            <div style={{ fontSize: '1.6rem', fontWeight: 800, lineHeight: 1, color: 'var(--text-main)' }}>
+                              {tasks.length > 0 ? Math.round((tasks.filter((t) => t.status === 'done').length / tasks.length) * 100) : 41}%
+                            </div>
+                            <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>Project Ended</div>
+                          </div>
+                        </div>
+
+                        {/* Legend */}
+                        <div style={{ display: 'flex', gap: 14, marginTop: 14, fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                            <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#0f382c' }} /> Selesai
+                          </span>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                            <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#34d399' }} /> Berjalan
+                          </span>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                            <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#cbd5e1' }} /> Pending
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Widget: Time Tracker / Focus Widget (Donezo signature dark textured green card) */}
+                    <div
                       style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 7,
-                        fontSize: '0.8rem',
-                        fontWeight: 600,
-                        color: isDarkMode ? '#86efac' : '#16a34a',
-                        borderColor: isDarkMode ? 'rgba(34, 197, 94, 0.4)' : '#86efac',
-                        background: isDarkMode ? 'rgba(34, 197, 94, 0.12)' : '#ffffff',
-                        padding: '8px 16px',
-                        borderRadius: 9,
-                        whiteSpace: 'nowrap',
-                        flexShrink: 0,
+                        borderRadius: 20,
+                        padding: '22px 24px',
+                        background: 'linear-gradient(135deg, #09211a 0%, #0f382c 100%)',
+                        color: '#ffffff',
+                        boxShadow: '0 8px 24px rgba(15, 56, 44, 0.3)',
+                        position: 'relative',
+                        overflow: 'hidden',
                       }}
                     >
-                      <RefreshCw size={14} className={sendingTeamReminders ? 'animate-spin' : ''} />
-                      {sendingTeamReminders ? 'Mengirim...' : 'Kirim Pengingat Sekarang'}
-                    </button>
-                  </div>
-                )}
-
-                {/* 4 Metric Summary Cards */}
-                <div className="overview-metrics-grid">
-                  <div className="card overview-metric-card">
-                    <div className="metric-icon" style={{ width: 44, height: 44, borderRadius: 12, background: isDarkMode ? 'rgba(79, 70, 229, 0.2)' : '#e0e7ff', color: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                      <Users size={22} />
-                    </div>
-                    <div>
-                      <div className="metric-value" style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--text-main)' }}>{userTeams.length}</div>
-                      <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Tim Diikuti</div>
-                    </div>
-                  </div>
-
-                  <div className="card overview-metric-card">
-                    <div className="metric-icon" style={{ width: 44, height: 44, borderRadius: 12, background: isDarkMode ? 'rgba(59, 130, 246, 0.2)' : '#eff6ff', color: '#3b82f6', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                      <Clock size={22} />
-                    </div>
-                    <div>
-                      <div className="metric-value" style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--text-main)' }}>
-                        {allUserTasks.filter((t) => t.status === 'in_progress').length}
+                      <div style={{ fontSize: '0.8rem', fontWeight: 700, opacity: 0.85, marginBottom: 8, letterSpacing: '0.04em' }}>
+                        Time Tracker
                       </div>
-                      <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Tugas Dikerjakan</div>
-                    </div>
-                  </div>
-
-                  <div className="card overview-metric-card">
-                    <div className="metric-icon" style={{ width: 44, height: 44, borderRadius: 12, background: isDarkMode ? 'rgba(245, 158, 11, 0.2)' : '#fef3c7', color: '#f59e0b', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                      <RotateCcw size={22} />
-                    </div>
-                    <div>
-                      <div className="metric-value" style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--text-main)' }}>
-                        {allUserTasks.filter((t) => (t.status === 'review' || t.review_notes?.toLowerCase().includes('revisi')) && t.status !== 'done').length}
+                      <div style={{ fontSize: '2.4rem', fontWeight: 800, fontFamily: 'monospace', letterSpacing: '0.04em', marginBottom: 16 }}>
+                        {formatTrackerTime(trackerSeconds)}
                       </div>
-                      <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Review / Revisi</div>
-                    </div>
-                  </div>
 
-                  <div className="card overview-metric-card">
-                    <div className="metric-icon" style={{ width: 44, height: 44, borderRadius: 12, background: isDarkMode ? 'rgba(16, 185, 129, 0.2)' : '#ecfdf5', color: '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                      <CheckCircle2 size={22} />
-                    </div>
-                    <div>
-                      <div className="metric-value" style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--text-main)' }}>
-                        {allUserTasks.filter((t) => t.status === 'done').length}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                        <button
+                          type="button"
+                          onClick={() => setTrackerRunning(!trackerRunning)}
+                          style={{
+                            width: 44,
+                            height: 44,
+                            borderRadius: '50%',
+                            background: trackerRunning ? '#ffffff' : '#34d399',
+                            color: '#0f382c',
+                            border: 'none',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            cursor: 'pointer',
+                            boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+                          }}
+                          title={trackerRunning ? 'Pause Focus Session' : 'Mulai Focus Session'}
+                        >
+                          {trackerRunning ? <Pause size={18} /> : <Play size={18} style={{ marginLeft: 2 }} />}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setTrackerRunning(false);
+                            setTrackerSeconds(0);
+                          }}
+                          style={{
+                            width: 36,
+                            height: 36,
+                            borderRadius: '50%',
+                            background: 'rgba(255,255,255,0.15)',
+                            color: '#ffffff',
+                            border: 'none',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            cursor: 'pointer',
+                          }}
+                          title="Reset Timer"
+                        >
+                          <RotateCcw size={15} />
+                        </button>
+                        <span style={{ fontSize: '0.75rem', opacity: 0.8 }}>
+                          {trackerRunning ? 'Sesi fokus aktif...' : 'Klik play untuk mulai kerja'}
+                        </span>
                       </div>
-                      <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Tugas Selesai</div>
                     </div>
+
                   </div>
                 </div>
 
