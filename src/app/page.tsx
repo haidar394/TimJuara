@@ -314,11 +314,6 @@ export default function HomePage() {
                       DEADLINE&lt;AMAN&lt;{new Date().getFullYear()}&lt;JUARA&lt;BERSAMA&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;
                     </div>
                   </div>
-
-                  {/* Caption underneath */}
-                  <p className="font-typewriter" style={{ textAlign: 'center', fontSize: '0.75rem', color: '#64748b', marginTop: 12 }}>
-                    Tampilan sertifikat asli saat semua tugas tim Anda selesai tepat waktu.
-                  </p>
                 </div>
               </div>
 
