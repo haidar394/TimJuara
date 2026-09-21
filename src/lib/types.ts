@@ -12,6 +12,7 @@ export interface Profile {
   phone_number?: string; // Nomor WhatsApp (contoh: 08123456789 atau 628123456789)
   created_at?: string;
   read_comments?: Record<string, number>;
+  time_tracker?: Record<string, { seconds: number; isRunning?: boolean; updatedAt?: string }>;
 }
 
 export interface Team {

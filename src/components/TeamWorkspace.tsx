@@ -40,6 +40,9 @@ import {
   addTaskComment,
   getUserReadComments,
   saveUserReadComments,
+  getUserTimeTracker,
+  saveUserTimeTracker,
+  resetUserTimeTracker,
   getUserNotifications,
   createNotification,
   markNotificationAsRead,
@@ -125,6 +128,7 @@ import {
   ArrowUpRight,
   Play,
   Pause,
+  Cloud,
   X,
 } from 'lucide-react';
 import Link from 'next/link';
@@ -209,6 +213,13 @@ export default function TeamWorkspace() {
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
+  const trackerSecondsRef = useRef(0);
+  trackerSecondsRef.current = trackerSeconds;
+  const currentUserRef = useRef<Profile | null>(null);
+  currentUserRef.current = currentUser;
+  const teamRef = useRef<Team | null>(null);
+  teamRef.current = team;
+
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('timjuara_tracker_seconds');
@@ -232,6 +243,22 @@ export default function TeamWorkspace() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
+  // Simpan durasi saat tab/browser ditutup
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      if (currentUserRef.current && trackerSecondsRef.current > 0) {
+        saveUserTimeTracker(currentUserRef.current.id, teamRef.current?.id, {
+          seconds: trackerSecondsRef.current,
+          isRunning: false,
+        });
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, []);
+
   useEffect(() => {
     let interval: NodeJS.Timeout | null = null;
     if (trackerRunning) {
@@ -240,6 +267,13 @@ export default function TeamWorkspace() {
           const next = prev + 1;
           if (next % 5 === 0 && typeof window !== 'undefined') {
             localStorage.setItem('timjuara_tracker_seconds', String(next));
+          }
+          // Cloud sync setiap 20 detik ke akun Supabase
+          if (next % 20 === 0 && currentUserRef.current) {
+            saveUserTimeTracker(currentUserRef.current.id, teamRef.current?.id, {
+              seconds: next,
+              isRunning: true,
+            });
           }
           return next;
         });
@@ -546,6 +580,16 @@ export default function TeamWorkspace() {
     setTeam(teamData);
     setTeamAvatarUrl(teamData.avatar_url || '');
     setMembers(membersData);
+
+    // Sinkronisasi Time Tracker dari Cloud & Local Storage
+    try {
+      const trackerData = await getUserTimeTracker(user.id, teamData.id);
+      if (trackerData && typeof trackerData.seconds === 'number') {
+        setTrackerSeconds(trackerData.seconds);
+      }
+    } catch (e) {
+      console.error('Error loading time tracker from cloud:', e);
+    }
 
     const taskList = await getTeamTasks(teamData.id);
     setTasks(taskList);
@@ -3481,8 +3525,27 @@ export default function TeamWorkspace() {
                         overflow: 'hidden',
                       }}
                     >
-                      <div style={{ fontSize: '0.8rem', fontWeight: 700, opacity: 0.85, marginBottom: 8, letterSpacing: '0.04em' }}>
-                        Time Tracker
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                        <div style={{ fontSize: '0.8rem', fontWeight: 700, opacity: 0.85, letterSpacing: '0.04em' }}>
+                          Time Tracker
+                        </div>
+                        <div
+                          style={{
+                            fontSize: '0.68rem',
+                            fontWeight: 600,
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 5,
+                            background: 'rgba(255,255,255,0.12)',
+                            color: '#a7f3d0',
+                            padding: '3px 8px',
+                            borderRadius: 999,
+                          }}
+                          title="Tersinkronisasi otomatis antar-perangkat ke akun Anda"
+                        >
+                          <Cloud size={11} />
+                          <span>Cloud Sync</span>
+                        </div>
                       </div>
                       <div style={{ fontSize: '2.4rem', fontWeight: 800, fontFamily: 'monospace', letterSpacing: '0.04em', marginBottom: 16 }}>
                         {formatTrackerTime(trackerSeconds)}
@@ -3494,7 +3557,12 @@ export default function TeamWorkspace() {
                           onClick={() => {
                             const nextState = !trackerRunning;
                             setTrackerRunning(nextState);
-                            if (!nextState && typeof window !== 'undefined') {
+                            if (currentUser) {
+                              saveUserTimeTracker(currentUser.id, team?.id, {
+                                seconds: trackerSeconds,
+                                isRunning: nextState,
+                              });
+                            } else if (typeof window !== 'undefined') {
                               localStorage.setItem('timjuara_tracker_seconds', String(trackerSeconds));
                             }
                           }}
@@ -3520,7 +3588,9 @@ export default function TeamWorkspace() {
                           onClick={() => {
                             setTrackerRunning(false);
                             setTrackerSeconds(0);
-                            if (typeof window !== 'undefined') {
+                            if (currentUser) {
+                              resetUserTimeTracker(currentUser.id, team?.id);
+                            } else if (typeof window !== 'undefined') {
                               localStorage.removeItem('timjuara_tracker_seconds');
                             }
                           }}
@@ -3541,7 +3611,7 @@ export default function TeamWorkspace() {
                           <RotateCcw size={15} />
                         </button>
                         <span style={{ fontSize: '0.75rem', opacity: 0.8 }}>
-                          {trackerRunning ? 'Sesi fokus aktif...' : 'Klik play untuk mulai kerja'}
+                          {trackerRunning ? 'Sesi fokus aktif (tersinkron)...' : 'Klik play untuk mulai kerja'}
                         </span>
                       </div>
                     </div>

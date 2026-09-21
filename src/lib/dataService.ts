@@ -183,6 +183,7 @@ export async function getCurrentUser(): Promise<Profile | null> {
       avatar_url: profile?.avatar_url || '',
       phone_number: profile?.phone_number || '',
       read_comments: user.user_metadata?.read_comments || undefined,
+      time_tracker: user.user_metadata?.time_tracker || undefined,
     };
   } else {
     // Mode Demo Lokal
@@ -2098,6 +2099,110 @@ export async function saveUserReadComments(userId: string, readMap: Record<strin
     try {
       await supabase.auth.updateUser({
         data: { read_comments: readMap }
+      });
+    } catch {}
+  }
+}
+
+export interface TimeTrackerData {
+  seconds: number;
+  isRunning?: boolean;
+  updatedAt?: string;
+}
+
+export async function getUserTimeTracker(userId: string, teamId?: string): Promise<TimeTrackerData> {
+  const localKey = teamId ? `timjuara_tracker_${userId}_${teamId}` : `timjuara_tracker_${userId}`;
+  let localSeconds = 0;
+  if (typeof window !== 'undefined') {
+    try {
+      const raw = localStorage.getItem(localKey) || localStorage.getItem('timjuara_tracker_seconds');
+      if (raw && !isNaN(Number(raw))) {
+        localSeconds = Number(raw);
+      }
+    } catch {}
+  }
+
+  if (isSupabaseConfigured && supabase) {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user?.user_metadata?.time_tracker) {
+        const trackerMap = user.user_metadata.time_tracker as Record<string, { seconds: number; isRunning?: boolean; updatedAt?: string }>;
+        const key = teamId || 'default';
+        const cloudData = trackerMap[key] || trackerMap['default'];
+        if (cloudData && typeof cloudData.seconds === 'number') {
+          const mergedSeconds = Math.max(cloudData.seconds, localSeconds);
+          if (typeof window !== 'undefined') {
+            try {
+              localStorage.setItem(localKey, String(mergedSeconds));
+              localStorage.setItem('timjuara_tracker_seconds', String(mergedSeconds));
+            } catch {}
+          }
+          return { seconds: mergedSeconds, isRunning: false, updatedAt: cloudData.updatedAt };
+        }
+      }
+    } catch {}
+  }
+
+  return { seconds: localSeconds, isRunning: false };
+}
+
+export async function saveUserTimeTracker(
+  userId: string,
+  teamId: string | undefined,
+  data: { seconds: number; isRunning?: boolean }
+): Promise<void> {
+  const localKey = teamId ? `timjuara_tracker_${userId}_${teamId}` : `timjuara_tracker_${userId}`;
+  if (typeof window !== 'undefined') {
+    try {
+      localStorage.setItem(localKey, String(data.seconds));
+      localStorage.setItem('timjuara_tracker_seconds', String(data.seconds));
+    } catch {}
+  }
+
+  if (isSupabaseConfigured && supabase) {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      const existing = (user?.user_metadata?.time_tracker as Record<string, any>) || {};
+      const key = teamId || 'default';
+      const updatedMap = {
+        ...existing,
+        [key]: {
+          seconds: data.seconds,
+          isRunning: !!data.isRunning,
+          updatedAt: new Date().toISOString(),
+        },
+      };
+      await supabase.auth.updateUser({
+        data: { time_tracker: updatedMap }
+      });
+    } catch {}
+  }
+}
+
+export async function resetUserTimeTracker(userId: string, teamId?: string): Promise<void> {
+  const localKey = teamId ? `timjuara_tracker_${userId}_${teamId}` : `timjuara_tracker_${userId}`;
+  if (typeof window !== 'undefined') {
+    try {
+      localStorage.removeItem(localKey);
+      localStorage.removeItem('timjuara_tracker_seconds');
+    } catch {}
+  }
+
+  if (isSupabaseConfigured && supabase) {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      const existing = (user?.user_metadata?.time_tracker as Record<string, any>) || {};
+      const key = teamId || 'default';
+      const updatedMap = {
+        ...existing,
+        [key]: {
+          seconds: 0,
+          isRunning: false,
+          updatedAt: new Date().toISOString(),
+        },
+      };
+      await supabase.auth.updateUser({
+        data: { time_tracker: updatedMap }
       });
     } catch {}
   }
