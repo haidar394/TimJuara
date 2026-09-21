@@ -148,6 +148,7 @@ export default function TeamWorkspace() {
   const [allUserTasks, setAllUserTasks] = useState<(Task & { team_name?: string; team_username?: string })[]>([]);
   const [searchTeamQuery, setSearchTeamQuery] = useState('');
   const [showTeamSwitcher, setShowTeamSwitcher] = useState(false);
+  const [showHeaderTeamSwitcher, setShowHeaderTeamSwitcher] = useState(false);
   const [overviewTaskFilter, setOverviewTaskFilter] = useState<'adaptive' | 'current_team' | 'urgent'>('adaptive');
   const [showAllOverviewTasks, setShowAllOverviewTasks] = useState(false);
 
@@ -2316,33 +2317,195 @@ export default function TeamWorkspace() {
         {/* Top Header Bar (Notifikasi & Menu di Kanan Atas) */}
         <header className="workspace-header" style={{ borderBottom: '1px solid var(--surface-border)', padding: '12px 20px', background: 'var(--surface)' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
-              {team?.avatar_url ? (
-                <img
-                  src={team.avatar_url}
-                  alt={team.name}
-                  className="avatar-photo"
-                  style={{ width: 34, height: 34, objectFit: 'cover' }}
-                />
-              ) : (
-                <div className="team-avatar-header" style={{ width: 34, height: 34, fontSize: '0.8rem', flexShrink: 0 }}>
-                  {team?.name.slice(0, 2).toUpperCase()}
+            {/* Header Kiri: Info Tim & Dropdown Ganti Tim Langsung (Sangat responsif di Mobile & Desktop) */}
+            <div style={{ position: 'relative', minWidth: 0, flex: 1, maxWidth: 'calc(100% - 130px)' }}>
+              <div
+                onClick={() => setShowHeaderTeamSwitcher((prev) => !prev)}
+                className="header-team-trigger"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
+                  minWidth: 0,
+                  cursor: 'pointer',
+                  padding: '4px 8px 4px 4px',
+                  borderRadius: 10,
+                  userSelect: 'none',
+                }}
+                title="Klik untuk ganti tim langsung"
+              >
+                {team?.avatar_url ? (
+                  <img
+                    src={team.avatar_url}
+                    alt={team.name}
+                    className="avatar-photo"
+                    style={{ width: 34, height: 34, objectFit: 'cover', flexShrink: 0, borderRadius: 8 }}
+                  />
+                ) : (
+                  <div className="team-avatar-header" style={{ width: 34, height: 34, fontSize: '0.8rem', flexShrink: 0, borderRadius: 8 }}>
+                    {team?.name ? team.name.slice(0, 2).toUpperCase() : 'TJ'}
+                  </div>
+                )}
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                    <h1 style={{ fontSize: '0.92rem', fontWeight: 800, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--text-main)' }}>
+                      {activeTab === 'overview'
+                        ? 'Overview Seluruh Tim'
+                        : team?.name || 'Pilih Tim'}
+                    </h1>
+                    <ChevronDown
+                      size={14}
+                      color="var(--text-muted)"
+                      style={{
+                        transform: showHeaderTeamSwitcher ? 'rotate(180deg)' : 'none',
+                        transition: 'transform 0.2s ease',
+                        flexShrink: 0,
+                      }}
+                    />
+                  </div>
+                  <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block', maxWidth: 170 }}>
+                    @{team?.username || 'tim'} • Ganti Tim
+                  </span>
                 </div>
-              )}
-              <div style={{ minWidth: 0 }}>
-                <h1 style={{ fontSize: '0.95rem', fontWeight: 800, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--text-main)' }}>
-                  {activeTab === 'overview'
-                    ? 'Overview Seluruh Tim'
-                    : activeTab === 'tasks'
-                    ? `${team?.name} • Tugas & Deadline`
-                    : activeTab === 'research'
-                    ? `${team?.name} • Materi & Riset`
-                    : `${team?.name} • Pengaturan`}
-                </h1>
-                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block', maxWidth: 180 }}>
-                  @{team?.username}
-                </span>
               </div>
+
+              {/* Dropdown Menu Ganti Tim dari Header */}
+              {showHeaderTeamSwitcher && (
+                <>
+                  {/* Backdrop Click Outside */}
+                  <div
+                    style={{
+                      position: 'fixed',
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      zIndex: 280,
+                    }}
+                    onClick={() => setShowHeaderTeamSwitcher(false)}
+                  />
+                  <div
+                    className="card header-team-dropdown"
+                    style={{
+                      position: 'absolute',
+                      top: 'calc(100% + 8px)',
+                      left: 0,
+                      width: 290,
+                      maxWidth: 'calc(100vw - 24px)',
+                      zIndex: 290,
+                      padding: '8px',
+                      boxShadow: '0 12px 30px -5px rgba(0, 0, 0, 0.35), 0 8px 12px -6px rgba(0, 0, 0, 0.2)',
+                      background: 'var(--surface)',
+                      border: '1px solid var(--surface-border)',
+                      borderRadius: 'var(--radius-md)',
+                      maxHeight: 380,
+                      overflowY: 'auto',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 8px 6px' }}>
+                      <span style={{ fontSize: '0.72rem', fontWeight: 800, textTransform: 'uppercase', color: 'var(--text-muted)' }}>
+                        Pilih / Ganti Tim ({userTeams.length})
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowHeaderTeamSwitcher(false);
+                          setActiveTab('overview');
+                        }}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: 'var(--primary)',
+                          fontSize: '0.72rem',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          padding: '2px 4px',
+                        }}
+                      >
+                        Semua Tim
+                      </button>
+                    </div>
+
+                    {userTeams.length === 0 ? (
+                      <div style={{ padding: '16px 10px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.8rem' }}>
+                        Belum ada tim yang diikuti
+                      </div>
+                    ) : (
+                      userTeams.map((ut) => {
+                        const isCurrent = ut.username === team?.username;
+                        return (
+                          <div
+                            key={ut.id}
+                            onClick={() => {
+                              setShowHeaderTeamSwitcher(false);
+                              if (activeTab === 'overview') {
+                                setActiveTab('tasks');
+                              }
+                              if (ut.username !== team?.username) {
+                                router.push(`/team/${ut.username}`);
+                              }
+                            }}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 10,
+                              padding: '8px 10px',
+                              borderRadius: 8,
+                              cursor: 'pointer',
+                              background: isCurrent ? 'var(--primary-light)' : 'transparent',
+                              color: isCurrent ? 'var(--primary)' : 'var(--text-main)',
+                              transition: 'background 0.15s ease',
+                              marginBottom: 3,
+                            }}
+                          >
+                            {ut.avatar_url ? (
+                              <img src={ut.avatar_url} alt={ut.name} className="avatar-photo" style={{ width: 32, height: 32, flexShrink: 0, borderRadius: 8, objectFit: 'cover' }} />
+                            ) : (
+                              <div className="team-avatar-header" style={{ width: 32, height: 32, fontSize: '0.8rem', flexShrink: 0, borderRadius: 8 }}>
+                                {ut.name.slice(0, 2).toUpperCase()}
+                              </div>
+                            )}
+                            <div style={{ minWidth: 0, flex: 1 }}>
+                              <div style={{ fontSize: '0.84rem', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {ut.name}
+                              </div>
+                              <div style={{ fontSize: '0.7rem', color: isCurrent ? 'var(--primary)' : 'var(--text-muted)' }}>
+                                @{ut.username} {ut.user_role === 'ketua' ? '• 👑 Ketua' : ''}
+                              </div>
+                            </div>
+                            {isCurrent && <Check size={15} color="var(--primary)" style={{ flexShrink: 0 }} />}
+                          </div>
+                        );
+                      })
+                    )}
+
+                    <div style={{ borderTop: '1px solid var(--surface-border)', marginTop: 6, paddingTop: 6, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowHeaderTeamSwitcher(false);
+                          setShowCreateTeamModal(true);
+                        }}
+                        className="btn btn-secondary btn-sm"
+                        style={{ width: '100%', justifyContent: 'flex-start', fontSize: '0.78rem', padding: '6px 10px', fontWeight: 600 }}
+                      >
+                        <PlusCircle size={14} /> Buat Tim Baru
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowHeaderTeamSwitcher(false);
+                          setShowJoinTeamModal(true);
+                        }}
+                        className="btn btn-secondary btn-sm"
+                        style={{ width: '100%', justifyContent: 'flex-start', fontSize: '0.78rem', padding: '6px 10px', fontWeight: 600 }}
+                      >
+                        <UserPlus size={14} /> Gabung Tim Lain
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
 
             {/* Kanan Atas: Notifikasi, Theme Toggle & Profil */}
