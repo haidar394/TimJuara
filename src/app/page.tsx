@@ -164,7 +164,7 @@ export default function HomePage() {
                 </h1>
 
                 <p style={{ fontSize: '1.25rem', color: '#334155', lineHeight: 1.5, marginBottom: 30, maxWidth: 520 }}>
-                  Aplikasi simpel dan ramah pengguna baru untuk membagi peran kelompok, memantau deadline otomatis via WhatsApp Bot, dan memastikan semua anggota berkontribusi tanpa beban.
+                  Aplikasi simpel dan ramah pengguna baru untuk membagi peran kelompok, memantau deadline otomatis via WhatsApp Bot, dan memastikan setiap anggota berkontribusi secara nyata, adil, dan teratur.
                 </p>
 
                 <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginBottom: 32 }}>
@@ -286,9 +286,9 @@ export default function HomePage() {
 
                       {/* Rubber Stamp */}
                       <div className="nop-stamp" style={{ flexShrink: 0 }}>
-                        <span>BEBAS</span>
-                        <span style={{ fontSize: '0.85rem' }}>BEBAN</span>
-                        <span>KELOMPOK</span>
+                        <span>KOLABORASI</span>
+                        <span style={{ fontSize: '0.85rem' }}>SOLID</span>
+                        <span>JUARA</span>
                       </div>
                     </div>
 
@@ -305,7 +305,7 @@ export default function HomePage() {
                         lineHeight: 1.35,
                       }}
                     >
-                      TJD&lt;TIMJUARA&lt;BEBAS&lt;BEBAN&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;
+                      TJD&lt;TIMJUARA&lt;SOLID&lt;JUARA&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;
                       <br />
                       DEADLINE&lt;AMAN&lt;{new Date().getFullYear()}&lt;JUARA&lt;BERSAMA&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;
                     </div>
@@ -326,11 +326,11 @@ export default function HomePage() {
         <section id="problem" style={{ padding: '60px 0 72px' }}>
           <div className="container" style={{ maxWidth: 1040, textAlign: 'center' }}>
             <p className="font-typewriter" style={{ color: '#dc2626', fontSize: '0.85rem', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 12 }}>
-              THE PROBLEM · MASALAH KLASIK KELOMPOK
+              THE CHALLENGE · TANTANGAN KOORDINASI TIM
             </p>
 
             <h2 style={{ fontSize: 'clamp(2rem, 4.5vw, 3rem)', fontWeight: 700, marginBottom: 38 }}>
-              Kamu pasti pernah <span className="nop-highlight">kena beban kelompok.</span>
+              Pernah merasa kerja kelompok <span className="nop-highlight">kurang terkoordinasi?</span>
             </h2>
 
             {/* 3 Comic Panels */}
@@ -344,7 +344,7 @@ export default function HomePage() {
                   Tugas Baru Dibagi.
                 </h3>
                 <p style={{ margin: 0, fontSize: '1.05rem', color: '#64748b', lineHeight: 1.45 }}>
-                  Semua anggota bilang &quot;siap gas!&quot; di grup chat. Suasana masih sangat optimis dan penuh semangat.
+                  Semua anggota antusias di grup chat. Suasana sangat optimis untuk memulai proyek bersama.
                 </p>
               </div>
 
@@ -354,10 +354,10 @@ export default function HomePage() {
                   :/
                 </div>
                 <h3 style={{ fontSize: '1.35rem', fontWeight: 700, marginBottom: 6 }}>
-                  H-3 Sebelum Deadline.
+                  Menjelang Deadline.
                 </h3>
                 <p style={{ margin: 0, fontSize: '1.05rem', color: '#64748b', lineHeight: 1.45 }}>
-                  Grup WhatsApp sepi senyap. Ditanya progres pura-pura ga baca atau tiba-tiba izin sibuk acara keluarga.
+                  Koordinasi mulai terhambat, pembagian progres kurang jelas, dan tidak ada pengingat otomatis.
                 </p>
               </div>
 
@@ -367,10 +367,10 @@ export default function HomePage() {
                   :(
                 </div>
                 <h3 style={{ fontSize: '1.35rem', fontWeight: 700, marginBottom: 6 }}>
-                  H-1 Jam 23:59 Malam.
+                  H-1 Pengumpulan.
                 </h3>
                 <p style={{ margin: 0, fontSize: '1.05rem', color: '#64748b', lineHeight: 1.45 }}>
-                  Akhirnya kamu yang begadang ngerjain tugas bagian mereka sendirian sambil menahan emosi.
+                  Kerepotan merapikan tugas di jam-jam terakhir karena tidak ada pencatatan progres yang terpusat.
                 </p>
               </div>
             </div>
@@ -476,7 +476,7 @@ export default function HomePage() {
                   Leaderboard Kontribusi
                 </h3>
                 <p style={{ margin: 0, fontSize: '1rem', color: '#475569', lineHeight: 1.5 }}>
-                  Statistik transparan siapa yang paling aktif dan berkontribusi. Menghilangkan fenomena &ldquo;numpang nama&rdquo; selamanya.
+                  Statistik transparan siapa yang paling aktif dan berkontribusi. Menjadikan apresiasi kerja tim lebih objektif, adil, dan memotivasi.
                 </p>
               </div>
 
@@ -568,16 +568,16 @@ export default function HomePage() {
               {/* Tier 3 */}
               <div className="nop-hand-card" style={{ padding: '28px 24px', textAlign: 'left', background: '#ffffff' }}>
                 <p className="font-typewriter" style={{ fontSize: '0.78rem', color: '#dc2626', textTransform: 'uppercase', margin: '0 0 10px' }}>
-                  PAKET ANTI BEBAN KELOMPOK
+                  PAKET KOLABORASI SOLID & ADIL
                 </p>
                 <div className="font-typewriter" style={{ fontSize: '2.6rem', fontWeight: 800, marginBottom: 8 }}>
                   Rp 0
                 </div>
                 <p style={{ fontSize: '1rem', color: '#64748b', lineHeight: 1.4, marginBottom: 16 }}>
-                  Untuk kamu yang lelah carry tugas teman sendirian dan butuh transparansi.
+                  Untuk tim yang ingin setiap kontribusi tercatat jelas, adil, dan saling mendukung.
                 </p>
                 <div style={{ borderTop: '1px dashed #cbd5e1', paddingTop: 14, fontSize: '0.95rem' }}>
-                  Fitur: <strong>Statistik kontribusi transparan & evaluasi anggota.</strong>
+                  Fitur: <strong>Statistik kontribusi transparan & evaluasi kerja tim.</strong>
                 </div>
               </div>
 
