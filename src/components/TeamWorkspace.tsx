@@ -186,6 +186,10 @@ export default function TeamWorkspace() {
   const [isTestingTeamGroup, setIsTestingTeamGroup] = useState(false);
   const [isSendingGroupRecap, setIsSendingGroupRecap] = useState(false);
   const [sendingTeamReminders, setSendingTeamReminders] = useState(false);
+  const [showUserMenuPopover, setShowUserMenuPopover] = useState(false);
+  const [teamWaRemindersEnabled, setTeamWaRemindersEnabled] = useState(true);
+  const [savingTeamWaSettings, setSavingTeamWaSettings] = useState(false);
+  const [teamWaCustomToken, setTeamWaCustomToken] = useState('');
 
   // Unread Comments Tracking (task_id -> last_known_count)
   const [readCommentsMap, setReadCommentsMap] = useState<Record<string, number>>({});
@@ -579,6 +583,8 @@ export default function TeamWorkspace() {
 
     setTeam(teamData);
     setTeamAvatarUrl(teamData.avatar_url || '');
+    setTeamWaRemindersEnabled(teamData.wa_notifications_enabled !== false);
+    setTeamWaCustomToken(teamData.wa_gateway_token || '');
     setMembers(membersData);
 
     // Sinkronisasi Time Tracker dari Cloud & Local Storage
@@ -832,13 +838,30 @@ export default function TeamWorkspace() {
     }
   };
 
+  const handleLogout = async () => {
+    try {
+      await signOutUser();
+      router.push('/auth');
+    } catch {
+      router.push('/auth');
+    }
+  };
+
   const handleManualTriggerTeamReminders = async () => {
     if (!team) return;
     setSendingTeamReminders(true);
     try {
-      const res = await triggerDeadlineReminders(team.id, true);
+      const res = await triggerDeadlineReminders(team.id, true, team.wa_gateway_token || globalWaToken);
       if (res.success) {
-        showToast(`📢 Bot WhatsApp: Berhasil mengirim ${res.sentCount || 0} pengingat deadline ke WhatsApp tim!`);
+        if (res.sentCount && res.sentCount > 0) {
+          showToast(`📢 Bot WhatsApp: Berhasil mengirim ${res.sentCount} pengingat deadline ke WhatsApp tim!`);
+        } else if (res.details && res.details.length > 0) {
+          const firstSkip = res.details.find((d: any) => d.status === 'skipped');
+          const reason = firstSkip?.reason || 'Tidak ada tugas yang mendekati batas waktu atau nomor WA belum diisi.';
+          showToast(`ℹ️ Pengingat tidak terkirim: ${reason}`);
+        } else {
+          showToast(`ℹ️ ${res.message || 'Tidak ada tugas yang memerlukan pengingat saat ini.'}`);
+        }
         if (currentUser) {
           loadNotifications(currentUser.id);
         }
@@ -849,6 +872,49 @@ export default function TeamWorkspace() {
       showToast('Gagal mengirim pengingat: ' + err.message);
     } finally {
       setSendingTeamReminders(false);
+    }
+  };
+
+  const handleToggleTeamWaReminders = async (enabled: boolean) => {
+    if (!team) return;
+    setSavingTeamWaSettings(true);
+    setTeamWaRemindersEnabled(enabled);
+    try {
+      const res = await updateTeamWhatsAppConfig(team.id, {
+        wa_notifications_enabled: enabled,
+        wa_gateway_token: teamWaCustomToken.trim() || undefined,
+      });
+      if (res.success) {
+        setTeam((prev) => prev ? { ...prev, wa_notifications_enabled: enabled } : null);
+        showToast(enabled ? 'Pengingat deadline WhatsApp otomatis jam 08:00 WIB diaktifkan! 🔔' : 'Pengingat deadline WhatsApp dinonaktifkan.');
+      } else {
+        showToast(`Gagal memperbarui pengaturan: ${res.error}`);
+      }
+    } catch {
+      showToast('Terjadi kesalahan saat menyimpan pengaturan pengingat');
+    } finally {
+      setSavingTeamWaSettings(false);
+    }
+  };
+
+  const handleSaveTeamCustomToken = async () => {
+    if (!team) return;
+    setSavingTeamWaSettings(true);
+    try {
+      const res = await updateTeamWhatsAppConfig(team.id, {
+        wa_gateway_token: teamWaCustomToken.trim() || undefined,
+        wa_notifications_enabled: teamWaRemindersEnabled,
+      });
+      if (res.success) {
+        setTeam((prev) => prev ? { ...prev, wa_gateway_token: teamWaCustomToken.trim() || undefined } : null);
+        showToast('Token WhatsApp Gateway tim berhasil disimpan! 🤖');
+      } else {
+        showToast(`Gagal: ${res.error}`);
+      }
+    } catch {
+      showToast('Gagal menyimpan token');
+    } finally {
+      setSavingTeamWaSettings(false);
     }
   };
 
@@ -877,6 +943,7 @@ export default function TeamWorkspace() {
   const isKetua = currentMember?.role === 'ketua' || (team && currentUser && team.created_by === currentUser.id);
   const isMasterAdminUser = isMasterAdmin(currentUser);
   const canManageMembers = isKetua || isMasterAdminUser;
+  const membersWithWaCount = members.filter((m) => Boolean(m.profile?.phone_number?.trim())).length;
 
   // Copy Team Username / Invite Link
   const handleCopyCode = () => {
@@ -3125,23 +3192,125 @@ export default function TeamWorkspace() {
                 {isDarkMode ? <Sun size={17} color="#f59e0b" /> : <Moon size={17} color="#6366f1" />}
               </button>
 
-              {/* User Avatar Mini */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, paddingLeft: 6, borderLeft: '1px solid var(--surface-border)' }}>
-                {currentUser?.avatar_url ? (
-                  <img
-                    src={currentUser.avatar_url}
-                    alt={currentUser.full_name}
-                    className="avatar-photo"
-                    style={{ width: 32, height: 32 }}
-                  />
-                ) : (
-                  <div className="avatar-badge" style={{ width: 32, height: 32, fontSize: '0.75rem' }}>
-                    {currentUser?.full_name?.slice(0, 2).toUpperCase() || 'AG'}
-                  </div>
+              {/* Tombol Logout Cepat di Mobile */}
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="theme-toggle-btn mobile-logout-btn"
+                style={{
+                  width: 36,
+                  height: 36,
+                  color: '#ef4444',
+                  borderColor: isDarkMode ? 'rgba(239, 68, 68, 0.4)' : '#fca5a5',
+                  background: isDarkMode ? 'rgba(239, 68, 68, 0.12)' : '#fef2f2',
+                }}
+                title="Keluar dari Akun (Logout)"
+              >
+                <LogOut size={16} />
+              </button>
+
+              {/* User Avatar Mini with Popover Dropdown */}
+              <div style={{ position: 'relative' }}>
+                <div
+                  onClick={() => setShowUserMenuPopover((prev) => !prev)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    paddingLeft: 6,
+                    borderLeft: '1px solid var(--surface-border)',
+                    cursor: 'pointer',
+                    userSelect: 'none',
+                  }}
+                  title="Menu Profil & Sesi Akun"
+                >
+                  {currentUser?.avatar_url ? (
+                    <img
+                      src={currentUser.avatar_url}
+                      alt={currentUser.full_name}
+                      className="avatar-photo"
+                      style={{ width: 32, height: 32, borderRadius: '50%' }}
+                    />
+                  ) : (
+                    <div className="avatar-badge" style={{ width: 32, height: 32, fontSize: '0.75rem' }}>
+                      {currentUser?.full_name?.slice(0, 2).toUpperCase() || 'AG'}
+                    </div>
+                  )}
+                  <span className="hide-mobile" style={{ fontSize: '0.825rem', fontWeight: 700, color: 'var(--text-main)', maxWidth: 110, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {currentUser?.full_name?.split(' ')[0]}
+                  </span>
+                  <ChevronDown size={13} color="var(--text-muted)" className="hide-mobile" />
+                </div>
+
+                {showUserMenuPopover && (
+                  <>
+                    <div
+                      style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 290 }}
+                      onClick={() => setShowUserMenuPopover(false)}
+                    />
+                    <div
+                      className="card"
+                      style={{
+                        position: 'absolute',
+                        top: 'calc(100% + 10px)',
+                        right: 0,
+                        width: 250,
+                        zIndex: 300,
+                        padding: '12px',
+                        borderRadius: 14,
+                        boxShadow: '0 16px 36px rgba(0,0,0,0.25)',
+                        border: '1px solid var(--surface-border)',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, paddingBottom: 10, borderBottom: '1px solid var(--surface-border)', marginBottom: 8 }}>
+                        {currentUser?.avatar_url ? (
+                          <img src={currentUser.avatar_url} alt="" style={{ width: 38, height: 38, borderRadius: '50%', objectFit: 'cover' }} />
+                        ) : (
+                          <div className="avatar-badge" style={{ width: 38, height: 38, fontSize: '0.85rem' }}>
+                            {currentUser?.full_name?.slice(0, 2).toUpperCase() || 'AG'}
+                          </div>
+                        )}
+                        <div style={{ minWidth: 0, flex: 1 }}>
+                          <div style={{ fontSize: '0.85rem', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {currentUser?.full_name}
+                          </div>
+                          <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {currentUser?.email || 'Akun Aktif'}
+                          </div>
+                          <span style={{ fontSize: '0.65rem', fontWeight: 700, color: isKetua ? '#b45309' : '#166534', background: isKetua ? '#fef3c7' : '#dcfce7', padding: '1px 6px', borderRadius: 99, display: 'inline-block', marginTop: 3 }}>
+                            {isKetua ? '👑 Ketua Tim' : '👤 Anggota Tim'}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setActiveTab('settings');
+                            setShowUserMenuPopover(false);
+                          }}
+                          className="btn btn-secondary btn-sm"
+                          style={{ width: '100%', justifyContent: 'flex-start', fontSize: '0.8rem', padding: '8px 10px', gap: 8 }}
+                        >
+                          <Settings size={14} /> Edit Profil & Pengaturan
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowUserMenuPopover(false);
+                            handleLogout();
+                          }}
+                          className="btn btn-danger btn-sm"
+                          style={{ width: '100%', justifyContent: 'flex-start', fontSize: '0.8rem', padding: '8px 10px', gap: 8, background: '#ef4444', color: '#ffffff' }}
+                        >
+                          <LogOut size={14} /> Keluar dari Akun
+                        </button>
+                      </div>
+                    </div>
+                  </>
                 )}
-                <span className="hide-mobile" style={{ fontSize: '0.825rem', fontWeight: 700, color: 'var(--text-main)', maxWidth: 110, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {currentUser?.full_name?.split(' ')[0]}
-                </span>
               </div>
             </div>
           </div>
@@ -3439,25 +3608,66 @@ export default function TeamWorkspace() {
                     
                     {/* Widget: Reminders Card */}
                     <div className="card" style={{ padding: '22px 24px', borderRadius: 20 }}>
-                      <div style={{ fontSize: '0.78rem', fontWeight: 800, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 8, letterSpacing: '0.04em' }}>
-                        Reminders
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, flexWrap: 'wrap', gap: 6 }}>
+                        <div style={{ fontSize: '0.78rem', fontWeight: 800, textTransform: 'uppercase', color: 'var(--text-muted)', letterSpacing: '0.04em' }}>
+                          Pengingat Deadline
+                        </div>
+                        {team?.wa_notifications_enabled !== false ? (
+                          <span className="badge badge-success" style={{ fontSize: '0.7rem', padding: '3px 8px', display: 'flex', alignItems: 'center', gap: 4 }}>
+                            🟢 Bot Aktif (08:00 WIB)
+                          </span>
+                        ) : (
+                          <span className="badge badge-neutral" style={{ fontSize: '0.7rem', padding: '3px 8px' }}>
+                            ⚪ Dinonaktifkan
+                          </span>
+                        )}
                       </div>
+
                       <h4 style={{ fontSize: '1.05rem', fontWeight: 800, margin: '0 0 6px', color: 'var(--text-main)' }}>
                         Otomasi Deadline Jam 08:00 WIB
                       </h4>
-                      <p style={{ margin: '0 0 16px', fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: 1.45 }}>
-                        Bot memindai tugas yang mendekati batas waktu setiap pagi dan mengirim notifikasi langsung ke WhatsApp anggota.
+                      <p style={{ margin: '0 0 14px', fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: 1.45 }}>
+                        Bot otomatis memindai seluruh tugas yang mendekati batas waktu (H-1, Hari H, & Terlewat) setiap pukul 08:00 WIB dan mengirim pesan ke WhatsApp anggota.
                       </p>
-                      <button
-                        type="button"
-                        onClick={handleManualTriggerTeamReminders}
-                        disabled={sendingTeamReminders}
-                        className="donezo-btn-primary"
-                        style={{ width: '100%', justifyContent: 'center', padding: '10px 16px', borderRadius: 12 }}
-                      >
-                        <RefreshCw size={14} className={sendingTeamReminders ? 'animate-spin' : ''} />
-                        {sendingTeamReminders ? 'Mengirim Pengingat...' : 'Kirim Pengingat Sekarang'}
-                      </button>
+
+                      {/* Info Kesiapan Anggota & Bot */}
+                      <div style={{ background: 'var(--surface-secondary)', border: '1px solid var(--surface-border)', borderRadius: 12, padding: '10px 12px', marginBottom: 14, fontSize: '0.75rem', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ color: 'var(--text-muted)' }}>📱 Nomor WA Anggota:</span>
+                          <strong style={{ color: membersWithWaCount === members.length ? '#16a34a' : '#d97706' }}>
+                            {membersWithWaCount}/{members.length} Terdaftar
+                          </strong>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ color: 'var(--text-muted)' }}>🤖 WhatsApp Gateway:</span>
+                          <strong style={{ color: '#16a34a' }}>
+                            {team?.wa_gateway_token ? 'Bot Mandiri Tim' : (globalWaToken ? 'Bot Platform TimJuara' : 'Siap Otomatis')}
+                          </strong>
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <button
+                          type="button"
+                          onClick={handleManualTriggerTeamReminders}
+                          disabled={sendingTeamReminders}
+                          className="donezo-btn-primary"
+                          style={{ flex: 1, justifyContent: 'center', padding: '10px 14px', borderRadius: 12, fontSize: '0.8rem' }}
+                          title="Pindai sekarang dan kirimkan pengingat ke WhatsApp seluruh anggota"
+                        >
+                          <RefreshCw size={14} className={sendingTeamReminders ? 'animate-spin' : ''} />
+                          {sendingTeamReminders ? 'Mengirim...' : 'Kirim Pengingat Sekarang'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setActiveTab('settings')}
+                          className="btn btn-secondary"
+                          style={{ borderRadius: 12, padding: '10px 12px', fontSize: '0.8rem' }}
+                          title="Buka Pengaturan Bot WhatsApp"
+                        >
+                          <Settings size={14} />
+                        </button>
+                      </div>
                     </div>
 
                     {/* Widget: Project Progress (Semi-Circular Donut Gauge) */}
@@ -5228,6 +5438,149 @@ export default function TeamWorkspace() {
                 </div>
               </div>
 
+              {/* WhatsApp Deadline Reminder Automation Card */}
+              <div
+                className="card"
+                style={{
+                  padding: '22px 24px',
+                  marginBottom: 24,
+                  border: teamWaRemindersEnabled
+                    ? (isDarkMode ? '1px solid rgba(22, 163, 74, 0.35)' : '1px solid #bbf7d0')
+                    : '1px solid var(--surface-border)',
+                  background: teamWaRemindersEnabled
+                    ? (isDarkMode ? 'rgba(22, 163, 74, 0.08)' : '#f0fdf4')
+                    : 'var(--surface)',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 14 }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14, minWidth: 260, flex: 1 }}>
+                    <div
+                      style={{
+                        width: 48,
+                        height: 48,
+                        borderRadius: 14,
+                        background: teamWaRemindersEnabled ? (isDarkMode ? 'rgba(34, 197, 94, 0.2)' : '#dcfce7') : 'var(--surface-secondary)',
+                        color: teamWaRemindersEnabled ? (isDarkMode ? '#4ade80' : '#16a34a') : 'var(--text-muted)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0,
+                      }}
+                    >
+                      <Bot size={26} />
+                    </div>
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 4 }}>
+                        <h3 style={{ fontSize: '1.15rem', fontWeight: 800, margin: 0 }}>Pengingat Deadline Otomatis (Bot WA)</h3>
+                        {teamWaRemindersEnabled ? (
+                          <span className="badge badge-success" style={{ fontSize: '0.75rem' }}>
+                            🟢 Aktif (Setiap 08:00 WIB)
+                          </span>
+                        ) : (
+                          <span className="badge badge-neutral" style={{ fontSize: '0.75rem' }}>
+                            ⚪ Dinonaktifkan
+                          </span>
+                        )}
+                      </div>
+                      <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: 0, lineHeight: 1.5 }}>
+                        Bot WhatsApp otomatis memindai seluruh tugas yang berstatus <strong>H-1 (besok)</strong>, <strong>Hari H (hari ini)</strong>, dan <strong>Terlewat</strong> setiap pukul <strong>08:00 WIB</strong>, lalu mengirim pesan pengingat langsung ke nomor WhatsApp penanggung jawab tugas (PIC).
+                      </p>
+                    </div>
+                  </div>
+
+                  {canManageMembers && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', userSelect: 'none', fontSize: '0.875rem', fontWeight: 700 }}>
+                        <input
+                          type="checkbox"
+                          checked={teamWaRemindersEnabled}
+                          onChange={(e) => handleToggleTeamWaReminders(e.target.checked)}
+                          disabled={savingTeamWaSettings}
+                          style={{ width: 18, height: 18, accentColor: '#16a34a', cursor: 'pointer' }}
+                        />
+                        {teamWaRemindersEnabled ? 'Otomasi Aktif' : 'Otomasi Mati'}
+                      </label>
+                    </div>
+                  )}
+                </div>
+
+                {/* Status Kesiapan Anggota & Kontak */}
+                <div style={{ marginTop: 18, paddingTop: 16, borderTop: '1px solid var(--surface-border)', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 14 }}>
+                  <div style={{ background: 'var(--surface-secondary)', border: '1px solid var(--surface-border)', borderRadius: 12, padding: '12px 14px' }}>
+                    <div style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 4 }}>
+                      📱 Kesiapan Nomor WhatsApp Anggota
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                      <span style={{ fontSize: '0.92rem', fontWeight: 700, color: 'var(--text-main)' }}>
+                        {membersWithWaCount} dari {members.length} Anggota Siap
+                      </span>
+                      <span className={`badge ${membersWithWaCount === members.length ? 'badge-success' : 'badge-warning'}`} style={{ fontSize: '0.7rem' }}>
+                        {membersWithWaCount === members.length ? '100% Lengkap' : `${members.length - membersWithWaCount} Belum Isi`}
+                      </span>
+                    </div>
+                    {members.some(m => !m.profile?.phone_number?.trim()) ? (
+                      <p style={{ margin: 0, fontSize: '0.75rem', color: '#d97706' }}>
+                        ⚠️ Ada anggota tim yang belum mengisi nomor WhatsApp di profil. Minta rekan tim mengisi nomor WA di tab <strong>Edit Profil Saya</strong> agar bisa menerima pesan bot.
+                      </p>
+                    ) : (
+                      <p style={{ margin: 0, fontSize: '0.75rem', color: '#16a34a' }}>
+                        ✅ Seluruh anggota tim sudah memiliki nomor WhatsApp terdaftar!
+                      </p>
+                    )}
+                  </div>
+
+                  <div style={{ background: 'var(--surface-secondary)', border: '1px solid var(--surface-border)', borderRadius: 12, padding: '12px 14px' }}>
+                    <div style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 4 }}>
+                      🤖 Gateway Pengiriman Bot
+                    </div>
+                    <div style={{ fontSize: '0.92rem', fontWeight: 700, color: 'var(--text-main)', marginBottom: 4 }}>
+                      {team.wa_gateway_token ? '🔑 Bot Token Khusus Tim' : '☁️ Bot Platform TimJuara'}
+                    </div>
+                    <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                      {team.wa_gateway_token
+                        ? 'Tim Anda menggunakan token Fonnte mandiri.'
+                        : 'Menggunakan koneksi gateway bot WhatsApp terpusat platform TimJuara (bebas biaya).'}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Tombol Aksi Pengingat */}
+                <div style={{ marginTop: 16, display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center' }}>
+                  <button
+                    type="button"
+                    onClick={handleManualTriggerTeamReminders}
+                    disabled={sendingTeamReminders}
+                    className="btn btn-primary"
+                    style={{ background: '#16a34a', borderColor: '#16a34a', display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.85rem' }}
+                  >
+                    <RefreshCw size={14} className={sendingTeamReminders ? 'animate-spin' : ''} />
+                    {sendingTeamReminders ? 'Memindai & Mengirim...' : 'Kirim Pengingat Sekarang (Pindai Semua Tugas)'}
+                  </button>
+
+                  {canManageMembers && (
+                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                      <input
+                        type="password"
+                        placeholder="Token Fonnte tim (opsional)..."
+                        value={teamWaCustomToken}
+                        onChange={(e) => setTeamWaCustomToken(e.target.value)}
+                        className="form-input"
+                        style={{ width: 220, padding: '6px 12px', fontSize: '0.8rem' }}
+                      />
+                      <button
+                        type="button"
+                        onClick={handleSaveTeamCustomToken}
+                        disabled={savingTeamWaSettings}
+                        className="btn btn-secondary btn-sm"
+                        style={{ fontSize: '0.8rem' }}
+                      >
+                        Simpan Token
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
               {/* Members Table */}
               <div className="card" style={{ padding: '24px 20px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18, flexWrap: 'wrap', gap: 10 }}>
@@ -5595,6 +5948,49 @@ export default function TeamWorkspace() {
                       </div>
                     </form>
                   </div>
+                </div>
+              </div>
+
+              {/* Sesi Akun & Tombol Logout */}
+              <div
+                className="card"
+                style={{
+                  padding: '22px 24px',
+                  marginTop: 24,
+                  border: isDarkMode ? '1px solid rgba(239, 68, 68, 0.35)' : '1px solid #fecaca',
+                  background: isDarkMode ? 'rgba(239, 68, 68, 0.08)' : '#fef2f2',
+                  borderRadius: 'var(--radius-lg)',
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
+                  <div>
+                    <h4 style={{ fontSize: '1.05rem', fontWeight: 800, color: '#dc2626', margin: '0 0 4px', display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <LogOut size={18} color="#ef4444" /> Sesi Akun
+                    </h4>
+                    <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: 0 }}>
+                      Saat ini Anda masuk sebagai <strong>{currentUser?.full_name}</strong> ({currentUser?.email || 'Akun TimJuara'}).
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleLogout}
+                    className="btn btn-danger"
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      padding: '10px 20px',
+                      fontWeight: 700,
+                      fontSize: '0.875rem',
+                      background: '#ef4444',
+                      color: '#ffffff',
+                      border: 'none',
+                      borderRadius: 10,
+                      boxShadow: '0 4px 12px rgba(239, 68, 68, 0.25)',
+                    }}
+                  >
+                    <LogOut size={16} /> Keluar dari Akun
+                  </button>
                 </div>
               </div>
             </div>

@@ -1020,13 +1020,15 @@ export async function sendTestWhatsAppMessage(
 
 export async function triggerDeadlineReminders(
   teamId?: string,
-  force: boolean = false
-): Promise<{ success: boolean; error: string | null; sentCount?: number; skippedCount?: number; message?: string }> {
+  force: boolean = false,
+  token?: string
+): Promise<{ success: boolean; error: string | null; sentCount?: number; skippedCount?: number; message?: string; details?: any[] }> {
   try {
+    const tokenToUse = token || (typeof window !== 'undefined' ? (localStorage.getItem('timjuara_fonnte_token') || localStorage.getItem('master_wa_token') || undefined) : undefined);
     const res = await fetch('/api/whatsapp/remind', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ teamId, force }),
+      body: JSON.stringify({ teamId, force, token: tokenToUse }),
     });
 
     const data = await res.json();
@@ -1039,6 +1041,7 @@ export async function triggerDeadlineReminders(
       sentCount: data.sentCount,
       skippedCount: data.skippedCount,
       message: data.message,
+      details: data.details,
     };
   } catch (err: any) {
     return { success: false, error: err.message || 'Terjadi kesalahan jaringan saat memicu pengingat.' };

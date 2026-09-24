@@ -2777,3 +2777,13 @@ button, input, select, textarea {
   }
 }
 
+.mobile-logout-btn {
+  display: none !important;
+}
+
+@media (max-width: 860px) {
+  .mobile-logout-btn {
+    display: flex !important;
+  }
+}
+

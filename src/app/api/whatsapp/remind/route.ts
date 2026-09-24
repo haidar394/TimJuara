@@ -14,12 +14,14 @@ async function handleReminders(request: Request) {
   try {
     let teamIdFilter: string | undefined;
     let forceSend = false;
+    let requestToken: string | undefined;
 
     if (request.method === 'POST') {
       try {
         const body = await request.json();
         teamIdFilter = body.teamId;
         forceSend = Boolean(body.force);
+        requestToken = body.token;
       } catch {
         // Body opsional jika dipanggil tanpa payload
       }
@@ -27,6 +29,11 @@ async function handleReminders(request: Request) {
       const url = new URL(request.url);
       teamIdFilter = url.searchParams.get('teamId') || undefined;
       forceSend = url.searchParams.get('force') === 'true';
+      requestToken = url.searchParams.get('token') || undefined;
+    }
+
+    if (requestToken && typeof requestToken === 'string' && requestToken.trim().length > 5) {
+      globalThis.__GLOBAL_FONNTE_TOKEN__ = requestToken.trim();
     }
 
     if (!isSupabaseConfigured || !supabase) {
@@ -85,8 +92,8 @@ async function handleReminders(request: Request) {
     let skippedCount = 0;
     let failedCount = 0;
 
-    // Ambil token dan status global dari system_settings (Master Admin)
-    let globalFonnteToken = process.env.FONNTE_TOKEN || '';
+    // Ambil token dan status global dari request / memory cache / env / system_settings
+    let globalFonnteToken = requestToken || globalThis.__GLOBAL_FONNTE_TOKEN__ || process.env.FONNTE_TOKEN || '';
     let globalWaEnabled = true;
 
     try {
@@ -97,7 +104,10 @@ async function handleReminders(request: Request) {
 
       if (settings) {
         for (const s of settings) {
-          if (s.key === 'fonnte_token' && s.value) globalFonnteToken = s.value;
+          if (s.key === 'fonnte_token' && s.value) {
+            if (!globalFonnteToken) globalFonnteToken = s.value;
+            globalThis.__GLOBAL_FONNTE_TOKEN__ = s.value;
+          }
           if (s.key === 'wa_notifications_enabled') globalWaEnabled = s.value !== 'false';
         }
       }
@@ -105,7 +115,24 @@ async function handleReminders(request: Request) {
       console.error('Error fetching global settings in remind route:', e);
     }
 
-    if (!globalWaEnabled) {
+    // Fallback: jika masih belum ada token, cari dari tim yang memiliki wa_gateway_token
+    if (!globalFonnteToken) {
+      try {
+        const { data: teamWithToken } = await supabase
+          .from('teams')
+          .select('wa_gateway_token')
+          .not('wa_gateway_token', 'is', null)
+          .neq('wa_gateway_token', '')
+          .limit(1)
+          .maybeSingle();
+        if (teamWithToken?.wa_gateway_token) {
+          globalFonnteToken = teamWithToken.wa_gateway_token;
+          globalThis.__GLOBAL_FONNTE_TOKEN__ = globalFonnteToken;
+        }
+      } catch {}
+    }
+
+    if (!globalWaEnabled && !forceSend) {
       return NextResponse.json({
         success: false,
         message: 'Pengingat WhatsApp otomatis saat ini dinonaktifkan oleh pengaturan sistem.',
@@ -124,6 +151,20 @@ async function handleReminders(request: Request) {
     for (const t of tasks) {
       const teamInfo: any = t.teams;
       let profileInfo: any = t.profiles;
+
+      // Jika tim mematikan notifikasi WA dan bukan dipicu manual (forceSend)
+      if (teamInfo?.wa_notifications_enabled === false && !forceSend) {
+        skippedCount++;
+        results.push({
+          taskId: t.id,
+          title: t.title,
+          assignee: profileInfo?.full_name || 'Anggota Tim',
+          phone: profileInfo?.phone_number || '',
+          status: 'skipped',
+          reason: 'Pengingat WhatsApp dinonaktifkan oleh tim ini',
+        });
+        continue;
+      }
 
       // Jika assigned_to kosong tapi assigned_to_ids ada, coba ambil profil PIC pertama
       if (!profileInfo && Array.isArray(t.assigned_to_ids) && t.assigned_to_ids.length > 0) {
@@ -160,7 +201,7 @@ async function handleReminders(request: Request) {
       // - Hari ini (diffDays === 0)
       // - Besok (diffDays === 1)
       // - Terlewat (diffDays < 0)
-      // - Atau dipicu manual paksa (forceSend && diffDays <= 3)
+      // - Atau dipicu manual paksa (forceSend untuk semua tugas yang belum selesai)
       let deadlineLabel = '';
       if (diffDays === 0) {
         deadlineLabel = '🚨 *HARI INI!*';
@@ -168,10 +209,10 @@ async function handleReminders(request: Request) {
         deadlineLabel = '⏳ *BESOK*';
       } else if (diffDays < 0) {
         deadlineLabel = `⚠️ *TERLEWAT ${Math.abs(diffDays)} HARI*`;
-      } else if (forceSend && diffDays <= 3) {
-        deadlineLabel = `🗓️ *${diffDays} Hari Lagi*`;
+      } else if (forceSend) {
+        deadlineLabel = diffDays === 1 ? '⏳ *BESOK*' : `🗓️ *${diffDays} Hari Lagi*`;
       } else {
-        // Belum mendekati batas pengingat
+        // Belum mendekati batas pengingat harian otomatis
         skippedCount++;
         continue;
       }
